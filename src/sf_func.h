@@ -3,8 +3,9 @@
 #ifndef _SF_FUNC_H
 #define _SF_FUNC_H
 
-#include "common_define.h"
+#include "fastcommon/common_define.h"
 #include "sf_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

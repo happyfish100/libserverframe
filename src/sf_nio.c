@@ -14,13 +14,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include "shared_func.h"
-#include "sched_thread.h"
-#include "pthread_func.h"
-#include "logger.h"
-#include "sockopt.h"
-#include "fast_task_queue.h"
-#include "ioevent_loop.h"
+#include "fastcommon/shared_func.h"
+#include "fastcommon/sched_thread.h"
+#include "fastcommon/pthread_func.h"
+#include "fastcommon/logger.h"
+#include "fastcommon/sockopt.h"
+#include "fastcommon/fast_task_queue.h"
+#include "fastcommon/ioevent_loop.h"
 #include "sf_global.h"
 #include "sf_types.h"
 #include "sf_nio.h"
@@ -87,7 +87,7 @@ void sf_task_finish_clean_up(struct fast_task_info *pTask)
         ioevent_remove(&pTask->thread_data->ev_puller, pTask);
     }
 
-    __sync_fetch_and_sub(&g_connection_stat.current_count, 1);
+    __sync_fetch_and_sub(&g_sf_global_vars.connection_stat.current_count, 1);
     free_queue_push(pTask);
 }
 
@@ -113,15 +113,15 @@ void sf_recv_notify_read(int sock, short event, void *arg)
             break;
         }
 
-        current_connections = __sync_add_and_fetch(&g_connection_stat.
+        current_connections = __sync_add_and_fetch(&g_sf_global_vars.connection_stat.
                 current_count, 1);
-        if (current_connections > g_connection_stat.max_count) {
-            g_connection_stat.max_count = current_connections;
+        if (current_connections > g_sf_global_vars.connection_stat.max_count) {
+            g_sf_global_vars.connection_stat.max_count = current_connections;
         }
 
         pTask = (struct fast_task_info *)task_ptr;
         if (ioevent_set(pTask, pTask->thread_data, pTask->event.fd, IOEVENT_READ,
-           (IOEventCallback)client_sock_read, g_sf_network_timeout) != 0)
+           (IOEventCallback)client_sock_read, g_sf_global_vars.network_timeout) != 0)
         {
             sf_task_cleanup_func(pTask);
             continue;
@@ -210,7 +210,7 @@ static int client_sock_read(int sock, short event, void *arg)
             }
 
             pTask->event.timer.expires = g_current_time +
-                g_sf_network_timeout;
+                g_sf_global_vars.network_timeout;
             fast_timer_add(&pTask->thread_data->timer,
                 &pTask->event.timer);
         }
@@ -248,7 +248,7 @@ static int client_sock_read(int sock, short event, void *arg)
     while (1) {
         fast_timer_modify(&pTask->thread_data->timer,
             &pTask->event.timer, g_current_time +
-            g_sf_network_timeout);
+            g_sf_global_vars.network_timeout);
         if (pTask->length == 0) { //recv header
             recv_bytes = sf_header_size - pTask->offset;
         }
@@ -310,12 +310,12 @@ static int client_sock_read(int sock, short event, void *arg)
             }
 
             pTask->length += sf_header_size;
-            if (pTask->length > g_max_pkg_size) {
+            if (pTask->length > g_sf_global_vars.max_pkg_size) {
                 logError("file: "__FILE__", line: %d, "
                     "client ip: %s, pkg length: %d > "
                     "max pkg size: %d", __LINE__,
                     pTask->client_ip, pTask->length,
-                    g_max_pkg_size);
+                    g_sf_global_vars.max_pkg_size);
 
                 sf_task_cleanup_func(pTask);
                 return -1;
@@ -385,7 +385,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
     while (1) {
         fast_timer_modify(&pTask->thread_data->timer,
             &pTask->event.timer, g_current_time +
-            g_sf_network_timeout);
+            g_sf_global_vars.network_timeout);
 
         bytes = write(sock, pTask->data + pTask->offset,
                 pTask->length - pTask->offset);

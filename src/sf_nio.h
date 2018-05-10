@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fast_task_queue.h"
+#include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
 
 #ifdef __cplusplus

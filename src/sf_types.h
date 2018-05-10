@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
-#include "connection_pool.h"
+#include "fastcommon/connection_pool.h"
 
 struct fast_task_info;
 typedef void (*sf_accept_done_callback)(struct fast_task_info *pTask,

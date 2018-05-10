@@ -11,10 +11,10 @@
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include "shared_func.h"
-#include "logger.h"
-#include "sockopt.h"
-#include "http_func.h"
+#include "fastcommon/shared_func.h"
+#include "fastcommon/logger.h"
+#include "fastcommon/sockopt.h"
+#include "fastcommon/http_func.h"
 #include "sf_define.h"
 #include "sf_global.h"
 #include "sf_func.h"
@@ -95,7 +95,7 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
     if(*sock < 0) {
         return errno != 0 ? errno : ENOMEM;
     }
-    tcpsetserveropt(*sock, g_sf_network_timeout);
+    tcpsetserveropt(*sock, g_sf_global_vars.network_timeout);
 
     if ((result=tcpsetnonblockopt(*sock)) != 0) {
         close(*sock);
@@ -104,7 +104,7 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
     }
 
     if ((result=connectserverbyip_nb(*sock, ip_addr, port,
-                    g_sf_connect_timeout)) != 0)
+                    g_sf_global_vars.connect_timeout)) != 0)
     {
         close(*sock);
         *sock = -1;

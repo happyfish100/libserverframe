@@ -11,42 +11,22 @@
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include "shared_func.h"
-#include "logger.h"
-#include "common_define.h"
+#include "fastcommon/common_define.h"
+#include "fastcommon/shared_func.h"
+#include "fastcommon/logger.h"
 #include "sf_define.h"
 #include "sf_global.h"
 
-int g_sf_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
-int g_sf_network_timeout = DEFAULT_NETWORK_TIMEOUT;
-char g_sf_base_path[MAX_PATH_SIZE] = {'/', 't', 'm', 'p', '\0'};
-
-struct nio_thread_data *g_thread_data = NULL;
-volatile bool g_continue_flag = true;
-int g_outer_port = 0;
-int g_inner_port = 0;
-int g_max_connections = DEFAULT_MAX_CONNECTONS;
-int g_accept_threads = 1;
-int g_work_threads = DEFAULT_WORK_THREADS;
-int g_thread_stack_size = SF_DEF_THREAD_STACK_SIZE;
-int g_max_pkg_size = SF_DEF_MAX_PACKAGE_SIZE;
-int g_min_buff_size = SF_DEF_MIN_BUFF_SIZE;
-int g_max_buff_size = SF_DEF_MAX_BUFF_SIZE;
-int g_sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
-
-bool g_rotate_error_log = false;
-int g_log_file_keep_days = 0;
-
-gid_t g_run_by_gid;
-uid_t g_run_by_uid;
-char g_run_by_group[32] = {0};
-char g_run_by_user[32] = {0};
-time_t g_up_time = 0;
-
-char g_inner_bind_addr[IP_ADDRESS_SIZE] = {0};
-char g_outer_bind_addr[IP_ADDRESS_SIZE] = {0};
-
-SFConnectionStat g_connection_stat = {0, 0};
+SFGlobalVariables g_sf_global_vars = {
+    DEFAULT_CONNECT_TIMEOUT, DEFAULT_NETWORK_TIMEOUT,
+    {'/', 't', 'm', 'p', '\0'}, NULL, true,
+    0, 0, DEFAULT_MAX_CONNECTONS, 1,
+    DEFAULT_WORK_THREADS, SF_DEF_THREAD_STACK_SIZE,
+    SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE, SF_DEF_MAX_BUFF_SIZE,
+    SYNC_LOG_BUFF_DEF_INTERVAL, 0, 0, 0,
+    {'\0'}, {'\0'}, false, 0,
+    {'\0'}, {'\0'}, {0, 0}
+};
 
 int sf_load_config(const char *server_name, const char *filename, 
         IniContext *pIniContext, const int default_inner_port,
@@ -74,85 +54,85 @@ int sf_load_config(const char *server_name, const char *filename,
         return ENOENT;
     }
 
-    snprintf(g_sf_base_path, sizeof(g_sf_base_path), "%s", pBasePath);
-    chopPath(g_sf_base_path);
-    if (!fileExists(g_sf_base_path)) {
+    snprintf(g_sf_global_vars.base_path, sizeof(g_sf_global_vars.base_path), "%s", pBasePath);
+    chopPath(g_sf_global_vars.base_path);
+    if (!fileExists(g_sf_global_vars.base_path)) {
         logError("file: "__FILE__", line: %d, "
                 "\"%s\" can't be accessed, error info: %s",
-                __LINE__, g_sf_base_path, strerror(errno));
+                __LINE__, g_sf_global_vars.base_path, strerror(errno));
         return errno != 0 ? errno : ENOENT;
     }
-    if (!isDir(g_sf_base_path)) {
+    if (!isDir(g_sf_global_vars.base_path)) {
         logError("file: "__FILE__", line: %d, "
                 "\"%s\" is not a directory!",
-                __LINE__, g_sf_base_path);
+                __LINE__, g_sf_global_vars.base_path);
         return ENOTDIR;
     }
 
-    g_sf_connect_timeout = iniGetIntValue(NULL, "connect_timeout",
+    g_sf_global_vars.connect_timeout = iniGetIntValue(NULL, "connect_timeout",
             pIniContext, DEFAULT_CONNECT_TIMEOUT);
-    if (g_sf_connect_timeout <= 0) {
-        g_sf_connect_timeout = DEFAULT_CONNECT_TIMEOUT;
+    if (g_sf_global_vars.connect_timeout <= 0) {
+        g_sf_global_vars.connect_timeout = DEFAULT_CONNECT_TIMEOUT;
     }
 
-    g_sf_network_timeout = iniGetIntValue(NULL, "network_timeout",
+    g_sf_global_vars.network_timeout = iniGetIntValue(NULL, "network_timeout",
             pIniContext, DEFAULT_NETWORK_TIMEOUT);
-    if (g_sf_network_timeout <= 0) {
-        g_sf_network_timeout = DEFAULT_NETWORK_TIMEOUT;
+    if (g_sf_global_vars.network_timeout <= 0) {
+        g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_inner_port = iniGetIntValue(NULL, "inner_port", pIniContext,
+    g_sf_global_vars.inner_port = iniGetIntValue(NULL, "inner_port", pIniContext,
             default_inner_port);
-    if (g_inner_port <= 0) {
-        g_inner_port = default_inner_port;
+    if (g_sf_global_vars.inner_port <= 0) {
+        g_sf_global_vars.inner_port = default_inner_port;
     }
-    g_outer_port = iniGetIntValue(NULL, "outer_port", pIniContext,
+    g_sf_global_vars.outer_port = iniGetIntValue(NULL, "outer_port", pIniContext,
         default_outer_port);
-    if (g_outer_port <= 0) {
-        g_outer_port = default_outer_port;
+    if (g_sf_global_vars.outer_port <= 0) {
+        g_sf_global_vars.outer_port = default_outer_port;
     }
 
     pBindAddr = iniGetStrValue(NULL, "inner_bind_addr", pIniContext);
     if (pBindAddr == NULL) {
-        *g_inner_bind_addr = '\0';
+        *g_sf_global_vars.inner_bind_addr = '\0';
     }
     else {
-        snprintf(g_inner_bind_addr, sizeof(g_inner_bind_addr), "%s", pBindAddr);
+        snprintf(g_sf_global_vars.inner_bind_addr, sizeof(g_sf_global_vars.inner_bind_addr), "%s", pBindAddr);
     }
 
     pBindAddr = iniGetStrValue(NULL, "outer_bind_addr", pIniContext);
     if (pBindAddr == NULL) {
-        *g_outer_bind_addr = '\0';
+        *g_sf_global_vars.outer_bind_addr = '\0';
     }
     else {
-        snprintf(g_outer_bind_addr, sizeof(g_outer_bind_addr), "%s", pBindAddr);
+        snprintf(g_sf_global_vars.outer_bind_addr, sizeof(g_sf_global_vars.outer_bind_addr), "%s", pBindAddr);
     }
 
-    g_max_connections = iniGetIntValue(NULL, "max_connections",
+    g_sf_global_vars.max_connections = iniGetIntValue(NULL, "max_connections",
             pIniContext, DEFAULT_MAX_CONNECTONS);
-    if (g_max_connections <= 0) {
-        g_max_connections = DEFAULT_MAX_CONNECTONS;
+    if (g_sf_global_vars.max_connections <= 0) {
+        g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
     }
 
-    g_accept_threads = iniGetIntValue(NULL, "accept_threads",
+    g_sf_global_vars.accept_threads = iniGetIntValue(NULL, "accept_threads",
             pIniContext, 1);
-    if (g_accept_threads <= 0) {
+    if (g_sf_global_vars.accept_threads <= 0) {
         logError("file: "__FILE__", line: %d, "
                 "item \"accept_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, g_accept_threads);
+                "value: %d <= 0!", __LINE__, g_sf_global_vars.accept_threads);
         return EINVAL;
     }
 
-    g_work_threads = iniGetIntValue(NULL, "work_threads",
+    g_sf_global_vars.work_threads = iniGetIntValue(NULL, "work_threads",
             pIniContext, DEFAULT_WORK_THREADS);
-    if (g_work_threads <= 0) {
+    if (g_sf_global_vars.work_threads <= 0) {
         logError("file: "__FILE__", line: %d, "
                 "item \"work_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, g_work_threads);
+                "value: %d <= 0!", __LINE__, g_sf_global_vars.work_threads);
         return EINVAL;
     }
 
-    if ((result=set_rlimit(RLIMIT_NOFILE, g_max_connections)) != 0) {
+    if ((result=set_rlimit(RLIMIT_NOFILE, g_sf_global_vars.max_connections)) != 0) {
         return result;
     }
 
@@ -166,7 +146,7 @@ int sf_load_config(const char *server_name, const char *filename,
     {
         return result;
     }
-    g_max_pkg_size = (int)max_pkg_size;
+    g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
 
     pMinBuffSize = iniGetStrValue(NULL,
             "min_buff_size", pIniContext);
@@ -178,7 +158,7 @@ int sf_load_config(const char *server_name, const char *filename,
     {
         return result;
     }
-    g_min_buff_size = (int)min_buff_size;
+    g_sf_global_vars.min_buff_size = (int)min_buff_size;
 
     pMaxBuffSize = iniGetStrValue(NULL,
             "max_buff_size", pIniContext);
@@ -190,32 +170,32 @@ int sf_load_config(const char *server_name, const char *filename,
     {
         return result;
     }
-    g_max_buff_size = (int)max_buff_size;
+    g_sf_global_vars.max_buff_size = (int)max_buff_size;
 
     if (pMinBuffSize == NULL || pMaxBuffSize == NULL) {
-        g_min_buff_size = g_max_pkg_size;
-        g_max_buff_size = g_max_pkg_size;
+        g_sf_global_vars.min_buff_size = g_sf_global_vars.max_pkg_size;
+        g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
     }
-    else if (g_max_buff_size < g_max_pkg_size) {
-        g_max_buff_size = g_max_pkg_size;
+    else if (g_sf_global_vars.max_buff_size < g_sf_global_vars.max_pkg_size) {
+        g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
     }
 
     pRunByGroup = iniGetStrValue(NULL, "run_by_group", pIniContext);
     pRunByUser = iniGetStrValue(NULL, "run_by_user", pIniContext);
     if (pRunByGroup == NULL) {
-        *g_run_by_group = '\0';
+        *g_sf_global_vars.run_by_group = '\0';
     }
     else {
-        snprintf(g_run_by_group, sizeof(g_run_by_group),
+        snprintf(g_sf_global_vars.run_by_group, sizeof(g_sf_global_vars.run_by_group),
                 "%s", pRunByGroup);
     }
-    if (*g_run_by_group == '\0') {
-        g_run_by_gid = getegid();
+    if (*g_sf_global_vars.run_by_group == '\0') {
+        g_sf_global_vars.run_by_gid = getegid();
     }
     else {
         struct group *pGroup;
 
-        pGroup = getgrnam(g_run_by_group);
+        pGroup = getgrnam(g_sf_global_vars.run_by_group);
         if (pGroup == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -225,23 +205,23 @@ int sf_load_config(const char *server_name, const char *filename,
             return result;
         }
 
-        g_run_by_gid = pGroup->gr_gid;
+        g_sf_global_vars.run_by_gid = pGroup->gr_gid;
     }
 
     if (pRunByUser == NULL) {
-        *g_run_by_user = '\0';
+        *g_sf_global_vars.run_by_user = '\0';
     }
     else {
-        snprintf(g_run_by_user, sizeof(g_run_by_user),
+        snprintf(g_sf_global_vars.run_by_user, sizeof(g_sf_global_vars.run_by_user),
                 "%s", pRunByUser);
     }
-    if (*g_run_by_user == '\0') {
-        g_run_by_uid = geteuid();
+    if (*g_sf_global_vars.run_by_user == '\0') {
+        g_sf_global_vars.run_by_uid = geteuid();
     }
     else {
         struct passwd *pUser;
 
-        pUser = getpwnam(g_run_by_user);
+        pUser = getpwnam(g_sf_global_vars.run_by_user);
         if (pUser == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -251,18 +231,18 @@ int sf_load_config(const char *server_name, const char *filename,
             return result;
         }
 
-        g_run_by_uid = pUser->pw_uid;
+        g_sf_global_vars.run_by_uid = pUser->pw_uid;
     }
 
-    if ((result=set_run_by(g_run_by_group, g_run_by_user)) != 0) {
+    if ((result=set_run_by(g_sf_global_vars.run_by_group, g_sf_global_vars.run_by_user)) != 0) {
         return result;
     }
 
-    g_sync_log_buff_interval = iniGetIntValue(NULL,
+    g_sf_global_vars.sync_log_buff_interval = iniGetIntValue(NULL,
             "sync_log_buff_interval", pIniContext,
             SYNC_LOG_BUFF_DEF_INTERVAL);
-    if (g_sync_log_buff_interval <= 0) {
-        g_sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
+    if (g_sf_global_vars.sync_log_buff_interval <= 0) {
+        g_sf_global_vars.sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
     }
 
     pThreadStackSize = iniGetStrValue(NULL,
@@ -275,15 +255,15 @@ int sf_load_config(const char *server_name, const char *filename,
     {
         return result;
     }
-    g_thread_stack_size = (int)thread_stack_size;
+    g_sf_global_vars.thread_stack_size = (int)thread_stack_size;
 
-    g_rotate_error_log = iniGetBoolValue(NULL, "rotate_error_log",
+    g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL, "rotate_error_log",
             pIniContext, false);
-    g_log_file_keep_days = iniGetIntValue(NULL, "log_file_keep_days",
+    g_sf_global_vars.log_file_keep_days = iniGetIntValue(NULL, "log_file_keep_days",
             pIniContext, 0);
 
     load_log_level(pIniContext);
-    if ((result=log_set_prefix(g_sf_base_path, server_name)) != 0) {
+    if ((result=log_set_prefix(g_sf_global_vars.base_path, server_name)) != 0) {
         return result;
     }
 

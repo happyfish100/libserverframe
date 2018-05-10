@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ioevent.h"
-#include "fast_task_queue.h"
+#include "fastcommon/ioevent.h"
+#include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);

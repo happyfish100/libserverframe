@@ -3,8 +3,7 @@
 #ifndef _SF_UTIL_H_
 #define _SF_UTIL_H_
 
-#include "logger.h"
-#include <assert.h>
+#include "fastcommon/logger.h"
 #ifdef DEBUG_FLAG  /*only for format check*/
 
 #define lemerg(...) snprintf(0,0,__VA_ARGS__), log_plus(LOG_EMERG, __FILE__, __LINE__, __VA_ARGS__)

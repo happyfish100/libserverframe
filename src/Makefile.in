@@ -1,7 +1,7 @@
 .SUFFIXES: .c .lo
 
 COMPILE = $(CC) $(CFLAGS) -fPIC
-INC_PATH = -I/usr/include -I/usr/include/fastcommon
+INC_PATH = -I/usr/include -I/usr/local/include
 LIB_PATH = $(LIBS) -lfastcommon 
 TARGET_LIB = $(TARGET_PREFIX)/lib64
 TARGET_PATH = $(TARGET_PREFIX)/bin

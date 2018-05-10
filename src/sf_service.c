@@ -10,12 +10,12 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "logger.h"
-#include "sockopt.h"
-#include "shared_func.h"
-#include "pthread_func.h"
-#include "sched_thread.h"
-#include "ioevent_loop.h"
+#include "fastcommon/logger.h"
+#include "fastcommon/sockopt.h"
+#include "fastcommon/shared_func.h"
+#include "fastcommon/pthread_func.h"
+#include "fastcommon/sched_thread.h"
+#include "fastcommon/ioevent_loop.h"
 #include "sf_global.h"
 #include "sf_nio.h"
 #include "sf_service.h"
@@ -68,52 +68,52 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         return result;
     }
 
-    if ((result=init_pthread_attr(&thread_attr, g_thread_stack_size)) != 0) {
+    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.thread_stack_size)) != 0) {
         logError("file: "__FILE__", line: %d, "
             "init_pthread_attr fail, program exit!", __LINE__);
         return result;
     }
 
-    m = g_min_buff_size / (16 * 1024);
+    m = g_sf_global_vars.min_buff_size / (16 * 1024);
     if (m == 0) {
         m = 1;
     } else if (m > 16) {
         m = 16;
     }
     alloc_conn_once = ALLOC_CONNECTIONS_ONCE / m;
-    init_connections = g_max_connections < alloc_conn_once ?
-        g_max_connections : alloc_conn_once;
-    if ((result=free_queue_init_ex(g_max_connections, init_connections,
-                    alloc_conn_once, g_min_buff_size, g_max_buff_size,
+    init_connections = g_sf_global_vars.max_connections < alloc_conn_once ?
+        g_sf_global_vars.max_connections : alloc_conn_once;
+    if ((result=free_queue_init_ex(g_sf_global_vars.max_connections, init_connections,
+                    alloc_conn_once, g_sf_global_vars.min_buff_size, g_sf_global_vars.max_buff_size,
                     task_arg_size)) != 0)
     {
         return result;
     }
 
-    bytes = sizeof(struct nio_thread_data) * g_work_threads;
-    g_thread_data = (struct nio_thread_data *)malloc(bytes);
-    if (g_thread_data == NULL) {
+    bytes = sizeof(struct nio_thread_data) * g_sf_global_vars.work_threads;
+    g_sf_global_vars.thread_data = (struct nio_thread_data *)malloc(bytes);
+    if (g_sf_global_vars.thread_data == NULL) {
         logError("file: "__FILE__", line: %d, "
             "malloc %d bytes fail, errno: %d, error info: %s",
             __LINE__, bytes, errno, strerror(errno));
         return errno != 0 ? errno : ENOMEM;
     }
-    memset(g_thread_data, 0, bytes);
+    memset(g_sf_global_vars.thread_data, 0, bytes);
 
     g_worker_thread_count = 0;
-    pDataEnd = g_thread_data + g_work_threads;
-    for (pThreadData=g_thread_data; pThreadData<pDataEnd; pThreadData++) {
+    pDataEnd = g_sf_global_vars.thread_data + g_sf_global_vars.work_threads;
+    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd; pThreadData++) {
         pThreadData->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
             pThreadData->arg = alloc_thread_extra_data_callback(
-                    (int)(pThreadData - g_thread_data));
+                    (int)(pThreadData - g_sf_global_vars.thread_data));
         }
         else {
             pThreadData->arg = NULL;
         }
 
         if (ioevent_init(&pThreadData->ev_puller,
-            g_max_connections + 2, net_timeout_ms, 0) != 0)
+            g_sf_global_vars.max_connections + 2, net_timeout_ms, 0) != 0)
         {
             result  = errno != 0 ? errno : ENOMEM;
             logError("file: "__FILE__", line: %d, "
@@ -124,7 +124,7 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         }
 
         result = fast_timer_init(&pThreadData->timer,
-                2 * g_sf_network_timeout, g_current_time);
+                2 * g_sf_global_vars.network_timeout, g_current_time);
         if (result != 0) {
             logError("file: "__FILE__", line: %d, "
                 "fast_timer_init fail, "
@@ -181,12 +181,12 @@ int sf_service_destroy()
     struct nio_thread_data *pDataEnd, *pThreadData;
 
     free_queue_destroy();
-    pDataEnd = g_thread_data + g_work_threads;
-    for (pThreadData=g_thread_data; pThreadData<pDataEnd; pThreadData++) {
+    pDataEnd = g_sf_global_vars.thread_data + g_sf_global_vars.work_threads;
+    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd; pThreadData++) {
         fast_timer_destroy(&pThreadData->timer);
     }
-    free(g_thread_data);
-    g_thread_data = NULL;
+    free(g_sf_global_vars.thread_data);
+    g_sf_global_vars.thread_data = NULL;
     return 0;
 }
 
@@ -196,7 +196,7 @@ static void *worker_thread_entrance(void* arg)
 
     pThreadData = (struct nio_thread_data *)arg;
     ioevent_loop(pThreadData, sf_recv_notify_read, sf_get_task_cleanup_func(),
-        &g_continue_flag);
+        &g_sf_global_vars.continue_flag);
     ioevent_destroy(&pThreadData->ev_puller);
 
     __sync_fetch_and_sub(&g_worker_thread_count, 1);
@@ -211,7 +211,7 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
         return result;
     }
 
-    if ((result=tcpsetserveropt(*sock, g_sf_network_timeout)) != 0) {
+    if ((result=tcpsetserveropt(*sock, g_sf_global_vars.network_timeout)) != 0) {
         return result;
     }
 
@@ -221,31 +221,31 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
 int sf_socket_server()
 {
     int result;
-    if (g_outer_port != g_inner_port) {
-        if ((result=_socket_server(g_outer_bind_addr, g_outer_port,
+    if (g_sf_global_vars.outer_port != g_sf_global_vars.inner_port) {
+        if ((result=_socket_server(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.outer_port,
                         &g_server_outer_sock)) != 0)
         {
             return result;
         }
 
-        if ((result=_socket_server(g_inner_bind_addr, g_inner_port,
+        if ((result=_socket_server(g_sf_global_vars.inner_bind_addr, g_sf_global_vars.inner_port,
                         &g_server_inner_sock)) != 0)
         {
             return result;
         }
     } else {
         const char *bind_addr;
-        if (*g_outer_bind_addr != '\0') {
-            if (*g_inner_bind_addr != '\0') {
+        if (*g_sf_global_vars.outer_bind_addr != '\0') {
+            if (*g_sf_global_vars.inner_bind_addr != '\0') {
                 bind_addr = "";
             } else {
-                bind_addr = g_outer_bind_addr;
+                bind_addr = g_sf_global_vars.outer_bind_addr;
             }
         } else {
-            bind_addr = g_inner_bind_addr;
+            bind_addr = g_sf_global_vars.inner_bind_addr;
         }
 
-        if ((result=_socket_server(bind_addr, g_outer_port,
+        if ((result=_socket_server(bind_addr, g_sf_global_vars.outer_port,
                         &g_server_outer_sock)) != 0)
         {
             return result;
@@ -266,7 +266,7 @@ static void *accept_thread_entrance(void* arg)
     char szClientIp[IP_ADDRESS_SIZE];
 
     server_sock = (long)arg;
-    while (g_continue_flag) {
+    while (g_sf_global_vars.continue_flag) {
         sockaddr_len = sizeof(inaddr);
         incomesock = accept(server_sock, (struct sockaddr*)&inaddr, &sockaddr_len);
         if (incomesock < 0) { //error
@@ -298,7 +298,7 @@ static void *accept_thread_entrance(void* arg)
         strcpy(pTask->client_ip, szClientIp);
 
         pTask->event.fd = incomesock;
-        pTask->thread_data = g_thread_data + incomesock % g_work_threads;
+        pTask->thread_data = g_sf_global_vars.thread_data + incomesock % g_sf_global_vars.work_threads;
         if (sf_accept_done_func != NULL) {
             sf_accept_done_func(pTask, server_sock == g_server_inner_sock);
         }
@@ -327,7 +327,7 @@ void _accept_loop(int server_sock, const int accept_threads)
     int result;
     int i;
 
-    if ((result=init_pthread_attr(&thread_attr, g_thread_stack_size)) != 0) {
+    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.thread_stack_size)) != 0) {
         logWarning("file: "__FILE__", line: %d, "
                 "init_pthread_attr fail!", __LINE__);
     }
@@ -351,11 +351,11 @@ void _accept_loop(int server_sock, const int accept_threads)
 
 void sf_accept_loop()
 {
-    if (g_outer_port != g_inner_port) {
-        _accept_loop(g_server_inner_sock, g_accept_threads);
+    if (g_sf_global_vars.outer_port != g_sf_global_vars.inner_port) {
+        _accept_loop(g_server_inner_sock, g_sf_global_vars.accept_threads);
     }
 
-    _accept_loop(g_server_outer_sock, g_accept_threads - 1);
+    _accept_loop(g_server_outer_sock, g_sf_global_vars.accept_threads - 1);
     accept_thread_entrance((void *)(long)g_server_outer_sock);
 }
 
@@ -372,7 +372,7 @@ static void sigDumpHandler(int sig)
     bDumpFlag = true;
 
     snprintf(filename, sizeof(filename), 
-        "%s/logs/sf_dump.log", g_sf_base_path);
+        "%s/logs/sf_dump.log", g_sf_global_vars.base_path);
     //manager_dump_global_vars_to_file(filename);
 
     bDumpFlag = false;
@@ -383,7 +383,7 @@ static void sigQuitHandler(int sig)
 {
     if (!bTerminateFlag) {
         bTerminateFlag = true;
-        g_continue_flag = false;
+        g_sf_global_vars.continue_flag = false;
         logCrit("file: "__FILE__", line: %d, " \
             "catch signal %d, program exiting...", \
             __LINE__, sig);
