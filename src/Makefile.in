@@ -1,0 +1,34 @@
+.SUFFIXES: .c .lo
+
+COMPILE = $(CC) $(CFLAGS) -fPIC
+INC_PATH = -I/usr/include -I/usr/include/fastcommon
+LIB_PATH = $(LIBS) -lfastcommon 
+TARGET_LIB = $(TARGET_PREFIX)/lib64
+TARGET_PATH = $(TARGET_PREFIX)/bin
+
+ALL_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h sf_func.h sf_util.h list.h
+ALL_LIBS = libserverframe.so
+
+all: $(ALL_LIBS)
+
+libserverframe.so: sf_nio.lo sf_service.lo sf_global.lo sf_func.lo sf_util.lo
+	cc -shared -o $@ $^ $(LIB_PATH)
+
+.lo:
+	$(COMPILE) -o $@ $<  $(SHARED_OBJS) $(LIB_PATH) $(INC_PATH)
+.c:
+	$(COMPILE) -o $@ $<  $(ALL_OBJS) $(LIB_PATH) $(INC_PATH)
+.c.lo:
+	$(COMPILE) -c -o $@ $<  $(INC_PATH)
+install:
+	mkdir -p $(TARGET_PATH)
+	mkdir -p $(TARGET_LIB)
+	mkdir -p $(TARGET_PREFIX)/include/sf
+
+	cp -f $(ALL_LIBS) $(TARGET_LIB)
+	cp -f $(ALL_HEADERS) $(TARGET_PREFIX)/include/sf
+
+#	if [ ! -h $(TARGET_LIB)/libserverframe.so ]; then cd $(TARGET_LIB); ln -s libserverframe.so.1 libserverframe.so; fi
+clean:
+	rm -f *.lo $(ALL_LIBS) $(ALL_PRGS)
+
