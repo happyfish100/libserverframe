@@ -271,3 +271,33 @@ int sf_load_config(const char *server_name, const char *filename,
     return 0;
 }
 
+void sf_log_config()
+{
+    logInfo("base_path=%s, inner_port=%d, inner_bind_addr=%s, "
+            "outer_port=%d, outer_bind_addr=%s, "
+            "max_connections=%d, accept_threads=%d, work_threads=%d, "
+            "connect_timeout=%d, network_timeout=%d, thread_stack_size=%d, "
+            "max_pkg_size=%d, min_buff_size=%d, max_buff_size=%d, "
+            "sync_log_buff_interval=%d, rotate_error_log=%d, "
+            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s",
+            g_sf_global_vars.base_path,
+            g_sf_global_vars.inner_port,
+            g_sf_global_vars.inner_bind_addr,
+            g_sf_global_vars.outer_port,
+            g_sf_global_vars.outer_bind_addr,
+            g_sf_global_vars.max_connections,
+            g_sf_global_vars.accept_threads,
+            g_sf_global_vars.work_threads,
+            g_sf_global_vars.connect_timeout,
+            g_sf_global_vars.network_timeout,
+            g_sf_global_vars.thread_stack_size,
+            g_sf_global_vars.max_pkg_size,
+            g_sf_global_vars.min_buff_size,
+            g_sf_global_vars.max_buff_size,
+            g_sf_global_vars.sync_log_buff_interval,
+            g_sf_global_vars.rotate_error_log,
+            g_sf_global_vars.log_file_keep_days,
+            g_sf_global_vars.run_by_group,
+            g_sf_global_vars.run_by_user
+            );
+}
