@@ -267,7 +267,6 @@ int sf_load_config(const char *server_name, const char *filename,
         return result;
     }
 
-    //log_set_time_precision(&g_log_context, LOG_TIME_PRECISION_MSECOND);
     return 0;
 }
 
@@ -278,7 +277,7 @@ void sf_log_config()
             "max_connections=%d, accept_threads=%d, work_threads=%d, "
             "connect_timeout=%d, network_timeout=%d, thread_stack_size=%d, "
             "max_pkg_size=%d, min_buff_size=%d, max_buff_size=%d, "
-            "sync_log_buff_interval=%d, rotate_error_log=%d, "
+            "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
             "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s",
             g_sf_global_vars.base_path,
             g_sf_global_vars.inner_port,
@@ -294,6 +293,7 @@ void sf_log_config()
             g_sf_global_vars.max_pkg_size,
             g_sf_global_vars.min_buff_size,
             g_sf_global_vars.max_buff_size,
+            log_get_level_caption(),
             g_sf_global_vars.sync_log_buff_interval,
             g_sf_global_vars.rotate_error_log,
             g_sf_global_vars.log_file_keep_days,
