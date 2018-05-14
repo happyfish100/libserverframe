@@ -57,7 +57,9 @@ int sf_load_config(const char *server_name, const char *filename,
         IniContext *pIniContext, const int default_inner_port,
         const int default_outer_port);
 
-void sf_log_config();
+void sf_log_config_ex(const char *other_config);
+
+#define sf_log_config() sf_log_config_ex(NULL)
 
 #ifdef __cplusplus
 }

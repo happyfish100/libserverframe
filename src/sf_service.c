@@ -47,7 +47,7 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_arg_size)
 {
-#define ALLOC_CONNECTIONS_ONCE 256
+#define ALLOC_CONNECTIONS_ONCE 1024
     int result;
     int bytes;
     int m;
@@ -74,7 +74,7 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         return result;
     }
 
-    m = g_sf_global_vars.min_buff_size / (16 * 1024);
+    m = g_sf_global_vars.min_buff_size / (64 * 1024);
     if (m == 0) {
         m = 1;
     } else if (m > 16) {

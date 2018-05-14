@@ -270,7 +270,7 @@ int sf_load_config(const char *server_name, const char *filename,
     return 0;
 }
 
-void sf_log_config()
+void sf_log_config_ex(const char *other_config)
 {
     logInfo("base_path=%s, inner_port=%d, inner_bind_addr=%s, "
             "outer_port=%d, outer_bind_addr=%s, "
@@ -278,7 +278,7 @@ void sf_log_config()
             "connect_timeout=%d, network_timeout=%d, thread_stack_size=%d, "
             "max_pkg_size=%d, min_buff_size=%d, max_buff_size=%d, "
             "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
-            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s",
+            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s%s%s",
             g_sf_global_vars.base_path,
             g_sf_global_vars.inner_port,
             g_sf_global_vars.inner_bind_addr,
@@ -298,6 +298,8 @@ void sf_log_config()
             g_sf_global_vars.rotate_error_log,
             g_sf_global_vars.log_file_keep_days,
             g_sf_global_vars.run_by_group,
-            g_sf_global_vars.run_by_user
+            g_sf_global_vars.run_by_user,
+            (other_config != NULL ? ", " : ""),
+            (other_config != NULL ? other_config : "")
             );
 }
