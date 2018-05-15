@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "fastcommon/ioevent.h"
 #include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
@@ -32,8 +33,10 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
 int sf_service_destroy();
 
 int sf_setup_signal_handler();
+int sf_startup_schedule(pthread_t *schedule_tid);
 int sf_socket_server();
 void sf_accept_loop();
+void sf_set_current_time();
 
 #ifdef __cplusplus
 }

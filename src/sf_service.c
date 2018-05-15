@@ -466,3 +466,47 @@ int sf_setup_signal_handler()
     return 0;
 }
 
+int sf_startup_schedule(pthread_t *schedule_tid)
+{
+#define SCHEDULE_ENTRIES_COUNT 3
+
+    ScheduleArray scheduleArray;
+    ScheduleEntry scheduleEntries[SCHEDULE_ENTRIES_COUNT];
+    int id;
+
+    scheduleArray.entries = scheduleEntries;
+    scheduleArray.count = 0;
+
+    memset(scheduleEntries, 0, sizeof(scheduleEntries));
+
+    id = scheduleArray.count++;
+    INIT_SCHEDULE_ENTRY(scheduleEntries[id], id, TIME_NONE, TIME_NONE, 0,
+             g_sf_global_vars.sync_log_buff_interval, log_sync_func, &g_log_context);
+
+    if (g_sf_global_vars.rotate_error_log) {
+        log_set_rotate_time_format(&g_log_context, "%Y%m%d");
+
+        id = scheduleArray.count++;
+        INIT_SCHEDULE_ENTRY(scheduleEntries[id], id, 0, 0, 0,
+             86400, log_notify_rotate, &g_log_context);
+
+        if (g_sf_global_vars.log_file_keep_days > 0) {
+            log_set_keep_days(&g_log_context, g_sf_global_vars.log_file_keep_days);
+
+            id = scheduleArray.count++;
+            INIT_SCHEDULE_ENTRY(scheduleEntries[id], id, 1, 0, 0,
+                    86400, log_delete_old_files, &g_log_context);
+        }
+    }
+
+    return sched_start(&scheduleArray, schedule_tid,
+            g_sf_global_vars.thread_stack_size, (bool * volatile)
+            &g_sf_global_vars.continue_flag);
+}
+
+void sf_set_current_time()
+{
+    g_current_time = time(NULL);
+    g_sf_global_vars.up_time = g_current_time;
+    srand(g_sf_global_vars.up_time);
+}
