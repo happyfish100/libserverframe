@@ -32,10 +32,17 @@ void log_plus(const int priority, const char* file,
 #ifdef DEBUG_FLAG
 
 #ifdef OS_LINUX
+
+#ifdef SYS_gettid
     tid = (long)syscall(SYS_gettid);
 #else
     tid = (long)pthread_self();
 #endif
+
+#else
+    tid = (long)pthread_self();
+#endif
+
     hlen = snprintf(buf, sizeof(buf), "%s:%d %ld ", file, line, tid);
 
 #else

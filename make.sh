@@ -1,10 +1,25 @@
 ENABLE_STATIC_LIB=0
 ENABLE_SHARED_LIB=1
 
-TARGET_PREFIX=$DESTDIR/usr/local
-TARGET_CONF_PATH=$DESTDIR/etc/mc
+TARGET_PREFIX=$DESTDIR/usr
+TARGET_CONF_PATH=$DESTDIR/etc
 
+LIB_VERSION=lib64
 DEBUG_FLAG=1
+
+if [ -f /usr/include/fastcommon/_os_define.h ]; then
+  OS_BITS=$(fgrep OS_BITS /usr/include/fastcommon/_os_define.h | awk '{print $NF;}')
+elif [ -f /usr/local/include/fastcommon/_os_define.h ]; then
+  OS_BITS=$(fgrep OS_BITS /usr/local/include/fastcommon/_os_define.h | awk '{print $NF;}')
+else
+  OS_BITS=64
+fi
+
+if [ "$OS_BITS" -eq 64 ]; then
+  LIB_VERSION=lib64
+else
+  LIB_VERSION=lib
+fi
 
 CFLAGS="$CFLAGS -Wall -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE"
 if [ "$DEBUG_FLAG" = "1" ]; then
@@ -17,8 +32,13 @@ LIBS=''
 uname=$(uname)
 if [ "$uname" = "Linux" ]; then
   CFLAGS="$CFLAGS"
-elif [ "$uname" = "FreeBSD" ]; then
+elif [ "$uname" = "FreeBSD" ] || [ "$uname" = "Darwin" ]; then
   CFLAGS="$CFLAGS"
+  if [ "$uname" = "Darwin" ]; then
+    LIB_VERSION=lib
+    TARGET_PREFIX=$TARGET_PREFIX/local
+  fi
+
 elif [ "$uname" = "SunOS" ]; then
   CFLAGS="$CFLAGS -D_THREAD_SAFE"
   LIBS="$LIBS -lsocket -lnsl -lresolv"
@@ -96,5 +116,6 @@ sed_replace "s#\$(LIBS)#$LIBS#g" Makefile
 sed_replace "s#\$(TARGET_PREFIX)#$TARGET_PREFIX#g" Makefile
 sed_replace "s#\$(ENABLE_STATIC_LIB)#$ENABLE_STATIC_LIB#g" Makefile
 sed_replace "s#\$(ENABLE_SHARED_LIB)#$ENABLE_SHARED_LIB#g" Makefile
+sed_replace "s#\\\$(LIB_VERSION)#$LIB_VERSION#g" Makefile
 make $1 $2
 
