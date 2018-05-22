@@ -35,8 +35,8 @@ if [ "$uname" = "Linux" ]; then
 elif [ "$uname" = "FreeBSD" ] || [ "$uname" = "Darwin" ]; then
   CFLAGS="$CFLAGS"
   if [ "$uname" = "Darwin" ]; then
-    LIB_VERSION=lib
     TARGET_PREFIX=$TARGET_PREFIX/local
+    LIB_VERSION=lib
   fi
 
 elif [ "$uname" = "SunOS" ]; then
@@ -111,11 +111,14 @@ sed_replace()
 
 cd src
 cp Makefile.in Makefile
-sed_replace "s#\$(CFLAGS)#$CFLAGS#g" Makefile
-sed_replace "s#\$(LIBS)#$LIBS#g" Makefile
-sed_replace "s#\$(TARGET_PREFIX)#$TARGET_PREFIX#g" Makefile
-sed_replace "s#\$(ENABLE_STATIC_LIB)#$ENABLE_STATIC_LIB#g" Makefile
-sed_replace "s#\$(ENABLE_SHARED_LIB)#$ENABLE_SHARED_LIB#g" Makefile
+sed_replace "s#\\\$(CFLAGS)#$CFLAGS#g" Makefile
+sed_replace "s#\\\$(LIBS)#$LIBS#g" Makefile
+sed_replace "s#\\\$(TARGET_PREFIX)#$TARGET_PREFIX#g" Makefile
+sed_replace "s#\\\$(ENABLE_STATIC_LIB)#$ENABLE_STATIC_LIB#g" Makefile
+sed_replace "s#\\\$(ENABLE_SHARED_LIB)#$ENABLE_SHARED_LIB#g" Makefile
 sed_replace "s#\\\$(LIB_VERSION)#$LIB_VERSION#g" Makefile
-make $1 $2
+make $1 $2 $3
 
+if [ "$1" = "clean" ]; then
+  /bin/rm -f Makefile
+fi

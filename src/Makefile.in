@@ -21,9 +21,10 @@ libserverframe.so: sf_nio.lo sf_service.lo sf_global.lo sf_func.lo sf_util.lo
 	$(COMPILE) -c -o $@ $<  $(INC_PATH)
 install:
 	mkdir -p $(TARGET_LIB)
+	mkdir -p $(TARGET_PREFIX)/lib
 	mkdir -p $(TARGET_PREFIX)/include/sf
 
-	cp -f $(ALL_LIBS) $(TARGET_LIB)
+	install -m 755 $(ALL_LIBS) $(TARGET_LIB)
 	cp -f $(ALL_HEADERS) $(TARGET_PREFIX)/include/sf
 
 	if [ ! -e $(TARGET_PREFIX)/lib/libserverframe.so ]; then ln -s $(TARGET_LIB)/libserverframe.so $(TARGET_PREFIX)/lib/libserverframe.so; fi
