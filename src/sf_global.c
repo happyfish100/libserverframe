@@ -272,11 +272,16 @@ int sf_load_config(const char *server_name, const char *filename,
 
 void sf_log_config_ex(const char *other_config)
 {
+    char sz_thread_stack_size[32];
+    char sz_max_pkg_size[32];
+    char sz_min_buff_size[32];
+    char sz_max_buff_size[32];
+
     logInfo("base_path=%s, inner_port=%d, inner_bind_addr=%s, "
             "outer_port=%d, outer_bind_addr=%s, "
             "max_connections=%d, accept_threads=%d, work_threads=%d, "
-            "connect_timeout=%d, network_timeout=%d, thread_stack_size=%d, "
-            "max_pkg_size=%d, min_buff_size=%d, max_buff_size=%d, "
+            "connect_timeout=%d, network_timeout=%d, thread_stack_size=%s, "
+            "max_pkg_size=%s, min_buff_size=%s, max_buff_size=%s, "
             "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
             "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s%s%s",
             g_sf_global_vars.base_path,
@@ -289,10 +294,10 @@ void sf_log_config_ex(const char *other_config)
             g_sf_global_vars.work_threads,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,
-            g_sf_global_vars.thread_stack_size,
-            g_sf_global_vars.max_pkg_size,
-            g_sf_global_vars.min_buff_size,
-            g_sf_global_vars.max_buff_size,
+            int_to_comma_str(g_sf_global_vars.thread_stack_size, sz_thread_stack_size),
+            int_to_comma_str(g_sf_global_vars.max_pkg_size, sz_max_pkg_size),
+            int_to_comma_str(g_sf_global_vars.min_buff_size, sz_min_buff_size),
+            int_to_comma_str(g_sf_global_vars.max_buff_size, sz_max_buff_size),
             log_get_level_caption(),
             g_sf_global_vars.sync_log_buff_interval,
             g_sf_global_vars.rotate_error_log,
