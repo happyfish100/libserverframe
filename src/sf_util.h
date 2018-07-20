@@ -48,6 +48,12 @@ int64_t getticks() ;
 void log_plus(const int priority, const char* file, int line, const char* fmt, ...);
 
 int sf_printbuffer(char* buffer,int32_t len);
+
+void sf_usage(const char *program);
+
+void sf_parse_daemon_mode_and_action(int argc, char *argv[],
+        bool *daemon_mode, char **action);
+
 #ifdef __cplusplus
 }
 #endif

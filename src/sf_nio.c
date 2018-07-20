@@ -224,7 +224,7 @@ static int client_sock_read(int sock, short event, void *arg)
             }
             else {
                 logWarning("file: "__FILE__", line: %d, "
-                        "client ip: %s, req_count: %ld, recv timeout",
+                        "client ip: %s, req_count: %"PRId64", recv timeout",
                         __LINE__, pTask->client_ip,  pTask->req_count);
             }
 

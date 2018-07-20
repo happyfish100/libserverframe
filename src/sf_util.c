@@ -5,6 +5,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 #include "sf_util.h"
 
@@ -72,3 +73,30 @@ int sf_printbuffer(char* buffer,int32_t len)
     return(0);
 }
 
+void sf_usage(const char *program)
+{
+    fprintf(stderr, "Usage: %s <config_file> [--without-daemon | --no-daemon] "
+            "[start | stop | restart]\n", program);
+}
+
+void sf_parse_daemon_mode_and_action(int argc, char *argv[],
+        bool *daemon_mode, char **action)
+{
+    int i;
+
+    *daemon_mode = true;
+    for (i=2; i<argc; i++) {
+        if (strcmp(argv[i], "--without-daemon") == 0 ||
+                strcmp(argv[i], "--no-daemon") == 0)
+        {
+            *daemon_mode = false;
+            break;
+        }
+    }
+
+    if (argc - (*daemon_mode ? 0 : 1) > 2) {
+        *action = argv[argc - 1];
+    } else {
+        *action = NULL;
+    }
+}
