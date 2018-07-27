@@ -480,22 +480,25 @@ int sf_startup_schedule(pthread_t *schedule_tid)
     memset(scheduleEntries, 0, sizeof(scheduleEntries));
 
     index = scheduleArray.count++;
-    INIT_SCHEDULE_ENTRY(scheduleEntries[index], index + 1, TIME_NONE, TIME_NONE, 0,
-             g_sf_global_vars.sync_log_buff_interval, log_sync_func, &g_log_context);
+    INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
+            TIME_NONE, TIME_NONE, 0,
+             g_sf_global_vars.sync_log_buff_interval,
+             log_sync_func, &g_log_context);
 
     if (g_sf_global_vars.rotate_error_log) {
         log_set_rotate_time_format(&g_log_context, "%Y%m%d");
 
         index = scheduleArray.count++;
-        INIT_SCHEDULE_ENTRY(scheduleEntries[index], index + 1, 0, 0, 0,
-             86400, log_notify_rotate, &g_log_context);
+        INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
+                0, 0, 0, 86400, log_notify_rotate, &g_log_context);
 
         if (g_sf_global_vars.log_file_keep_days > 0) {
-            log_set_keep_days(&g_log_context, g_sf_global_vars.log_file_keep_days);
+            log_set_keep_days(&g_log_context,
+                    g_sf_global_vars.log_file_keep_days);
 
             index = scheduleArray.count++;
-            INIT_SCHEDULE_ENTRY(scheduleEntries[index], index + 1, 1, 0, 0,
-                    86400, log_delete_old_files, &g_log_context);
+            INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
+                    1, 0, 0, 86400, log_delete_old_files, &g_log_context);
         }
     }
 
