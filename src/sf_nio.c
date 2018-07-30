@@ -32,8 +32,6 @@ static sf_set_body_length_callback sf_set_body_length = NULL;
 static TaskCleanUpCallback sf_task_cleanup_func = sf_task_finish_clean_up;
 static sf_recv_timeout_callback sf_timeout_callback = NULL;
 
-static int client_sock_read(int sock, short event, void *arg);
-
 void sf_set_parameters(const int header_size, sf_set_body_length_callback
         set_body_length_func, sf_deal_task_func deal_func,
         TaskCleanUpCallback cleanup_func,
@@ -113,15 +111,16 @@ void sf_recv_notify_read(int sock, short event, void *arg)
             break;
         }
 
-        current_connections = __sync_add_and_fetch(&g_sf_global_vars.connection_stat.
-                current_count, 1);
+        current_connections = __sync_add_and_fetch(
+                &g_sf_global_vars.connection_stat.current_count, 1);
         if (current_connections > g_sf_global_vars.connection_stat.max_count) {
             g_sf_global_vars.connection_stat.max_count = current_connections;
         }
 
         pTask = (struct fast_task_info *)task_ptr;
-        if (ioevent_set(pTask, pTask->thread_data, pTask->event.fd, IOEVENT_READ,
-           (IOEventCallback)client_sock_read, g_sf_global_vars.network_timeout) != 0)
+        if (ioevent_set(pTask, pTask->thread_data, pTask->event.fd,
+                    IOEVENT_READ, (IOEventCallback)sf_client_sock_read,
+                    g_sf_global_vars.network_timeout) != 0)
         {
             sf_task_cleanup_func(pTask);
             continue;
@@ -157,11 +156,11 @@ static inline int set_read_event(struct fast_task_info *pTask)
 {
     int result;
 
-    if (pTask->event.callback == (IOEventCallback)client_sock_read) {
+    if (pTask->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
     }
 
-    pTask->event.callback = (IOEventCallback)client_sock_read;
+    pTask->event.callback = (IOEventCallback)sf_client_sock_read;
     if (ioevent_modify(&pTask->thread_data->ev_puller,
                 pTask->event.fd, IOEVENT_READ, pTask) != 0)
     {
@@ -191,7 +190,7 @@ int sf_send_add_event(struct fast_task_info *pTask)
     return 0;
 }
 
-static int client_sock_read(int sock, short event, void *arg)
+int sf_client_sock_read(int sock, short event, void *arg)
 {
     int bytes;
     int recv_bytes;
