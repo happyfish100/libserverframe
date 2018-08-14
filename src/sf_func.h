@@ -10,13 +10,6 @@
 extern "C" {
 #endif
 
-int sf_load_server_info(IniContext *pIniContext, const char *filename,
-        const char *item_name, ConnectionInfo *pServerInfo,
-        const int default_port);
-
-int sf_parse_server_info(const char *pServerStr, ConnectionInfo *pServerInfo,
-                         const int default_port);
-
 int sf_connect_to_server(const char *ip_addr, const int port, int *sock);
 
 #ifdef __cplusplus
