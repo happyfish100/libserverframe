@@ -17,10 +17,5 @@ typedef int (*sf_set_body_length_callback)(struct fast_task_info *pTask);
 typedef int (*sf_deal_task_func)(struct fast_task_info *pTask);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *pTask);
 
-typedef struct {
-    char ip_addr[IP_ADDRESS_SIZE];
-    int port;
-} SFServerInfo;
-
 #endif
 

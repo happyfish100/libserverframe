@@ -388,7 +388,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
         bytes = write(sock, pTask->data + pTask->offset,
                 pTask->length - pTask->offset);
-        //printf("%08X sended %d bytes\n", (int)pTask, bytes);
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {

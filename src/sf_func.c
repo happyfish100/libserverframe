@@ -19,7 +19,7 @@
 #include "sf_global.h"
 #include "sf_func.h"
 
-int sf_parse_server_info(const char* pServerStr, SFServerInfo* pServerInfo,
+int sf_parse_server_info(const char *pServerStr, ConnectionInfo *pServerInfo,
                          const int default_port)
 {
     char *parts[2];
@@ -67,12 +67,13 @@ int sf_parse_server_info(const char* pServerStr, SFServerInfo* pServerInfo,
             __LINE__, pServerStr, parts[0]);
         return EINVAL;
     }
-    
+
+    pServerInfo->socket_domain = AF_INET;
     return 0;
 }
 
 int sf_load_server_info(IniContext *pIniContext, const char *filename,
-        const char *item_name, SFServerInfo *pServerInfo,
+        const char *item_name, ConnectionInfo *pServerInfo,
         const int default_port)
 {
     char *pServerStr;
@@ -113,4 +114,3 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
 
     return 0;
 }
-
