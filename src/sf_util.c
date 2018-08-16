@@ -52,6 +52,9 @@ void log_plus(const int priority, const char* file,
     va_start(ap, fmt);
     hlen += vsnprintf(buf+hlen, sizeof(buf)-hlen, fmt, ap);
     va_end(ap);
+    if (hlen >= sizeof(buf)) {
+        hlen = sizeof(buf) - 1;
+    }
     log_it_ex1(&g_log_context, priority, buf, hlen);
 }
 
