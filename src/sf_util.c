@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include "sf_global.h"
 #include "sf_util.h"
 
 int64_t getticks() 
@@ -102,4 +103,58 @@ void sf_parse_daemon_mode_and_action(int argc, char *argv[],
     } else {
         *action = NULL;
     }
+}
+
+int sf_logger_init(LogContext *pContext, const char *filename_prefix)
+{
+    int result;
+    if ((result=log_init_ex(pContext)) != 0) {
+        return result;
+    }
+
+    if ((result=log_set_prefix_ex(pContext, g_sf_global_vars.base_path,
+                    filename_prefix)) != 0)
+    {
+        return result;
+    }
+
+    log_set_rotate_time_format(pContext, "%Y%m%d");
+    log_set_cache_ex(pContext, true);
+    return 0;
+}
+
+ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
+        ScheduleEntry *pScheduleEntry)
+{
+    pScheduleEntry->id = sched_generate_next_id();
+    pScheduleEntry->time_base.hour = TIME_NONE;
+    pScheduleEntry->time_base.minute = TIME_NONE;
+    pScheduleEntry->interval = g_sf_global_vars.sync_log_buff_interval;
+    pScheduleEntry->task_func = log_sync_func;
+    pScheduleEntry->func_args = pContext;
+    pScheduleEntry++;
+
+    pScheduleEntry->id = sched_generate_next_id();
+    pScheduleEntry->time_base.hour = 0;
+    pScheduleEntry->time_base.minute = 0;
+    pScheduleEntry->time_base.second = 0;
+    pScheduleEntry->interval = 86400;
+    pScheduleEntry->task_func = log_notify_rotate;
+    pScheduleEntry->func_args = pContext;
+    pScheduleEntry++;
+
+    if (g_sf_global_vars.log_file_keep_days > 0) {
+        log_set_keep_days(pContext, g_sf_global_vars.log_file_keep_days);
+
+        pScheduleEntry->id = sched_generate_next_id();
+        pScheduleEntry->time_base.hour = 1;
+        pScheduleEntry->time_base.minute = 30;
+        pScheduleEntry->time_base.second = 0;
+        pScheduleEntry->interval = 86400;
+        pScheduleEntry->task_func = log_delete_old_files;
+        pScheduleEntry->func_args = pContext;
+        pScheduleEntry++;
+    }
+
+    return pScheduleEntry;
 }

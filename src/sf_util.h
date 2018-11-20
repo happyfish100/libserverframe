@@ -4,6 +4,8 @@
 #define _SF_UTIL_H_
 
 #include "fastcommon/logger.h"
+#include "fastcommon/sched_thread.h"
+
 #ifdef DEBUG_FLAG  /*only for format check*/
 
 #define lemerg(...) snprintf(0,0,__VA_ARGS__), log_plus(LOG_EMERG, __FILE__, __LINE__, __VA_ARGS__)
@@ -54,9 +56,13 @@ void sf_usage(const char *program);
 void sf_parse_daemon_mode_and_action(int argc, char *argv[],
         bool *daemon_mode, char **action);
 
+int sf_logger_init(LogContext *pContext, const char *filename_prefix);
+
+ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
+        ScheduleEntry *pScheduleEntry);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
