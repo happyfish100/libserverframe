@@ -221,35 +221,32 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
 int sf_socket_server()
 {
     int result;
-    if (g_sf_global_vars.outer_port != g_sf_global_vars.inner_port) {
-        if ((result=_socket_server(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.outer_port,
-                        &g_server_outer_sock)) != 0)
-        {
-            return result;
-        }
+    const char *bind_addr;
 
-        if ((result=_socket_server(g_sf_global_vars.inner_bind_addr, g_sf_global_vars.inner_port,
-                        &g_server_inner_sock)) != 0)
-        {
-            return result;
-        }
-    } else {
-        const char *bind_addr;
-        if (*g_sf_global_vars.outer_bind_addr != '\0') {
-            if (*g_sf_global_vars.inner_bind_addr != '\0') {
-                bind_addr = "";
+    if (g_sf_global_vars.outer_port == g_sf_global_vars.inner_port) {
+        if (*g_sf_global_vars.outer_bind_addr == '\0' || *g_sf_global_vars.inner_bind_addr == '\0') {
+            bind_addr = "";
+            return _socket_server(bind_addr, g_sf_global_vars.outer_port, &g_server_outer_sock);
+        } else if (strcmp(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.inner_bind_addr) == 0) {
+            bind_addr = g_sf_global_vars.outer_bind_addr;
+            if (is_private_ip(bind_addr)) {
+                return _socket_server(bind_addr, g_sf_global_vars.inner_port, &g_server_inner_sock);
             } else {
-                bind_addr = g_sf_global_vars.outer_bind_addr;
+                return _socket_server(bind_addr, g_sf_global_vars.outer_port, &g_server_outer_sock);
             }
-        } else {
-            bind_addr = g_sf_global_vars.inner_bind_addr;
         }
+    }
 
-        if ((result=_socket_server(bind_addr, g_sf_global_vars.outer_port,
-                        &g_server_outer_sock)) != 0)
-        {
-            return result;
-        }
+    if ((result=_socket_server(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.outer_port,
+                    &g_server_outer_sock)) != 0)
+    {
+        return result;
+    }
+
+    if ((result=_socket_server(g_sf_global_vars.inner_bind_addr, g_sf_global_vars.inner_port,
+                    &g_server_inner_sock)) != 0)
+    {
+        return result;
     }
 
     return 0;
@@ -327,6 +324,10 @@ void _accept_loop(int server_sock, const int accept_threads)
     int result;
     int i;
 
+    if (accept_threads <= 0) {
+       return;
+    }
+
     if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.thread_stack_size)) != 0) {
         logWarning("file: "__FILE__", line: %d, "
                 "init_pthread_attr fail!", __LINE__);
@@ -351,12 +352,17 @@ void _accept_loop(int server_sock, const int accept_threads)
 
 void sf_accept_loop()
 {
-    if (g_sf_global_vars.outer_port != g_sf_global_vars.inner_port) {
-        _accept_loop(g_server_inner_sock, g_sf_global_vars.accept_threads);
-    }
+    if (g_server_outer_sock >= 0) {
+        if (g_server_inner_sock >= 0) {
+            _accept_loop(g_server_inner_sock, g_sf_global_vars.accept_threads);
+        }
 
-    _accept_loop(g_server_outer_sock, g_sf_global_vars.accept_threads - 1);
-    accept_thread_entrance((void *)(long)g_server_outer_sock);
+        _accept_loop(g_server_outer_sock, g_sf_global_vars.accept_threads - 1);
+        accept_thread_entrance((void *)(long)g_server_outer_sock);
+     } else {
+        _accept_loop(g_server_inner_sock, g_sf_global_vars.accept_threads - 1);
+        accept_thread_entrance((void *)(long)g_server_inner_sock);
+     }
 }
 
 #if defined(DEBUG_FLAG)
