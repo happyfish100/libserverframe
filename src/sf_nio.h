@@ -27,6 +27,8 @@ int sf_client_sock_read(int sock, short event, void *arg);
 
 void sf_task_finish_clean_up(struct fast_task_info *pTask);
 
+int sf_nio_notify(struct fast_task_info *pTask, const int stage);
+
 static inline bool sf_client_sock_in_read_stage(struct fast_task_info *pTask)
 {
     return (pTask->event.callback == (IOEventCallback)sf_client_sock_read);

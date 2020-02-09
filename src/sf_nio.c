@@ -89,45 +89,6 @@ void sf_task_finish_clean_up(struct fast_task_info *pTask)
     free_queue_push(pTask);
 }
 
-void sf_recv_notify_read(int sock, short event, void *arg)
-{
-    int bytes;
-    int current_connections;
-    long task_ptr;
-    struct fast_task_info *pTask;
-
-    while (1) {
-        if ((bytes=read(sock, &task_ptr, sizeof(task_ptr))) < 0) {
-            if (!(errno == EAGAIN || errno == EWOULDBLOCK)) {
-                logError("file: "__FILE__", line: %d, "
-                    "call read failed, "
-                    "errno: %d, error info: %s",
-                    __LINE__, errno, strerror(errno));
-            }
-
-            break;
-        }
-        else if (bytes == 0) {
-            break;
-        }
-
-        current_connections = __sync_add_and_fetch(
-                &g_sf_global_vars.connection_stat.current_count, 1);
-        if (current_connections > g_sf_global_vars.connection_stat.max_count) {
-            g_sf_global_vars.connection_stat.max_count = current_connections;
-        }
-
-        pTask = (struct fast_task_info *)task_ptr;
-        if (ioevent_set(pTask, pTask->thread_data, pTask->event.fd,
-                    IOEVENT_READ, (IOEventCallback)sf_client_sock_read,
-                    g_sf_global_vars.network_timeout) != 0)
-        {
-            sf_task_cleanup_func(pTask);
-            continue;
-        }
-    }
-}
-
 static inline int set_write_event(struct fast_task_info *pTask)
 {
     int result;
@@ -175,6 +136,102 @@ static inline int set_read_event(struct fast_task_info *pTask)
     }
 
     return 0;
+}
+
+int sf_nio_notify(struct fast_task_info *pTask, const int stage)
+{
+    long task_addr;
+
+    task_addr = (long)pTask;
+    pTask->nio_stage = stage;
+    if (write(pTask->thread_data->pipe_fds[1], &task_addr,
+        sizeof(task_addr)) != sizeof(task_addr))
+    {
+        int result;
+        result = errno != 0 ? errno : EIO;
+        logError("file: "__FILE__", line: %d, "
+            "write to pipe %d fail, errno: %d, error info: %s",
+            __LINE__, pTask->thread_data->pipe_fds[1],
+            result, STRERROR(result));
+        return result;
+    }
+
+    return 0;
+}
+
+static int sf_nio_init(struct fast_task_info *pTask)
+{
+    int current_connections;
+    int result;
+
+    current_connections = __sync_add_and_fetch(
+            &g_sf_global_vars.connection_stat.current_count, 1);
+    if (current_connections > g_sf_global_vars.connection_stat.max_count) {
+        g_sf_global_vars.connection_stat.max_count = current_connections;
+    }
+
+    pTask->nio_stage = SF_NIO_STAGE_RECV;
+    result = ioevent_set(pTask, pTask->thread_data, pTask->event.fd,
+            IOEVENT_READ, (IOEventCallback)sf_client_sock_read,
+            g_sf_global_vars.network_timeout);
+    return result > 0 ? -1 * result : result;
+}
+
+void sf_recv_notify_read(int sock, short event, void *arg)
+{
+    int bytes;
+    int result;
+    long task_ptr;
+    struct fast_task_info *pTask;
+
+    while (1) {
+        if ((bytes=read(sock, &task_ptr, sizeof(task_ptr))) < 0) {
+            if (!(errno == EAGAIN || errno == EWOULDBLOCK)) {
+                logError("file: "__FILE__", line: %d, "
+                        "call read failed, "
+                        "errno: %d, error info: %s",
+                        __LINE__, errno, strerror(errno));
+            }
+
+            break;
+        }
+        else if (bytes == 0) {
+            break;
+        }
+
+        pTask = (struct fast_task_info *)task_ptr;
+        switch (pTask->nio_stage) {
+            case SF_NIO_STAGE_INIT:
+                result = sf_nio_init(pTask);
+                break;
+            case SF_NIO_STAGE_RECV:
+                if ((result=set_read_event(pTask)) == 0)
+                {
+                    sf_client_sock_read(pTask->event.fd,
+                            IOEVENT_READ, pTask);
+                }
+                break;
+            case SF_NIO_STAGE_SEND:
+                result = sf_send_add_event(pTask);
+                break;
+            case SF_NIO_STAGE_FORWARDED:
+                result = sf_deal_task(pTask);
+                break;
+            case SF_NIO_STAGE_CLOSE:
+                result = -EIO;   //close this socket
+                break;
+            default:
+                logError("file: "__FILE__", line: %d, "
+                        "client ip: %s, invalid stage: %d",
+                        __LINE__, pTask->client_ip, pTask->nio_stage);
+                result = -EINVAL;
+                break;
+        }
+
+        if (result < 0) {
+            sf_task_cleanup_func(pTask);
+        }
+    }
 }
 
 int sf_send_add_event(struct fast_task_info *pTask)
@@ -342,6 +399,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
         if (pTask->offset >= pTask->length) { //recv done
             pTask->req_count++;
+            pTask->nio_stage = SF_NIO_STAGE_SEND;
             if (sf_deal_task(pTask) < 0) {  //fatal error
                 sf_task_cleanup_func(pTask);
                 return -1;
@@ -427,6 +485,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
         if (pTask->offset >= pTask->length) {
             pTask->offset = 0;
             pTask->length = 0;
+            pTask->nio_stage = SF_NIO_STAGE_RECV;
             if (set_read_event(pTask) != 0) {
                 return -1;
             }

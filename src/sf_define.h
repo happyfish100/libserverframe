@@ -10,6 +10,12 @@
 #define SF_DEF_MIN_BUFF_SIZE  (64 * 1024)
 #define SF_DEF_MAX_BUFF_SIZE  (64 * 1024)
 
+#define SF_NIO_STAGE_INIT       0  //set ioevent
+#define SF_NIO_STAGE_RECV       1  //recv
+#define SF_NIO_STAGE_SEND       2  //send
+#define SF_NIO_STAGE_FORWARDED  3  //deal the forwarded request
+#define SF_NIO_STAGE_CLOSE      4  //cleanup the task
+
 #ifdef __cplusplus
 extern "C" {
 #endif

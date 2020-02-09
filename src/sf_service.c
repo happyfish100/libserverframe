@@ -265,7 +265,8 @@ static void *accept_thread_entrance(void* arg)
     server_sock = (long)arg;
     while (g_sf_global_vars.continue_flag) {
         sockaddr_len = sizeof(inaddr);
-        incomesock = accept(server_sock, (struct sockaddr*)&inaddr, &sockaddr_len);
+        incomesock = accept(server_sock, (struct sockaddr*)&inaddr,
+                &sockaddr_len);
         if (incomesock < 0) { //error
             if (!(errno == EINTR || errno == EAGAIN)) {
                 logError("file: "__FILE__", line: %d, "
@@ -294,8 +295,10 @@ static void *accept_thread_entrance(void* arg)
         }
         strcpy(pTask->client_ip, szClientIp);
 
+        pTask->nio_stage = SF_NIO_STAGE_INIT;
         pTask->event.fd = incomesock;
-        pTask->thread_data = g_sf_global_vars.thread_data + incomesock % g_sf_global_vars.work_threads;
+        pTask->thread_data = g_sf_global_vars.thread_data + incomesock %
+            g_sf_global_vars.work_threads;
         if (sf_accept_done_func != NULL) {
             sf_accept_done_func(pTask, server_sock == g_server_inner_sock);
         }

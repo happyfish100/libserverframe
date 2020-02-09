@@ -6,6 +6,7 @@
 #include "fastcommon/common_define.h"
 #include "fastcommon/ini_file_reader.h"
 #include "fastcommon/ioevent.h"
+#include "sf_define.h"
 
 typedef struct sf_connection_stat {
     volatile int current_count;
