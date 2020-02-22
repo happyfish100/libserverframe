@@ -325,7 +325,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             }
             else {
                 logWarning("file: "__FILE__", line: %d, "
-                    "client ip: %s, recv failed, "
+                    "client ip: %s, recv fail, "
                     "errno: %d, error info: %s",
                     __LINE__, pTask->client_ip,
                     errno, strerror(errno));
@@ -335,10 +335,29 @@ int sf_client_sock_read(int sock, short event, void *arg)
             }
         }
         else if (bytes == 0) {
-            logDebug("file: "__FILE__", line: %d, "
-                "client ip: %s, sock: %d, recv failed, "
-                "connection disconnected",
-                __LINE__, pTask->client_ip, sock);
+            if (pTask->offset > 0) {
+                if (pTask->length > 0) {
+                    logWarning("file: "__FILE__", line: %d, "
+                            "client ip: %s, connection "
+                            "disconnected, expect pkg length: %d, "
+                            "recv pkg length: %d", __LINE__,
+                            pTask->client_ip, pTask->length,
+                            pTask->offset);
+                }
+                else {
+                    logWarning("file: "__FILE__", line: %d, "
+                            "client ip: %s, connection "
+                            "disconnected, recv pkg length: %d",
+                            __LINE__, pTask->client_ip,
+                            pTask->offset);
+                }
+            }
+            else {
+                logDebug("file: "__FILE__", line: %d, "
+                        "client ip: %s, sock: %d, recv fail, "
+                        "connection disconnected",
+                        __LINE__, pTask->client_ip, sock);
+            }
 
             sf_task_cleanup_func(pTask);
             return -1;

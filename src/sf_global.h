@@ -13,6 +13,11 @@ typedef struct sf_connection_stat {
     volatile int max_count;
 } SFConnectionStat;
 
+typedef struct sf_custom_config {
+    const char *item_prefix_name;
+    int default_port;
+} SFCustomConfig;
+
 typedef struct sf_global_variables {
     int connect_timeout;
     int network_timeout;
@@ -52,11 +57,27 @@ typedef struct sf_global_variables {
 extern "C" {
 #endif
 
-extern SFGlobalVariables g_sf_global_vars;
+extern SFGlobalVariables     g_sf_global_vars;
+
+#define SF_G_BASE_PATH         g_sf_global_vars.base_path
+#define SF_G_CONTINUE_FLAG     g_sf_global_vars.continue_flag
+#define SF_G_CONNECT_TIMEOUT   g_sf_global_vars.connect_timeout
+#define SF_G_NETWORK_TIMEOUT   g_sf_global_vars.network_timeout
+#define SF_G_THREAD_STACK_SIZE g_sf_global_vars.thread_stack_size
+
+#define SF_SET_CUSTOM_CONFIG(cfg, prefix_name, port) \
+    do { \
+        (cfg).item_prefix_name = prefix_name;    \
+        (cfg).default_port = port; \
+    } while (0)
 
 int sf_load_config(const char *server_name, const char *filename, 
         IniContext *pIniContext, const int default_inner_port,
         const int default_outer_port);
+
+int sf_load_config_ex(const char *server_name, const char *filename,
+        IniContext *pIniContext, const SFCustomConfig *inner_cfg,
+        const SFCustomConfig *outer_cfg);
 
 void sf_log_config_ex(const char *other_config);
 

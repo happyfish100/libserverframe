@@ -28,12 +28,45 @@ SFGlobalVariables g_sf_global_vars = {
     {'\0'}, {'\0'}, {0, 0}
 };
 
-int sf_load_config(const char *server_name, const char *filename, 
-        IniContext *pIniContext, const int default_inner_port,
-        const int default_outer_port)
+static int sf_get_config_int_value(IniContext *pIniContext,
+        const char *item_prefix_name, const char *item_affix_name,
+        const int default_value)
+{
+    int value;
+    char item_name[FAST_INI_ITEM_NAME_SIZE];
+
+    snprintf(item_name, sizeof(item_name), "%s_%s",
+            item_prefix_name, item_affix_name);
+    value = iniGetIntValue(NULL, item_name, pIniContext, default_value);
+    if (value <= 0) {
+        value = default_value;
+    }
+    return value;
+}
+
+static void sf_get_config_str_value(IniContext *pIniContext,
+        const char *item_prefix_name, const char *item_affix_name,
+        char *dest, const int dest_size)
+{
+    char item_name[FAST_INI_ITEM_NAME_SIZE];
+    char *value;
+
+    snprintf(item_name, sizeof(item_name), "%s_%s",
+            item_prefix_name, item_affix_name);
+    value = iniGetStrValue(NULL, item_name, pIniContext);
+    if (value == NULL) {
+        *dest = '\0';
+    }
+    else {
+        snprintf(dest, dest_size, "%s", value);
+    }
+}
+
+int sf_load_config_ex(const char *server_name, const char *filename,
+        IniContext *pIniContext, const SFCustomConfig *inner_cfg,
+        const SFCustomConfig *outer_cfg)
 {
     char *pBasePath;
-    char *pBindAddr;
     char *pRunByGroup;
     char *pRunByUser;
     char *pMaxPkgSize;
@@ -54,7 +87,8 @@ int sf_load_config(const char *server_name, const char *filename,
         return ENOENT;
     }
 
-    snprintf(g_sf_global_vars.base_path, sizeof(g_sf_global_vars.base_path), "%s", pBasePath);
+    snprintf(g_sf_global_vars.base_path, sizeof(g_sf_global_vars.base_path),
+            "%s", pBasePath);
     chopPath(g_sf_global_vars.base_path);
     if (!fileExists(g_sf_global_vars.base_path)) {
         logError("file: "__FILE__", line: %d, "
@@ -81,32 +115,18 @@ int sf_load_config(const char *server_name, const char *filename,
         g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.inner_port = iniGetIntValue(NULL, "inner_port", pIniContext,
-            default_inner_port);
-    if (g_sf_global_vars.inner_port <= 0) {
-        g_sf_global_vars.inner_port = default_inner_port;
-    }
-    g_sf_global_vars.outer_port = iniGetIntValue(NULL, "outer_port", pIniContext,
-        default_outer_port);
-    if (g_sf_global_vars.outer_port <= 0) {
-        g_sf_global_vars.outer_port = default_outer_port;
-    }
+    g_sf_global_vars.inner_port = sf_get_config_int_value(pIniContext,
+        inner_cfg->item_prefix_name, "port", inner_cfg->default_port);
+    g_sf_global_vars.outer_port = sf_get_config_int_value(pIniContext,
+        outer_cfg->item_prefix_name, "port", outer_cfg->default_port);
 
-    pBindAddr = iniGetStrValue(NULL, "inner_bind_addr", pIniContext);
-    if (pBindAddr == NULL) {
-        *g_sf_global_vars.inner_bind_addr = '\0';
-    }
-    else {
-        snprintf(g_sf_global_vars.inner_bind_addr, sizeof(g_sf_global_vars.inner_bind_addr), "%s", pBindAddr);
-    }
+    sf_get_config_str_value(pIniContext, inner_cfg->item_prefix_name,
+            "bind_addr", g_sf_global_vars.inner_bind_addr,
+            sizeof(g_sf_global_vars.inner_bind_addr));
 
-    pBindAddr = iniGetStrValue(NULL, "outer_bind_addr", pIniContext);
-    if (pBindAddr == NULL) {
-        *g_sf_global_vars.outer_bind_addr = '\0';
-    }
-    else {
-        snprintf(g_sf_global_vars.outer_bind_addr, sizeof(g_sf_global_vars.outer_bind_addr), "%s", pBindAddr);
-    }
+    sf_get_config_str_value(pIniContext, outer_cfg->item_prefix_name,
+            "bind_addr", g_sf_global_vars.outer_bind_addr,
+            sizeof(g_sf_global_vars.outer_bind_addr));
 
     g_sf_global_vars.max_connections = iniGetIntValue(NULL, "max_connections",
             pIniContext, DEFAULT_MAX_CONNECTONS);
@@ -186,7 +206,8 @@ int sf_load_config(const char *server_name, const char *filename,
         *g_sf_global_vars.run_by_group = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_group, sizeof(g_sf_global_vars.run_by_group),
+        snprintf(g_sf_global_vars.run_by_group,
+                sizeof(g_sf_global_vars.run_by_group),
                 "%s", pRunByGroup);
     }
     if (*g_sf_global_vars.run_by_group == '\0') {
@@ -212,7 +233,8 @@ int sf_load_config(const char *server_name, const char *filename,
         *g_sf_global_vars.run_by_user = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_user, sizeof(g_sf_global_vars.run_by_user),
+        snprintf(g_sf_global_vars.run_by_user,
+                sizeof(g_sf_global_vars.run_by_user),
                 "%s", pRunByUser);
     }
     if (*g_sf_global_vars.run_by_user == '\0') {
@@ -234,7 +256,9 @@ int sf_load_config(const char *server_name, const char *filename,
         g_sf_global_vars.run_by_uid = pUser->pw_uid;
     }
 
-    if ((result=set_run_by(g_sf_global_vars.run_by_group, g_sf_global_vars.run_by_user)) != 0) {
+    if ((result=set_run_by(g_sf_global_vars.run_by_group,
+                    g_sf_global_vars.run_by_user)) != 0)
+    {
         return result;
     }
 
@@ -257,10 +281,10 @@ int sf_load_config(const char *server_name, const char *filename,
     }
     g_sf_global_vars.thread_stack_size = (int)thread_stack_size;
 
-    g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL, "rotate_error_log",
-            pIniContext, false);
-    g_sf_global_vars.log_file_keep_days = iniGetIntValue(NULL, "log_file_keep_days",
-            pIniContext, 0);
+    g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL,
+            "rotate_error_log", pIniContext, false);
+    g_sf_global_vars.log_file_keep_days = iniGetIntValue(NULL,
+            "log_file_keep_days", pIniContext, 0);
 
     load_log_level(pIniContext);
     if ((result=log_set_prefix(g_sf_global_vars.base_path, server_name)) != 0) {
@@ -268,6 +292,19 @@ int sf_load_config(const char *server_name, const char *filename,
     }
 
     return 0;
+}
+
+int sf_load_config(const char *server_name, const char *filename,
+        IniContext *pIniContext, const int default_inner_port,
+        const int default_outer_port)
+{
+    SFCustomConfig inner_cfg;
+    SFCustomConfig outer_cfg;
+
+    SF_SET_CUSTOM_CONFIG(inner_cfg, "inner", default_inner_port);
+    SF_SET_CUSTOM_CONFIG(outer_cfg, "outer", default_outer_port);
+    return sf_load_config_ex(server_name, filename, pIniContext,
+            &inner_cfg, &outer_cfg);
 }
 
 void sf_log_config_ex(const char *other_config)
