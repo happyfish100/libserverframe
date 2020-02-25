@@ -210,7 +210,7 @@ int sf_load_config_ex(const char *server_name, const char *filename,
                 sizeof(g_sf_global_vars.run_by_group),
                 "%s", pRunByGroup);
     }
-    if (*g_sf_global_vars.run_by_group == '\0') {
+    if (*(g_sf_global_vars.run_by_group) == '\0') {
         g_sf_global_vars.run_by_gid = getegid();
     }
     else {
@@ -237,7 +237,7 @@ int sf_load_config_ex(const char *server_name, const char *filename,
                 sizeof(g_sf_global_vars.run_by_user),
                 "%s", pRunByUser);
     }
-    if (*g_sf_global_vars.run_by_user == '\0') {
+    if (*(g_sf_global_vars.run_by_user) == '\0') {
         g_sf_global_vars.run_by_uid = geteuid();
     }
     else {

@@ -68,7 +68,9 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         return result;
     }
 
-    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.thread_stack_size)) != 0) {
+    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.
+                    thread_stack_size)) != 0)
+    {
         logError("file: "__FILE__", line: %d, "
             "init_pthread_attr fail, program exit!", __LINE__);
         return result;
@@ -83,8 +85,9 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
     alloc_conn_once = ALLOC_CONNECTIONS_ONCE / m;
     init_connections = g_sf_global_vars.max_connections < alloc_conn_once ?
         g_sf_global_vars.max_connections : alloc_conn_once;
-    if ((result=free_queue_init_ex(g_sf_global_vars.max_connections, init_connections,
-                    alloc_conn_once, g_sf_global_vars.min_buff_size, g_sf_global_vars.max_buff_size,
+    if ((result=free_queue_init_ex(g_sf_global_vars.max_connections,
+                    init_connections, alloc_conn_once, g_sf_global_vars.
+                    min_buff_size, g_sf_global_vars.max_buff_size,
                     task_arg_size)) != 0)
     {
         return result;
@@ -102,7 +105,9 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
 
     g_worker_thread_count = 0;
     pDataEnd = g_sf_global_vars.thread_data + g_sf_global_vars.work_threads;
-    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd; pThreadData++) {
+    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd;
+            pThreadData++)
+    {
         pThreadData->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
             pThreadData->arg = alloc_thread_extra_data_callback(
@@ -182,7 +187,9 @@ int sf_service_destroy()
 
     free_queue_destroy();
     pDataEnd = g_sf_global_vars.thread_data + g_sf_global_vars.work_threads;
-    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd; pThreadData++) {
+    for (pThreadData=g_sf_global_vars.thread_data; pThreadData<pDataEnd;
+            pThreadData++)
+    {
         fast_timer_destroy(&pThreadData->timer);
     }
     free(g_sf_global_vars.thread_data);
@@ -224,27 +231,32 @@ int sf_socket_server()
     const char *bind_addr;
 
     if (g_sf_global_vars.outer_port == g_sf_global_vars.inner_port) {
-        if (*g_sf_global_vars.outer_bind_addr == '\0' || *g_sf_global_vars.inner_bind_addr == '\0') {
+        if (*g_sf_global_vars.outer_bind_addr == '\0' ||
+                *g_sf_global_vars.inner_bind_addr == '\0') {
             bind_addr = "";
-            return _socket_server(bind_addr, g_sf_global_vars.outer_port, &g_server_outer_sock);
-        } else if (strcmp(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.inner_bind_addr) == 0) {
+            return _socket_server(bind_addr, g_sf_global_vars.outer_port,
+                    &g_server_outer_sock);
+        } else if (strcmp(g_sf_global_vars.outer_bind_addr,
+                    g_sf_global_vars.inner_bind_addr) == 0) {
             bind_addr = g_sf_global_vars.outer_bind_addr;
             if (is_private_ip(bind_addr)) {
-                return _socket_server(bind_addr, g_sf_global_vars.inner_port, &g_server_inner_sock);
+                return _socket_server(bind_addr, g_sf_global_vars.
+                        inner_port, &g_server_inner_sock);
             } else {
-                return _socket_server(bind_addr, g_sf_global_vars.outer_port, &g_server_outer_sock);
+                return _socket_server(bind_addr, g_sf_global_vars.
+                        outer_port, &g_server_outer_sock);
             }
         }
     }
 
-    if ((result=_socket_server(g_sf_global_vars.outer_bind_addr, g_sf_global_vars.outer_port,
-                    &g_server_outer_sock)) != 0)
+    if ((result=_socket_server(g_sf_global_vars.outer_bind_addr,
+                    g_sf_global_vars.outer_port, &g_server_outer_sock)) != 0)
     {
         return result;
     }
 
-    if ((result=_socket_server(g_sf_global_vars.inner_bind_addr, g_sf_global_vars.inner_port,
-                    &g_server_inner_sock)) != 0)
+    if ((result=_socket_server(g_sf_global_vars.inner_bind_addr,
+                    g_sf_global_vars.inner_port, &g_server_inner_sock)) != 0)
     {
         return result;
     }
@@ -252,7 +264,7 @@ int sf_socket_server()
     return 0;
 }
 
-static void *accept_thread_entrance(void* arg)
+static void *accept_thread_entrance(void *arg)
 {
     int server_sock;
     int incomesock;
@@ -331,7 +343,9 @@ void _accept_loop(int server_sock, const int accept_threads)
        return;
     }
 
-    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.thread_stack_size)) != 0) {
+    if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.
+                    thread_stack_size)) != 0)
+    {
         logWarning("file: "__FILE__", line: %d, "
                 "init_pthread_attr fail!", __LINE__);
     }
@@ -393,15 +407,15 @@ static void sigQuitHandler(int sig)
     if (!bTerminateFlag) {
         bTerminateFlag = true;
         g_sf_global_vars.continue_flag = false;
-        logCrit("file: "__FILE__", line: %d, " \
-            "catch signal %d, program exiting...", \
+        logCrit("file: "__FILE__", line: %d, "
+            "catch signal %d, program exiting...",
             __LINE__, sig);
     }
 }
 
 static void sigHupHandler(int sig)
 {
-    logInfo("file: "__FILE__", line: %d, " \
+    logInfo("file: "__FILE__", line: %d, "
         "catch signal %d", __LINE__, sig);
 }
 
