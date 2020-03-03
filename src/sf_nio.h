@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fastcommon/fast_task_queue.h"
+#include "sf_define.h"
 #include "sf_types.h"
 
 #ifdef __cplusplus
@@ -27,7 +28,17 @@ int sf_client_sock_read(int sock, short event, void *arg);
 
 void sf_task_finish_clean_up(struct fast_task_info *pTask);
 
+void sf_task_switch_thread(struct fast_task_info *pTask,
+        const int new_thread_index);
+
 int sf_nio_notify(struct fast_task_info *pTask, const int stage);
+
+static inline int sf_nio_forward_request(struct fast_task_info *pTask,
+        const int new_thread_index)
+{
+    sf_task_switch_thread(pTask, new_thread_index);
+    return sf_nio_notify(pTask, SF_NIO_STAGE_FORWARDED);
+}
 
 static inline bool sf_client_sock_in_read_stage(struct fast_task_info *pTask)
 {
