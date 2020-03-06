@@ -7,6 +7,7 @@
 #include "fastcommon/ini_file_reader.h"
 #include "fastcommon/ioevent.h"
 #include "sf_define.h"
+#include "sf_types.h"
 
 typedef struct sf_connection_stat {
     volatile int current_count;
@@ -23,22 +24,15 @@ typedef struct sf_global_variables {
     int network_timeout;
     char base_path[MAX_PATH_SIZE];
 
-    struct nio_thread_data *thread_data;
-
     volatile bool continue_flag;
-    int outer_port;
-    int inner_port;
     int max_connections;
-    int accept_threads;
-    int work_threads;
-    int thread_stack_size;
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
+    int thread_stack_size;
     int sync_log_buff_interval; //sync log buff to disk every interval seconds
 
     time_t up_time;
-
     gid_t run_by_gid;
     uid_t run_by_uid;
     char run_by_group[32];
@@ -46,9 +40,6 @@ typedef struct sf_global_variables {
 
     bool rotate_error_log;
     int log_file_keep_days;
-
-    char inner_bind_addr[IP_ADDRESS_SIZE];
-    char outer_bind_addr[IP_ADDRESS_SIZE];
 
     SFConnectionStat connection_stat;
 } SFGlobalVariables;
@@ -58,13 +49,14 @@ extern "C" {
 #endif
 
 extern SFGlobalVariables       g_sf_global_vars;
+extern SFContext               g_sf_context;
 
 #define SF_G_BASE_PATH         g_sf_global_vars.base_path
 #define SF_G_CONTINUE_FLAG     g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT   g_sf_global_vars.connect_timeout
 #define SF_G_NETWORK_TIMEOUT   g_sf_global_vars.network_timeout
-#define SF_G_WORK_THREADS      g_sf_global_vars.work_threads
 #define SF_G_THREAD_STACK_SIZE g_sf_global_vars.thread_stack_size
+#define SF_G_WORK_THREADS      g_sf_context.work_threads
 
 #define SF_SET_CUSTOM_CONFIG(cfg, prefix_name, port) \
     do { \
@@ -94,8 +86,13 @@ int sf_load_config(const char *server_name, const char *filename,
         const int default_outer_port);
 
 int sf_load_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const SFCustomConfig *inner_cfg,
-        const SFCustomConfig *outer_cfg);
+        IniContext *pIniContext, const char *section_name,
+        const int default_inner_port, const int default_outer_port);
+
+int sf_load_context_from_config(SFContext *sf_context,
+        const char *filename, IniContext *pIniContext,
+        const char *section_name, const int default_inner_port,
+        const int default_outer_port);
 
 void sf_log_config_ex(const char *other_config);
 

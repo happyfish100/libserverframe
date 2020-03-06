@@ -24,33 +24,18 @@
 #include "sf_global.h"
 #include "sf_nio.h"
 
-static int sf_header_size = 0;
-static bool sf_remove_from_ready_list = true;
-static sf_deal_task_func sf_deal_task = NULL;
-static sf_set_body_length_callback sf_set_body_length = NULL;
-static TaskCleanUpCallback sf_task_cleanup_func = sf_task_finish_clean_up;
-static sf_recv_timeout_callback sf_timeout_callback = NULL;
+#define SF_CTX  ((SFContext *)(pTask->ctx))
 
-void sf_set_parameters(const int header_size, sf_set_body_length_callback
-        set_body_length_func, sf_deal_task_func deal_func,
-        TaskCleanUpCallback cleanup_func,
+void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
+        sf_set_body_length_callback set_body_length_func,
+        sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback)
 {
-    sf_header_size = header_size;
-    sf_set_body_length = set_body_length_func;
-    sf_deal_task = deal_func;
-    sf_task_cleanup_func = cleanup_func;
-    sf_timeout_callback = timeout_callback;
-}
-
-void sf_set_remove_from_ready_list(const bool enabled)
-{
-    sf_remove_from_ready_list = enabled;
-}
-
-TaskCleanUpCallback sf_get_task_cleanup_func()
-{
-    return sf_task_cleanup_func; 
+    sf_context->header_size = header_size;
+    sf_context->set_body_length = set_body_length_func;
+    sf_context->deal_task = deal_func;
+    sf_context->task_cleanup_func = cleanup_func;
+    sf_context->timeout_callback = timeout_callback;
 }
 
 static void sf_task_detach_thread(struct fast_task_info *pTask)
@@ -63,16 +48,16 @@ static void sf_task_detach_thread(struct fast_task_info *pTask)
         pTask->event.timer.expires = 0;
     }
 
-    if (sf_remove_from_ready_list) {
+    if (SF_CTX->remove_from_ready_list) {
         ioevent_remove(&pTask->thread_data->ev_puller, pTask);
     }
 }
 
-void sf_task_switch_thread(struct fast_task_info *pTask,
-        const int new_thread_index)
+void sf_task_switch_thread_ex(SFContext *sf_context,
+        struct fast_task_info *pTask, const int new_thread_index)
 {
     sf_task_detach_thread(pTask);
-    pTask->thread_data = g_sf_global_vars.thread_data + new_thread_index;
+    pTask->thread_data = sf_context->thread_data + new_thread_index;
 }
 
 void sf_task_finish_clean_up(struct fast_task_info *pTask)
@@ -113,7 +98,7 @@ static inline int set_write_event(struct fast_task_info *pTask)
         pTask->event.fd, IOEVENT_WRITE, pTask) != 0)
     {
         result = errno != 0 ? errno : ENOENT;
-        sf_task_cleanup_func(pTask);
+        SF_CTX->task_cleanup_func(pTask);
 
         logError("file: "__FILE__", line: %d, "
             "ioevent_modify fail, "
@@ -137,7 +122,7 @@ static inline int set_read_event(struct fast_task_info *pTask)
                 pTask->event.fd, IOEVENT_READ, pTask) != 0)
     {
         result = errno != 0 ? errno : ENOENT;
-        sf_task_cleanup_func(pTask);
+        SF_CTX->task_cleanup_func(pTask);
 
         logError("file: "__FILE__", line: %d, "
                 "ioevent_modify fail, "
@@ -231,9 +216,12 @@ void sf_recv_notify_read(int sock, short event, void *arg)
             case SF_NIO_STAGE_SEND:
                 result = sf_send_add_event(pTask);
                 break;
+            case SF_NIO_STAGE_CONTINUE:   //continue deal
+                result = SF_CTX->deal_task(pTask);
+                break;
             case SF_NIO_STAGE_FORWARDED:  //forward by other thread
                 if ((result=sf_ioevent_add(pTask)) == 0) {
-                    result = sf_deal_task(pTask);
+                    result = SF_CTX->deal_task(pTask);
                 }
                 break;
             case SF_NIO_STAGE_CLOSE:
@@ -248,7 +236,7 @@ void sf_recv_notify_read(int sock, short event, void *arg)
         }
 
         if (result < 0) {
-            sf_task_cleanup_func(pTask);
+            SF_CTX->task_cleanup_func(pTask);
         }
     }
 }
@@ -273,13 +261,17 @@ int sf_client_sock_read(int sock, short event, void *arg)
     int total_read;
     struct fast_task_info *pTask;
 
-    assert(sock >= 0);
     pTask = (struct fast_task_info *)arg;
+    if (pTask->nio_stage != SF_NIO_STAGE_RECV) {
+        return 0;
+    }
+
+    assert(sock >= 0);
     if (event & IOEVENT_TIMEOUT) {
         if (pTask->offset == 0 && pTask->req_count > 0) {
-            if (sf_timeout_callback != NULL) {
-                if (sf_timeout_callback(pTask) != 0) {
-                    sf_task_cleanup_func(pTask);
+            if (SF_CTX->timeout_callback != NULL) {
+                if (SF_CTX->timeout_callback(pTask) != 0) {
+                    SF_CTX->task_cleanup_func(pTask);
                     return -1;
                 }
             }
@@ -303,7 +295,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                         __LINE__, pTask->client_ip,  pTask->req_count);
             }
 
-            sf_task_cleanup_func(pTask);
+            SF_CTX->task_cleanup_func(pTask);
             return -1;
         }
 
@@ -315,7 +307,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             "client ip: %s, recv error event: %d, "
             "close connection", __LINE__, pTask->client_ip, event);
 
-        sf_task_cleanup_func(pTask);
+        SF_CTX->task_cleanup_func(pTask);
         return -1;
     }
 
@@ -325,7 +317,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             &pTask->event.timer, g_current_time +
             g_sf_global_vars.network_timeout);
         if (pTask->length == 0) { //recv header
-            recv_bytes = sf_header_size - pTask->offset;
+            recv_bytes = SF_CTX->header_size - pTask->offset;
         }
         else {
             recv_bytes = pTask->length - pTask->offset;
@@ -349,7 +341,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     __LINE__, pTask->client_ip,
                     errno, strerror(errno));
 
-                sf_task_cleanup_func(pTask);
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
         }
@@ -378,19 +370,19 @@ int sf_client_sock_read(int sock, short event, void *arg)
                         __LINE__, pTask->client_ip, sock);
             }
 
-            sf_task_cleanup_func(pTask);
+            SF_CTX->task_cleanup_func(pTask);
             return -1;
         }
 
         total_read += bytes;
         pTask->offset += bytes;
         if (pTask->length == 0) { //header
-            if (pTask->offset < sf_header_size) {
+            if (pTask->offset < SF_CTX->header_size) {
                 break;
             }
 
-            if (sf_set_body_length(pTask) != 0) {
-                sf_task_cleanup_func(pTask);
+            if (SF_CTX->set_body_length(pTask) != 0) {
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
             if (pTask->length < 0) {
@@ -399,11 +391,11 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     __LINE__, pTask->client_ip,
                     pTask->length);
 
-                sf_task_cleanup_func(pTask);
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
 
-            pTask->length += sf_header_size;
+            pTask->length += SF_CTX->header_size;
             if (pTask->length > g_sf_global_vars.max_pkg_size) {
                 logError("file: "__FILE__", line: %d, "
                     "client ip: %s, pkg length: %d > "
@@ -411,7 +403,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     pTask->client_ip, pTask->length,
                     g_sf_global_vars.max_pkg_size);
 
-                sf_task_cleanup_func(pTask);
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
 
@@ -424,7 +416,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                             "from %d to %d fail", __LINE__,
                             pTask->client_ip, pTask->size, pTask->length);
 
-                    sf_task_cleanup_func(pTask);
+                    SF_CTX->task_cleanup_func(pTask);
                     return -1;
                 }
 
@@ -438,8 +430,8 @@ int sf_client_sock_read(int sock, short event, void *arg)
         if (pTask->offset >= pTask->length) { //recv done
             pTask->req_count++;
             pTask->nio_stage = SF_NIO_STAGE_SEND;
-            if (sf_deal_task(pTask) < 0) {  //fatal error
-                sf_task_cleanup_func(pTask);
+            if (SF_CTX->deal_task(pTask) < 0) {  //fatal error
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
             break;
@@ -463,7 +455,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
             "remain: %d", __LINE__, pTask->client_ip, pTask->length,
             pTask->offset, pTask->length - pTask->offset);
 
-        sf_task_cleanup_func(pTask);
+        SF_CTX->task_cleanup_func(pTask);
         return -1;
     }
 
@@ -472,7 +464,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
             "client ip: %s, recv error event: %d, "
             "close connection", __LINE__, pTask->client_ip, event);
 
-        sf_task_cleanup_func(pTask);
+        SF_CTX->task_cleanup_func(pTask);
         return -1;
     }
 
@@ -505,7 +497,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
                     __LINE__, pTask->client_ip,
                     errno, strerror(errno));
 
-                sf_task_cleanup_func(pTask);
+                SF_CTX->task_cleanup_func(pTask);
                 return -1;
             }
         }
@@ -514,7 +506,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
                 "client ip: %s, sock: %d, send failed, connection disconnected",
                 __LINE__, pTask->client_ip, sock);
 
-            sf_task_cleanup_func(pTask);
+            SF_CTX->task_cleanup_func(pTask);
             return -1;
         }
 

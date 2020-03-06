@@ -15,56 +15,40 @@
 #include "fastcommon/shared_func.h"
 #include "fastcommon/logger.h"
 #include "sf_define.h"
+#include "sf_nio.h"
 #include "sf_global.h"
 
 SFGlobalVariables g_sf_global_vars = {
     DEFAULT_CONNECT_TIMEOUT, DEFAULT_NETWORK_TIMEOUT,
-    {'/', 't', 'm', 'p', '\0'}, NULL, true,
-    0, 0, DEFAULT_MAX_CONNECTONS, 1,
-    DEFAULT_WORK_THREADS, SF_DEF_THREAD_STACK_SIZE,
+    {'/', 't', 'm', 'p', '\0'}, true,
+    SF_DEF_THREAD_STACK_SIZE, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE, SF_DEF_MAX_BUFF_SIZE,
-    SYNC_LOG_BUFF_DEF_INTERVAL, 0, 0, 0,
-    {'\0'}, {'\0'}, false, 0,
-    {'\0'}, {'\0'}, {0, 0}
+    SYNC_LOG_BUFF_DEF_INTERVAL, 0, 0, 0, {'\0'}, {'\0'}, false, 0, {0, 0}
 };
 
-static int sf_get_config_int_value(IniContext *pIniContext,
-        const char *item_prefix_name, const char *item_affix_name,
-        const int default_value)
-{
-    int value;
-    char item_name[FAST_INI_ITEM_NAME_SIZE];
-
-    snprintf(item_name, sizeof(item_name), "%s_%s",
-            item_prefix_name, item_affix_name);
-    value = iniGetIntValue(NULL, item_name, pIniContext, default_value);
-    if (value <= 0) {
-        value = default_value;
-    }
-    return value;
-}
+SFContext g_sf_context = {
+    NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
+    {'\0'}, {'\0'}, 0, true, NULL, NULL, sf_task_finish_clean_up,
+    NULL
+};
 
 static void sf_get_config_str_value(IniContext *pIniContext,
-        const char *item_prefix_name, const char *item_affix_name,
+        const char *section_name, const char *item_name,
         char *dest, const int dest_size)
 {
-    char item_name[FAST_INI_ITEM_NAME_SIZE];
     char *value;
 
-    snprintf(item_name, sizeof(item_name), "%s_%s",
-            item_prefix_name, item_affix_name);
-    value = iniGetStrValue(NULL, item_name, pIniContext);
+    value = iniGetStrValue(section_name, item_name, pIniContext);
     if (value == NULL) {
         *dest = '\0';
-    }
-    else {
+    } else {
         snprintf(dest, dest_size, "%s", value);
     }
 }
 
 int sf_load_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const SFCustomConfig *inner_cfg,
-        const SFCustomConfig *outer_cfg)
+        IniContext *pIniContext, const char *section_name,
+        const int default_inner_port, const int default_outer_port)
 {
     char *pBasePath;
     char *pRunByGroup;
@@ -115,44 +99,15 @@ int sf_load_config_ex(const char *server_name, const char *filename,
         g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.inner_port = sf_get_config_int_value(pIniContext,
-        inner_cfg->item_prefix_name, "port", inner_cfg->default_port);
-    g_sf_global_vars.outer_port = sf_get_config_int_value(pIniContext,
-        outer_cfg->item_prefix_name, "port", outer_cfg->default_port);
-
-    sf_get_config_str_value(pIniContext, inner_cfg->item_prefix_name,
-            "bind_addr", g_sf_global_vars.inner_bind_addr,
-            sizeof(g_sf_global_vars.inner_bind_addr));
-
-    sf_get_config_str_value(pIniContext, outer_cfg->item_prefix_name,
-            "bind_addr", g_sf_global_vars.outer_bind_addr,
-            sizeof(g_sf_global_vars.outer_bind_addr));
-
     g_sf_global_vars.max_connections = iniGetIntValue(NULL, "max_connections",
             pIniContext, DEFAULT_MAX_CONNECTONS);
     if (g_sf_global_vars.max_connections <= 0) {
         g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
     }
 
-    g_sf_global_vars.accept_threads = iniGetIntValue(NULL, "accept_threads",
-            pIniContext, 1);
-    if (g_sf_global_vars.accept_threads <= 0) {
-        logError("file: "__FILE__", line: %d, "
-                "item \"accept_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, g_sf_global_vars.accept_threads);
-        return EINVAL;
-    }
-
-    g_sf_global_vars.work_threads = iniGetIntValue(NULL, "work_threads",
-            pIniContext, DEFAULT_WORK_THREADS);
-    if (g_sf_global_vars.work_threads <= 0) {
-        logError("file: "__FILE__", line: %d, "
-                "item \"work_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, g_sf_global_vars.work_threads);
-        return EINVAL;
-    }
-
-    if ((result=set_rlimit(RLIMIT_NOFILE, g_sf_global_vars.max_connections)) != 0) {
+    if ((result=set_rlimit(RLIMIT_NOFILE, g_sf_global_vars.
+                    max_connections)) != 0)
+    {
         return result;
     }
 
@@ -291,20 +246,58 @@ int sf_load_config_ex(const char *server_name, const char *filename,
         return result;
     }
 
-    return 0;
+    return sf_load_context_from_config(&g_sf_context, filename, pIniContext,
+            section_name, default_inner_port, default_outer_port);
 }
 
 int sf_load_config(const char *server_name, const char *filename,
         IniContext *pIniContext, const int default_inner_port,
         const int default_outer_port)
 {
-    SFCustomConfig inner_cfg;
-    SFCustomConfig outer_cfg;
+    return sf_load_config_ex(server_name, filename, pIniContext, "",
+            default_inner_port, default_outer_port);
+}
 
-    SF_SET_CUSTOM_CONFIG(inner_cfg, "inner", default_inner_port);
-    SF_SET_CUSTOM_CONFIG(outer_cfg, "outer", default_outer_port);
-    return sf_load_config_ex(server_name, filename, pIniContext,
-            &inner_cfg, &outer_cfg);
+int sf_load_context_from_config(SFContext *sf_context,
+        const char *filename, IniContext *pIniContext,
+        const char *section_name, const int default_inner_port,
+        const int default_outer_port)
+{
+    sf_context->inner_port = iniGetIntValue(section_name,
+            "inner_port", pIniContext, default_inner_port);
+    sf_context->outer_port = iniGetIntValue(section_name,
+            "outer_port", pIniContext, default_outer_port);
+
+    sf_get_config_str_value(pIniContext, section_name,
+            "inner_bind_addr", sf_context->inner_bind_addr,
+            sizeof(sf_context->inner_bind_addr));
+    sf_get_config_str_value(pIniContext, section_name,
+            "outer_bind_addr", sf_context->outer_bind_addr,
+            sizeof(sf_context->outer_bind_addr));
+
+    sf_context->accept_threads = iniGetIntValue(section_name,
+            "accept_threads", pIniContext, 1);
+    if (sf_context->accept_threads <= 0) {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, section: %s, "
+                "item \"accept_threads\" is invalid, "
+                "value: %d <= 0!", __LINE__, filename,
+                section_name, sf_context->accept_threads);
+        return EINVAL;
+    }
+
+    sf_context->work_threads = iniGetIntValue(section_name,
+            "work_threads", pIniContext, DEFAULT_WORK_THREADS);
+    if (sf_context->work_threads <= 0) {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, section: %s, "
+                "item \"work_threads\" is invalid, "
+                "value: %d <= 0!", __LINE__, filename,
+                section_name, sf_context->work_threads);
+        return EINVAL;
+    }
+
+    return 0;
 }
 
 void sf_log_config_ex(const char *other_config)
@@ -322,13 +315,13 @@ void sf_log_config_ex(const char *other_config)
             "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
             "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s%s%s",
             g_sf_global_vars.base_path,
-            g_sf_global_vars.inner_port,
-            g_sf_global_vars.inner_bind_addr,
-            g_sf_global_vars.outer_port,
-            g_sf_global_vars.outer_bind_addr,
+            g_sf_context.inner_port,
+            g_sf_context.inner_bind_addr,
+            g_sf_context.outer_port,
+            g_sf_context.outer_bind_addr,
             g_sf_global_vars.max_connections,
-            g_sf_global_vars.accept_threads,
-            g_sf_global_vars.work_threads,
+            g_sf_context.accept_threads,
+            g_sf_context.work_threads,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,
             int_to_comma_str(g_sf_global_vars.thread_stack_size, sz_thread_stack_size),

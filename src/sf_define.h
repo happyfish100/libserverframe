@@ -14,7 +14,8 @@
 #define SF_NIO_STAGE_RECV       1  //recv
 #define SF_NIO_STAGE_SEND       2  //send
 #define SF_NIO_STAGE_FORWARDED  3  //deal the forwarded request
-#define SF_NIO_STAGE_CLOSE      4  //cleanup the task
+#define SF_NIO_STAGE_CONTINUE   4  //notify the thread continue deal
+#define SF_NIO_STAGE_CLOSE      9  //cleanup the task
 
 #ifdef __cplusplus
 extern "C" {

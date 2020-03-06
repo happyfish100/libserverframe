@@ -22,7 +22,8 @@ extern int g_server_inner_sock;
 
 extern int g_worker_thread_count;
 
-int sf_service_init(sf_alloc_thread_extra_data_callback
+int sf_service_init_ex(SFContext *sf_context,
+        sf_alloc_thread_extra_data_callback
         alloc_thread_extra_data_callback,
         ThreadLoopCallback thread_loop_callback,
         sf_accept_done_callback accept_done_callback,
@@ -30,13 +31,30 @@ int sf_service_init(sf_alloc_thread_extra_data_callback
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_arg_size);
-int sf_service_destroy();
+
+#define sf_service_init(alloc_thread_extra_data_callback, \
+        thread_loop_callback, accept_done_callback, set_body_length_func, \
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms, \
+        proto_header_size, task_arg_size) \
+    sf_service_init_ex(&g_sf_context, alloc_thread_extra_data_callback, \
+        thread_loop_callback, accept_done_callback, set_body_length_func, \
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms, \
+        proto_header_size, task_arg_size)
+
+int sf_service_destroy_ex(SFContext *sf_context);
+
+#define sf_service_destroy() sf_service_destroy_ex(&g_sf_context)
 
 int sf_setup_signal_handler();
 int sf_startup_schedule(pthread_t *schedule_tid);
-int sf_socket_server();
-void sf_accept_loop();
 void sf_set_current_time();
+
+int sf_socket_server_ex(SFContext *sf_context);
+#define sf_socket_server() sf_socket_server_ex(&g_sf_context)
+
+void sf_accept_loop_ex(SFContext *sf_context, const bool block);
+
+#define sf_accept_loop()  sf_accept_loop_ex(&g_sf_context, true)
 
 #ifdef __cplusplus
 }
