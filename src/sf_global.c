@@ -28,17 +28,13 @@ SFGlobalVariables g_sf_global_vars = {
 
 SFContext g_sf_context = {
     NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
-    {'\0'}, {'\0'}, 0, true, NULL, NULL, sf_task_finish_clean_up,
-    NULL
+    {'\0'}, {'\0'}, 0, true, NULL, NULL, NULL,
+    sf_task_finish_clean_up, NULL
 };
 
-static void sf_get_config_str_value(IniContext *pIniContext,
-        const char *section_name, const char *item_name,
+static inline void set_config_str_value(const char *value,
         char *dest, const int dest_size)
 {
-    char *value;
-
-    value = iniGetStrValue(section_name, item_name, pIniContext);
     if (value == NULL) {
         *dest = '\0';
     } else {
@@ -263,17 +259,54 @@ int sf_load_context_from_config(SFContext *sf_context,
         const char *section_name, const int default_inner_port,
         const int default_outer_port)
 {
-    sf_context->inner_port = iniGetIntValue(section_name,
-            "inner_port", pIniContext, default_inner_port);
-    sf_context->outer_port = iniGetIntValue(section_name,
-            "outer_port", pIniContext, default_outer_port);
+    char *inner_port;
+    char *outer_port;
+    char *inner_bind_addr;
+    char *outer_bind_addr;
+    char *bind_addr;
+    int port;
 
-    sf_get_config_str_value(pIniContext, section_name,
-            "inner_bind_addr", sf_context->inner_bind_addr,
-            sizeof(sf_context->inner_bind_addr));
-    sf_get_config_str_value(pIniContext, section_name,
-            "outer_bind_addr", sf_context->outer_bind_addr,
-            sizeof(sf_context->outer_bind_addr));
+    sf_context->inner_port = sf_context->outer_port = 0;
+
+    inner_port = iniGetStrValue(section_name, "inner_port", pIniContext);
+    outer_port = iniGetStrValue(section_name, "outer_port", pIniContext);
+    if (inner_port == NULL && outer_port == NULL) {
+        port = iniGetIntValue(section_name, "port", pIniContext, 0);
+        if (port > 0) {
+            sf_context->inner_port = sf_context->outer_port = port;
+        }
+    } else {
+        if (inner_port != NULL) {
+            sf_context->inner_port = atoi(inner_port);
+        }
+        if (outer_port != NULL) {
+            sf_context->outer_port = atoi(outer_port);
+        }
+    }
+
+    if (sf_context->inner_port <= 0) {
+        sf_context->inner_port = default_inner_port;
+    }
+    if (sf_context->outer_port <= 0) {
+        sf_context->outer_port = default_outer_port;
+    }
+
+
+    inner_bind_addr = iniGetStrValue(section_name,
+            "inner_bind_addr", pIniContext);
+    outer_bind_addr = iniGetStrValue(section_name,
+            "outer_bind_addr", pIniContext);
+    if (inner_bind_addr == NULL && outer_bind_addr == NULL) {
+        bind_addr = iniGetStrValue(section_name,
+                "bind_addr", pIniContext);
+        if (bind_addr != NULL) {
+            inner_bind_addr = outer_bind_addr = bind_addr;
+        }
+    }
+    set_config_str_value(inner_bind_addr, sf_context->inner_bind_addr,
+                sizeof(sf_context->inner_bind_addr));
+    set_config_str_value(outer_bind_addr, sf_context->outer_bind_addr,
+                sizeof(sf_context->outer_bind_addr));
 
     sf_context->accept_threads = iniGetIntValue(section_name,
             "accept_threads", pIniContext, 1);
@@ -300,31 +333,52 @@ int sf_load_context_from_config(SFContext *sf_context,
     return 0;
 }
 
-void sf_log_config_ex(const char *other_config)
+void sf_context_config_to_string(const SFContext *sf_context,
+        char *output, const int size)
+{
+    int len;
+
+    len = 0;
+    if ((sf_context->inner_port == sf_context->outer_port) &&
+            (strcmp(sf_context->inner_bind_addr,
+                    sf_context->outer_bind_addr) == 0))
+    {
+        len += snprintf(output + len, size - len,
+                "port=%d, bind_addr=%s",
+                sf_context->inner_port,
+                sf_context->inner_bind_addr);
+    } else {
+        len += snprintf(output + len, size - len,
+                "inner_port=%d, inner_bind_addr=%s, "
+                "outer_port=%d, outer_bind_addr=%s",
+                sf_context->inner_port, sf_context->inner_bind_addr,
+                sf_context->outer_port, sf_context->outer_bind_addr);
+    }
+
+    len += snprintf(output + len, size - len,
+            ", accept_threads=%d, work_threads=%d",
+            sf_context->accept_threads, sf_context->work_threads);
+}
+
+void sf_global_config_to_string(char *output, const int size)
 {
     char sz_thread_stack_size[32];
     char sz_max_pkg_size[32];
     char sz_min_buff_size[32];
     char sz_max_buff_size[32];
 
-    logInfo("base_path=%s, inner_port=%d, inner_bind_addr=%s, "
-            "outer_port=%d, outer_bind_addr=%s, "
-            "max_connections=%d, accept_threads=%d, work_threads=%d, "
-            "connect_timeout=%d, network_timeout=%d, thread_stack_size=%s, "
-            "max_pkg_size=%s, min_buff_size=%s, max_buff_size=%s, "
-            "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
-            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s%s%s",
+    snprintf(output, size,
+            "base_path=%s, max_connections=%d, connect_timeout=%d, "
+            "network_timeout=%d, thread_stack_size=%s, max_pkg_size=%s, "
+            "min_buff_size=%s, max_buff_size=%s, log_level=%s, "
+            "sync_log_buff_interval=%d, rotate_error_log=%d, "
+            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s",
             g_sf_global_vars.base_path,
-            g_sf_context.inner_port,
-            g_sf_context.inner_bind_addr,
-            g_sf_context.outer_port,
-            g_sf_context.outer_bind_addr,
             g_sf_global_vars.max_connections,
-            g_sf_context.accept_threads,
-            g_sf_context.work_threads,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,
-            int_to_comma_str(g_sf_global_vars.thread_stack_size, sz_thread_stack_size),
+            int_to_comma_str(g_sf_global_vars.thread_stack_size,
+                sz_thread_stack_size),
             int_to_comma_str(g_sf_global_vars.max_pkg_size, sz_max_pkg_size),
             int_to_comma_str(g_sf_global_vars.min_buff_size, sz_min_buff_size),
             int_to_comma_str(g_sf_global_vars.max_buff_size, sz_max_buff_size),
@@ -333,8 +387,22 @@ void sf_log_config_ex(const char *other_config)
             g_sf_global_vars.rotate_error_log,
             g_sf_global_vars.log_file_keep_days,
             g_sf_global_vars.run_by_group,
-            g_sf_global_vars.run_by_user,
-            (other_config != NULL ? ", " : ""),
-            (other_config != NULL ? other_config : "")
-            );
+            g_sf_global_vars.run_by_user
+                );
+}
+
+void sf_log_config_ex(const char *other_config)
+{
+    char sz_global_config[512];
+    char sz_context_config[128];
+
+    sf_global_config_to_string(sz_global_config, sizeof(sz_global_config));
+    sf_context_config_to_string(&g_sf_context,
+            sz_context_config, sizeof(sz_context_config));
+
+    logInfo("%s, %s%s%s",
+            sz_global_config, sz_context_config,
+            (other_config != NULL && *other_config != '\0')  ? ", " : "",
+            (other_config != NULL) ? other_config : ""
+           );
 }

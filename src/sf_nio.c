@@ -53,11 +53,11 @@ static void sf_task_detach_thread(struct fast_task_info *pTask)
     }
 }
 
-void sf_task_switch_thread_ex(SFContext *sf_context,
-        struct fast_task_info *pTask, const int new_thread_index)
+void sf_task_switch_thread(struct fast_task_info *pTask,
+        const int new_thread_index)
 {
     sf_task_detach_thread(pTask);
-    pTask->thread_data = sf_context->thread_data + new_thread_index;
+    pTask->thread_data = SF_CTX->thread_data + new_thread_index;
 }
 
 void sf_task_finish_clean_up(struct fast_task_info *pTask)

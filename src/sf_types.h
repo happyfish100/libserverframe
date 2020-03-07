@@ -19,7 +19,7 @@ typedef int (*sf_recv_timeout_callback)(struct fast_task_info *pTask);
 
 typedef struct sf_context {
     struct nio_thread_data *thread_data;
-    int thread_count;
+    volatile int thread_count;
     int outer_sock;
     int inner_sock;
 
@@ -35,9 +35,9 @@ typedef struct sf_context {
     bool remove_from_ready_list;
     sf_deal_task_func deal_task;
     sf_set_body_length_callback set_body_length;
+    sf_accept_done_callback accept_done_func;
     TaskCleanUpCallback task_cleanup_func;
     sf_recv_timeout_callback timeout_callback;
-    sf_accept_done_callback accept_done_func;
 } SFContext;
 
 #endif

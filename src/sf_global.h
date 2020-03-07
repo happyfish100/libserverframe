@@ -14,11 +14,6 @@ typedef struct sf_connection_stat {
     volatile int max_count;
 } SFConnectionStat;
 
-typedef struct sf_custom_config {
-    const char *item_prefix_name;
-    int default_port;
-} SFCustomConfig;
-
 typedef struct sf_global_variables {
     int connect_timeout;
     int network_timeout;
@@ -48,21 +43,19 @@ typedef struct sf_global_variables {
 extern "C" {
 #endif
 
-extern SFGlobalVariables       g_sf_global_vars;
-extern SFContext               g_sf_context;
+extern SFGlobalVariables        g_sf_global_vars;
+extern SFContext                g_sf_context;
 
-#define SF_G_BASE_PATH         g_sf_global_vars.base_path
-#define SF_G_CONTINUE_FLAG     g_sf_global_vars.continue_flag
-#define SF_G_CONNECT_TIMEOUT   g_sf_global_vars.connect_timeout
-#define SF_G_NETWORK_TIMEOUT   g_sf_global_vars.network_timeout
-#define SF_G_THREAD_STACK_SIZE g_sf_global_vars.thread_stack_size
-#define SF_G_WORK_THREADS      g_sf_context.work_threads
+#define SF_G_BASE_PATH          g_sf_global_vars.base_path
+#define SF_G_CONTINUE_FLAG      g_sf_global_vars.continue_flag
+#define SF_G_CONNECT_TIMEOUT    g_sf_global_vars.connect_timeout
+#define SF_G_NETWORK_TIMEOUT    g_sf_global_vars.network_timeout
+#define SF_G_THREAD_STACK_SIZE  g_sf_global_vars.thread_stack_size
+#define SF_G_WORK_THREADS       g_sf_context.work_threads
+#define SF_G_ALIVE_THREAD_COUNT g_sf_context.thread_count
 
-#define SF_SET_CUSTOM_CONFIG(cfg, prefix_name, port) \
-    do { \
-        (cfg).item_prefix_name = prefix_name;    \
-        (cfg).default_port = port; \
-    } while (0)
+#define SF_WORK_THREADS(sf_context)  sf_context.work_threads
+#define SF_ALIVE_THREAD_COUNT(sf_context) sf_context.thread_count
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
     do { \
@@ -93,6 +86,11 @@ int sf_load_context_from_config(SFContext *sf_context,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
         const int default_outer_port);
+
+void sf_global_config_to_string(char *output, const int size);
+
+void sf_context_config_to_string(const SFContext *sf_context,
+        char *output, const int size);
 
 void sf_log_config_ex(const char *other_config);
 

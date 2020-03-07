@@ -235,7 +235,6 @@ static void *worker_thread_entrance(void *arg)
     struct worker_thread_context *thread_ctx;
 
     thread_ctx = (struct worker_thread_context *)arg;
-
     __sync_fetch_and_add(&thread_ctx->sf_context->thread_count, 1);
 
     ioevent_loop(thread_ctx->thread_data,
@@ -268,6 +267,7 @@ int sf_socket_server_ex(SFContext *sf_context)
     int result;
     const char *bind_addr;
 
+    sf_context->inner_sock = sf_context->outer_sock = -1;
     if (sf_context->outer_port == sf_context->inner_port) {
         if (*sf_context->outer_bind_addr == '\0' ||
                 *sf_context->inner_bind_addr == '\0') {
