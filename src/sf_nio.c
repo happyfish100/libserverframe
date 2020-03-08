@@ -211,16 +211,16 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     task->nio_stage = stage;
     task->next = NULL;
 
-    pthread_mutex_lock(&task->thread_data.waiting_queue.lock);
-    if (task->thread_data.waiting_queue.tail == NULL) {
-        task->thread_data.waiting_queue.head = task;
+    pthread_mutex_lock(&task->thread_data->waiting_queue.lock);
+    if (task->thread_data->waiting_queue.tail == NULL) {
+        task->thread_data->waiting_queue.head = task;
         notify = true;
     } else {
-        task->thread_data.waiting_queue.tail->next = task;
+        task->thread_data->waiting_queue.tail->next = task;
         notify = false;
     }
-    task->thread_data.waiting_queue.tail = task;
-    pthread_mutex_unlock(&task->thread_data.waiting_queue.lock);
+    task->thread_data->waiting_queue.tail = task;
+    pthread_mutex_unlock(&task->thread_data->waiting_queue.lock);
 
     if (notify) {
         n = 1;
@@ -253,10 +253,10 @@ void sf_recv_notify_read(int sock, short event, void *arg)
                 __LINE__, sock, errno, STRERROR(errno));
     }
 
-    pthread_mutex_lock(&thread_data.waiting_queue.lock);
+    pthread_mutex_lock(&thread_data->waiting_queue.lock);
     current = thread_data->waiting_queue.head;
     thread_data->waiting_queue.head = thread_data->waiting_queue.tail = NULL;
-    pthread_mutex_unlock(&thread_data.waiting_queue.lock);
+    pthread_mutex_unlock(&thread_data->waiting_queue.lock);
 
     while (current != NULL) {
         task = current;

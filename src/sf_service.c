@@ -10,9 +10,6 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#if defined(OS_LINUX)
-#include <sys/eventfd.h>
-#endif
 #include "fastcommon/logger.h"
 #include "fastcommon/sockopt.h"
 #include "fastcommon/shared_func.h"
@@ -23,6 +20,9 @@
 #include "sf_nio.h"
 #include "sf_service.h"
 
+#if defined(OS_LINUX)
+#include <sys/eventfd.h>
+#endif
 
 static bool bTerminateFlag = false;
 
@@ -177,7 +177,8 @@ int sf_service_init_ex(SFContext *sf_context,
         }
 
 #if defined(OS_LINUX)
-        if ((NOTIFY_READ_FD(thread_data)=eventfd(0, EFD_NONBLOCK) < 0) {
+        NOTIFY_READ_FD(thread_data) = eventfd(0, EFD_NONBLOCK);
+        if (NOTIFY_READ_FD(thread_data) < 0) {
             result = errno != 0 ? errno : EPERM;
             logError("file: "__FILE__", line: %d, "
                 "call eventfd fail, "
@@ -185,9 +186,9 @@ int sf_service_init_ex(SFContext *sf_context,
                 __LINE__, result, strerror(result));
             break;
         }
-        NOTIFY_WRITE_FD(tdata) = NOTIFY_READ_FD(thread_data);
+        NOTIFY_WRITE_FD(thread_data) = NOTIFY_READ_FD(thread_data);
 
-        if ((result=init_pthread_lock(&thread_data.waiting_queue.lock)) != 0) {
+        if ((result=init_pthread_lock(&thread_data->waiting_queue.lock)) != 0) {
             return result;
         }
 #else
