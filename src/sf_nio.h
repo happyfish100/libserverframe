@@ -10,6 +10,9 @@
 #include "sf_define.h"
 #include "sf_types.h"
 
+#define NOTIFY_READ_FD(tdata)  (tdata)->pipe_fds[0]
+#define NOTIFY_WRITE_FD(tdata) (tdata)->pipe_fds[1]
+
 #ifdef __cplusplus
 extern "C" {
 #endif

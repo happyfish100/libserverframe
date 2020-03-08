@@ -10,6 +10,9 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#if defined(OS_LINUX)
+#include <sys/eventfd.h>
+#endif
 #include "fastcommon/logger.h"
 #include "fastcommon/sockopt.h"
 #include "fastcommon/shared_func.h"
@@ -98,7 +101,7 @@ int sf_service_init_ex(SFContext *sf_context,
     int bytes;
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
-    struct nio_thread_data *pThreadData;
+    struct nio_thread_data *thread_data;
     struct nio_thread_data *pDataEnd;
     pthread_t tid;
     pthread_attr_t thread_attr;
@@ -140,19 +143,19 @@ int sf_service_init_ex(SFContext *sf_context,
 
     sf_context->thread_count = 0;
     pDataEnd = sf_context->thread_data + sf_context->work_threads;
-    for (pThreadData=sf_context->thread_data,thread_ctx=thread_contexts;
-            pThreadData<pDataEnd; pThreadData++,thread_ctx++)
+    for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
+            thread_data<pDataEnd; thread_data++,thread_ctx++)
     {
-        pThreadData->thread_loop_callback = thread_loop_callback;
+        thread_data->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
-            pThreadData->arg = alloc_thread_extra_data_callback(
-                    (int)(pThreadData - sf_context->thread_data));
+            thread_data->arg = alloc_thread_extra_data_callback(
+                    (int)(thread_data - sf_context->thread_data));
         }
         else {
-            pThreadData->arg = NULL;
+            thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&pThreadData->ev_puller,
+        if (ioevent_init(&thread_data->ev_puller,
             g_sf_global_vars.max_connections + 2, net_timeout_ms, 0) != 0)
         {
             result  = errno != 0 ? errno : ENOMEM;
@@ -163,7 +166,7 @@ int sf_service_init_ex(SFContext *sf_context,
             return result;
         }
 
-        result = fast_timer_init(&pThreadData->timer,
+        result = fast_timer_init(&thread_data->timer,
                 2 * g_sf_global_vars.network_timeout, g_current_time);
         if (result != 0) {
             logError("file: "__FILE__", line: %d, "
@@ -173,7 +176,22 @@ int sf_service_init_ex(SFContext *sf_context,
             return result;
         }
 
-        if (pipe(pThreadData->pipe_fds) != 0) {
+#if defined(OS_LINUX)
+        if ((NOTIFY_READ_FD(thread_data)=eventfd(0, EFD_NONBLOCK) < 0) {
+            result = errno != 0 ? errno : EPERM;
+            logError("file: "__FILE__", line: %d, "
+                "call eventfd fail, "
+                "errno: %d, error info: %s",
+                __LINE__, result, strerror(result));
+            break;
+        }
+        NOTIFY_WRITE_FD(tdata) = NOTIFY_READ_FD(thread_data);
+
+        if ((result=init_pthread_lock(&thread_data.waiting_queue.lock)) != 0) {
+            return result;
+        }
+#else
+        if (pipe(thread_data->pipe_fds) != 0) {
             result = errno != 0 ? errno : EPERM;
             logError("file: "__FILE__", line: %d, "
                 "call pipe fail, "
@@ -181,15 +199,7 @@ int sf_service_init_ex(SFContext *sf_context,
                 __LINE__, result, strerror(result));
             break;
         }
-
-#if defined(OS_LINUX)
-        if ((result=fd_add_flags(pThreadData->pipe_fds[0],
-                O_NONBLOCK | O_NOATIME)) != 0)
-        {
-            break;
-        }
-#else
-        if ((result=fd_add_flags(pThreadData->pipe_fds[0],
+        if ((result=fd_add_flags(NOTIFY_READ_FD(thread_data),
                 O_NONBLOCK)) != 0)
         {
             break;
@@ -197,14 +207,14 @@ int sf_service_init_ex(SFContext *sf_context,
 #endif
 
         thread_ctx->sf_context = sf_context;
-        thread_ctx->thread_data = pThreadData;
+        thread_ctx->thread_data = thread_data;
         if ((result=pthread_create(&tid, &thread_attr,
             worker_thread_entrance, thread_ctx)) != 0)
         {
             logError("file: "__FILE__", line: %d, "
                     "create thread failed, startup threads: %d, "
                     "errno: %d, error info: %s",
-                    __LINE__, (int)(pThreadData - sf_context->thread_data),
+                    __LINE__, (int)(thread_data - sf_context->thread_data),
                     result, strerror(result));
             break;
         }
@@ -216,14 +226,14 @@ int sf_service_init_ex(SFContext *sf_context,
 
 int sf_service_destroy_ex(SFContext *sf_context)
 {
-    struct nio_thread_data *pDataEnd, *pThreadData;
+    struct nio_thread_data *pDataEnd, *thread_data;
 
     free_queue_destroy();
     pDataEnd = sf_context->thread_data + sf_context->work_threads;
-    for (pThreadData=sf_context->thread_data; pThreadData<pDataEnd;
-            pThreadData++)
+    for (thread_data=sf_context->thread_data; thread_data<pDataEnd;
+            thread_data++)
     {
-        fast_timer_destroy(&pThreadData->timer);
+        fast_timer_destroy(&thread_data->timer);
     }
     free(sf_context->thread_data);
     sf_context->thread_data = NULL;
@@ -306,10 +316,9 @@ static void *accept_thread_entrance(void *arg)
 {
     struct accept_thread_context *accept_context;
     int incomesock;
-    long task_ptr;
     struct sockaddr_in inaddr;
     socklen_t sockaddr_len;
-    struct fast_task_info *pTask;
+    struct fast_task_info *task;
     char szClientIp[IP_ADDRESS_SIZE];
 
     accept_context = (struct accept_thread_context *)arg;
@@ -320,8 +329,8 @@ static void *accept_thread_entrance(void *arg)
         if (incomesock < 0) { //error
             if (!(errno == EINTR || errno == EAGAIN)) {
                 logError("file: "__FILE__", line: %d, "
-                    "accept fail, errno: %d, error info: %s",
-                    __LINE__, errno, strerror(errno));
+                        "accept fail, errno: %d, error info: %s",
+                        __LINE__, errno, strerror(errno));
             }
 
             continue;
@@ -334,39 +343,30 @@ static void *accept_thread_entrance(void *arg)
             continue;
         }
 
-        pTask = free_queue_pop();
-        if (pTask == NULL) {
+        task = free_queue_pop();
+        if (task == NULL) {
             logError("file: "__FILE__", line: %d, "
-                "malloc task buff failed, you should "
-                "increase the parameter: max_connections",
-                __LINE__);
+                    "malloc task buff failed, you should "
+                    "increase the parameter: max_connections",
+                    __LINE__);
             close(incomesock);
             continue;
         }
-        strcpy(pTask->client_ip, szClientIp);
+        strcpy(task->client_ip, szClientIp);
 
-        pTask->ctx = accept_context->sf_context;
-        pTask->nio_stage = SF_NIO_STAGE_INIT;
-        pTask->event.fd = incomesock;
-        pTask->thread_data = accept_context->sf_context->thread_data +
+        task->ctx = accept_context->sf_context;
+        task->event.fd = incomesock;
+        task->thread_data = accept_context->sf_context->thread_data +
             incomesock % accept_context->sf_context->work_threads;
         if (accept_context->sf_context->accept_done_func != NULL) {
-            accept_context->sf_context->accept_done_func(pTask,
+            accept_context->sf_context->accept_done_func(task,
                     accept_context->server_sock ==
                     accept_context->sf_context->inner_sock);
         }
 
-        task_ptr = (long)pTask;
-        if (write(pTask->thread_data->pipe_fds[1], &task_ptr,
-            sizeof(task_ptr)) != sizeof(task_ptr))
-        {
-            logError("file: "__FILE__", line: %d, "
-                "call write to pipe fd: %d fail, "
-                "errno: %d, error info: %s",
-                __LINE__, pTask->thread_data->pipe_fds[1],
-                errno, strerror(errno));
+        if (sf_nio_notify(task, SF_NIO_STAGE_INIT) != 0) {
             close(incomesock);
-            free_queue_push(pTask);
+            free_queue_push(task);
         }
     }
 
