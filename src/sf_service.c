@@ -176,6 +176,9 @@ int sf_service_init_ex(SFContext *sf_context,
             return result;
         }
 
+        if ((result=init_pthread_lock(&thread_data->waiting_queue.lock)) != 0) {
+            return result;
+        }
 #if defined(OS_LINUX)
         NOTIFY_READ_FD(thread_data) = eventfd(0, EFD_NONBLOCK);
         if (NOTIFY_READ_FD(thread_data) < 0) {
@@ -187,10 +190,6 @@ int sf_service_init_ex(SFContext *sf_context,
             break;
         }
         NOTIFY_WRITE_FD(thread_data) = NOTIFY_READ_FD(thread_data);
-
-        if ((result=init_pthread_lock(&thread_data->waiting_queue.lock)) != 0) {
-            return result;
-        }
 #else
         if (pipe(thread_data->pipe_fds) != 0) {
             result = errno != 0 ? errno : EPERM;
@@ -355,6 +354,7 @@ static void *accept_thread_entrance(void *arg)
         }
         strcpy(task->client_ip, szClientIp);
 
+        task->canceled = false;
         task->ctx = accept_context->sf_context;
         task->event.fd = incomesock;
         task->thread_data = accept_context->sf_context->thread_data +
