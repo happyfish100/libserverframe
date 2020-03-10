@@ -223,13 +223,13 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
 
     if (notify) {
         n = 1;
-        if (write(NOTIFY_WRITE_FD(task->thread_data),
+        if (write(FC_NOTIFY_WRITE_FD(task->thread_data),
                     &n, sizeof(n)) != sizeof(n))
         {
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
                     "write eventfd %d fail, errno: %d, error info: %s",
-                    __LINE__, NOTIFY_WRITE_FD(task->thread_data),
+                    __LINE__, FC_NOTIFY_WRITE_FD(task->thread_data),
                     result, STRERROR(result));
             return result;
         }

@@ -180,8 +180,8 @@ int sf_service_init_ex(SFContext *sf_context,
             return result;
         }
 #if defined(OS_LINUX)
-        NOTIFY_READ_FD(thread_data) = eventfd(0, EFD_NONBLOCK);
-        if (NOTIFY_READ_FD(thread_data) < 0) {
+        FC_NOTIFY_READ_FD(thread_data) = eventfd(0, EFD_NONBLOCK);
+        if (FC_NOTIFY_READ_FD(thread_data) < 0) {
             result = errno != 0 ? errno : EPERM;
             logError("file: "__FILE__", line: %d, "
                 "call eventfd fail, "
@@ -189,7 +189,7 @@ int sf_service_init_ex(SFContext *sf_context,
                 __LINE__, result, strerror(result));
             break;
         }
-        NOTIFY_WRITE_FD(thread_data) = NOTIFY_READ_FD(thread_data);
+        FC_NOTIFY_WRITE_FD(thread_data) = FC_NOTIFY_READ_FD(thread_data);
 #else
         if (pipe(thread_data->pipe_fds) != 0) {
             result = errno != 0 ? errno : EPERM;
@@ -199,7 +199,7 @@ int sf_service_init_ex(SFContext *sf_context,
                 __LINE__, result, strerror(result));
             break;
         }
-        if ((result=fd_add_flags(NOTIFY_READ_FD(thread_data),
+        if ((result=fd_add_flags(FC_NOTIFY_READ_FD(thread_data),
                 O_NONBLOCK)) != 0)
         {
             break;
@@ -249,7 +249,7 @@ static void *worker_thread_entrance(void *arg)
 
     ioevent_loop(thread_ctx->thread_data,
             sf_recv_notify_read,
-            sf_get_task_cleanup_func(),
+            thread_ctx->sf_context->task_cleanup_func,
             &g_sf_global_vars.continue_flag);
     ioevent_destroy(&thread_ctx->thread_data->ev_puller);
 
