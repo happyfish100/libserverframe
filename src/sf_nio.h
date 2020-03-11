@@ -52,6 +52,8 @@ void sf_task_finish_clean_up(struct fast_task_info *pTask);
 
 int sf_nio_notify(struct fast_task_info *pTask, const int stage);
 
+int sf_set_read_event(struct fast_task_info *task);
+
 void sf_task_switch_thread(struct fast_task_info *pTask,
         const int new_thread_index);
 

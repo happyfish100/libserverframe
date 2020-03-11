@@ -109,10 +109,11 @@ static inline int set_write_event(struct fast_task_info *task)
     return 0;
 }
 
-static inline int set_read_event(struct fast_task_info *task)
+int sf_set_read_event(struct fast_task_info *task)
 {
     int result;
 
+    task->nio_stage = SF_NIO_STAGE_RECV;
     if (task->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
     }
@@ -166,7 +167,7 @@ static int sf_nio_deal_task(struct fast_task_info *task)
             result = sf_nio_init(task);
             break;
         case SF_NIO_STAGE_RECV:
-            if ((result=set_read_event(task)) == 0)
+            if ((result=sf_set_read_event(task)) == 0)
             {
                 sf_client_sock_read(task->event.fd,
                         IOEVENT_READ, task);
@@ -546,8 +547,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
         if (task->offset >= task->length) {
             task->offset = 0;
             task->length = 0;
-            task->nio_stage = SF_NIO_STAGE_RECV;
-            if (set_read_event(task) != 0) {
+            if (sf_set_read_event(task) != 0) {
                 return -1;
             }
             break;

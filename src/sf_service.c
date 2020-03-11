@@ -612,3 +612,16 @@ void sf_set_current_time()
     g_sf_global_vars.up_time = g_current_time;
     srand(g_sf_global_vars.up_time);
 }
+
+void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled)
+{
+    struct nio_thread_data *thread_data;
+    struct nio_thread_data *pDataEnd;
+
+    pDataEnd = sf_context->thread_data + sf_context->work_threads;
+    for (thread_data=sf_context->thread_data; thread_data<pDataEnd;
+            thread_data++)
+    {
+        thread_data->notify.enabled = enabled;
+    }
+}

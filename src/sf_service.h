@@ -56,6 +56,11 @@ void sf_accept_loop_ex(SFContext *sf_context, const bool block);
 
 #define sf_accept_loop()  sf_accept_loop_ex(&g_sf_context, true)
 
+void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled);
+
+#define sf_enable_thread_notify(enabled)  \
+    sf_enable_thread_notify_ex(&g_sf_context, enabled)
+
 #ifdef __cplusplus
 }
 #endif
