@@ -436,6 +436,18 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
             if (task->length > task->size) {
                 int old_size;
+
+                if (!SF_CTX->realloc_task_buffer) {
+                    logError("file: "__FILE__", line: %d, "
+                            "client ip: %s, pkg length: %d exceeds "
+                            "task size: %d, but realloc buffer disabled",
+                            __LINE__, task->client_ip, task->size,
+                            task->length);
+
+                    iovent_add_to_deleted_list(task);
+                    return -1;
+                }
+
                 old_size = task->size;
                 if (free_queue_realloc_buffer(task, task->length) != 0) {
                     logError("file: "__FILE__", line: %d, "

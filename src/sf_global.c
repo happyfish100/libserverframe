@@ -28,7 +28,7 @@ SFGlobalVariables g_sf_global_vars = {
 
 SFContext g_sf_context = {
     NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
-    {'\0'}, {'\0'}, 0, true, NULL, NULL, NULL,
+    {'\0'}, {'\0'}, 0, true, true, NULL, NULL, NULL,
     sf_task_finish_clean_up, NULL
 };
 

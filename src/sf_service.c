@@ -106,6 +106,8 @@ int sf_service_init_ex(SFContext *sf_context,
     pthread_t tid;
     pthread_attr_t thread_attr;
 
+    sf_context->realloc_task_buffer = g_sf_global_vars.
+                    min_buff_size < g_sf_global_vars.max_buff_size;
     sf_context->accept_done_func = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size, set_body_length_func,
             deal_func, task_cleanup_func, timeout_callback);

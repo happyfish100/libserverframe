@@ -61,6 +61,15 @@ void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled);
 #define sf_enable_thread_notify(enabled)  \
     sf_enable_thread_notify_ex(&g_sf_context, enabled)
 
+static inline void sf_enable_realloc_task_buffer_ex(SFContext *sf_context,
+        const bool enabled)
+{
+    sf_context->realloc_task_buffer = enabled;
+}
+
+#define sf_enable_realloc_task_buffer(enabled)  \
+    sf_enable_realloc_task_buffer_ex(&g_sf_context, enabled)
+
 #ifdef __cplusplus
 }
 #endif
