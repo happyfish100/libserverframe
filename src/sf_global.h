@@ -43,19 +43,23 @@ typedef struct sf_global_variables {
 extern "C" {
 #endif
 
-extern SFGlobalVariables        g_sf_global_vars;
-extern SFContext                g_sf_context;
+extern SFGlobalVariables         g_sf_global_vars;
+extern SFContext                 g_sf_context;
 
-#define SF_G_BASE_PATH          g_sf_global_vars.base_path
-#define SF_G_CONTINUE_FLAG      g_sf_global_vars.continue_flag
-#define SF_G_CONNECT_TIMEOUT    g_sf_global_vars.connect_timeout
-#define SF_G_NETWORK_TIMEOUT    g_sf_global_vars.network_timeout
-#define SF_G_THREAD_STACK_SIZE  g_sf_global_vars.thread_stack_size
-#define SF_G_WORK_THREADS       g_sf_context.work_threads
-#define SF_G_ALIVE_THREAD_COUNT g_sf_context.thread_count
+#define SF_G_BASE_PATH           g_sf_global_vars.base_path
+#define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
+#define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
+#define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
+#define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
+#define SF_G_WORK_THREADS        g_sf_context.work_threads
+#define SF_G_ALIVE_THREAD_COUNT  g_sf_context.thread_count
+#define SF_G_THREAD_INDEX(tdata) (int)(tdata - g_sf_context.thread_data)
+#define SF_G_CONN_CURRENT_COUNT  g_sf_global_vars.connection_stat.current_count
+#define SF_G_CONN_MAX_COUNT      g_sf_global_vars.connection_stat.max_count
 
-#define SF_WORK_THREADS(sf_context)  sf_context.work_threads
-#define SF_ALIVE_THREAD_COUNT(sf_context) sf_context.thread_count
+#define SF_WORK_THREADS(sf_context)        sf_context.work_threads
+#define SF_ALIVE_THREAD_COUNT(sf_context)  sf_context.thread_count
+#define SF_THREAD_INDEX(sf_context, tdata) (int)(tdata - sf_context.thread_data)
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
     do { \
