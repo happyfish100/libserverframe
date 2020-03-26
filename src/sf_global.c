@@ -291,7 +291,6 @@ int sf_load_context_from_config(SFContext *sf_context,
         sf_context->outer_port = default_outer_port;
     }
 
-
     inner_bind_addr = iniGetStrValue(section_name,
             "inner_bind_addr", pIniContext);
     outer_bind_addr = iniGetStrValue(section_name,

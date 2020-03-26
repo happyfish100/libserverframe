@@ -318,10 +318,10 @@ static void *accept_thread_entrance(void *arg)
 {
     struct accept_thread_context *accept_context;
     int incomesock;
+    int port;
     struct sockaddr_in inaddr;
     socklen_t sockaddr_len;
     struct fast_task_info *task;
-    char szClientIp[IP_ADDRESS_SIZE];
 
     accept_context = (struct accept_thread_context *)arg;
     while (g_sf_global_vars.continue_flag) {
@@ -338,8 +338,6 @@ static void *accept_thread_entrance(void *arg)
             continue;
         }
 
-        getPeerIpaddr(incomesock,
-                szClientIp, IP_ADDRESS_SIZE);
         if (tcpsetnonblockopt(incomesock) != 0) {
             close(incomesock);
             continue;
@@ -354,7 +352,9 @@ static void *accept_thread_entrance(void *arg)
             close(incomesock);
             continue;
         }
-        strcpy(task->client_ip, szClientIp);
+        getPeerIpAddPort(incomesock, task->client_ip,
+                sizeof(task->client_ip), &port);
+        task->port = port;
 
         task->canceled = false;
         task->ctx = accept_context->sf_context;
