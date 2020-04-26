@@ -116,6 +116,11 @@ int sf_load_config_ex(const char *server_name, const char *filename,
                     &max_pkg_size)) != 0)
     {
         return result;
+    } else if (max_pkg_size < 4096) {
+        logWarning("file: "__FILE__", line: %d, "
+                "max_pkg_size: %d is too small, set to 4096",
+                __LINE__, (int)max_pkg_size);
+        max_pkg_size = 4096;
     }
     g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
 
@@ -128,6 +133,11 @@ int sf_load_config_ex(const char *server_name, const char *filename,
                     &min_buff_size)) != 0)
     {
         return result;
+    } else if (min_buff_size < 2048) {
+        logWarning("file: "__FILE__", line: %d, "
+                "min_buff_size: %d is too small, set to 2048",
+                __LINE__, (int)min_buff_size);
+        min_buff_size = 2048;
     }
     g_sf_global_vars.min_buff_size = (int)min_buff_size;
 
@@ -147,8 +157,19 @@ int sf_load_config_ex(const char *server_name, const char *filename,
         g_sf_global_vars.min_buff_size = g_sf_global_vars.max_pkg_size;
         g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
     }
-    else if (g_sf_global_vars.max_buff_size < g_sf_global_vars.max_pkg_size) {
-        g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
+    else {
+        if (g_sf_global_vars.max_buff_size < g_sf_global_vars.max_pkg_size) {
+            g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
+        }
+
+        if (g_sf_global_vars.max_buff_size < g_sf_global_vars.min_buff_size) {
+            logWarning("file: "__FILE__", line: %d, "
+                    "max_buff_size: %d < min_buff_size: %d, "
+                    "set max_buff_size to min_buff_size", __LINE__,
+                    g_sf_global_vars.max_buff_size,
+                    g_sf_global_vars.min_buff_size);
+            g_sf_global_vars.max_buff_size = g_sf_global_vars.min_buff_size;
+        }
     }
 
     pRunByGroup = iniGetStrValue(NULL, "run_by_group", pIniContext);
