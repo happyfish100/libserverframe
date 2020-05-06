@@ -46,7 +46,8 @@ struct accept_thread_context {
 
 static void *worker_thread_entrance(void *arg);
 
-static int sf_init_free_queues(const int task_arg_size)
+static int sf_init_free_queues(const int task_arg_size,
+        TaskInitCallback init_callback)
 {
 #define ALLOC_CONNECTIONS_ONCE 1024
 
@@ -76,10 +77,10 @@ static int sf_init_free_queues(const int task_arg_size)
     alloc_conn_once = ALLOC_CONNECTIONS_ONCE / m;
     init_connections = g_sf_global_vars.max_connections < alloc_conn_once ?
         g_sf_global_vars.max_connections : alloc_conn_once;
-    if ((result=free_queue_init_ex(g_sf_global_vars.max_connections,
+    if ((result=free_queue_init_ex2(g_sf_global_vars.max_connections,
                     init_connections, alloc_conn_once, g_sf_global_vars.
                     min_buff_size, g_sf_global_vars.max_buff_size,
-                    task_arg_size)) != 0)
+                    task_arg_size, init_callback)) != 0)
     {
         return result;
     }
@@ -87,7 +88,7 @@ static int sf_init_free_queues(const int task_arg_size)
     return 0;
 }
 
-int sf_service_init_ex(SFContext *sf_context,
+int sf_service_init_ex2(SFContext *sf_context,
         sf_alloc_thread_extra_data_callback
         alloc_thread_extra_data_callback,
         ThreadLoopCallback thread_loop_callback,
@@ -95,7 +96,8 @@ int sf_service_init_ex(SFContext *sf_context,
         sf_set_body_length_callback set_body_length_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
-        const int proto_header_size, const int task_arg_size)
+        const int proto_header_size, const int task_arg_size,
+        TaskInitCallback init_callback)
 {
     int result;
     int bytes;
@@ -112,7 +114,7 @@ int sf_service_init_ex(SFContext *sf_context,
     sf_set_parameters_ex(sf_context, proto_header_size, set_body_length_func,
             deal_func, task_cleanup_func, timeout_callback);
 
-    if ((result=sf_init_free_queues(task_arg_size)) != 0) {
+    if ((result=sf_init_free_queues(task_arg_size, init_callback)) != 0) {
         return result;
     }
 

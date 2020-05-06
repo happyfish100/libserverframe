@@ -22,7 +22,7 @@ extern int g_server_inner_sock;
 
 extern int g_worker_thread_count;
 
-int sf_service_init_ex(SFContext *sf_context,
+int sf_service_init_ex2(SFContext *sf_context,
         sf_alloc_thread_extra_data_callback
         alloc_thread_extra_data_callback,
         ThreadLoopCallback thread_loop_callback,
@@ -30,16 +30,26 @@ int sf_service_init_ex(SFContext *sf_context,
         sf_set_body_length_callback set_body_length_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
-        const int proto_header_size, const int task_arg_size);
+        const int proto_header_size, const int task_arg_size,
+        TaskInitCallback init_callback);
+
+#define sf_service_init_ex(sf_context, alloc_thread_extra_data_callback,  \
+        thread_loop_callback, accept_done_callback, set_body_length_func, \
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms,   \
+        proto_header_size, task_arg_size) \
+    sf_service_init_ex2(sf_context, alloc_thread_extra_data_callback,     \
+        thread_loop_callback, accept_done_callback, set_body_length_func, \
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms,   \
+        proto_header_size, task_arg_size, NULL)
 
 #define sf_service_init(alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func, \
-        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms, \
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms,   \
         proto_header_size, task_arg_size) \
-    sf_service_init_ex(&g_sf_context, alloc_thread_extra_data_callback, \
+    sf_service_init_ex2(&g_sf_context, alloc_thread_extra_data_callback,  \
         thread_loop_callback, accept_done_callback, set_body_length_func, \
-        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms, \
-        proto_header_size, task_arg_size)
+        deal_func, task_cleanup_func, timeout_callback, net_timeout_ms,   \
+        proto_header_size, task_arg_size, NULL)
 
 int sf_service_destroy_ex(SFContext *sf_context);
 
