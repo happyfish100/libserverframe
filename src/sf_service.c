@@ -16,6 +16,7 @@
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/ioevent_loop.h"
+#include "fastcommon/fc_memory.h"
 #include "sf_global.h"
 #include "sf_nio.h"
 #include "sf_service.h"
@@ -127,22 +128,16 @@ int sf_service_init_ex2(SFContext *sf_context,
     }
 
     bytes = sizeof(struct nio_thread_data) * sf_context->work_threads;
-    sf_context->thread_data = (struct nio_thread_data *)malloc(bytes);
+    sf_context->thread_data = (struct nio_thread_data *)fc_malloc(bytes);
     if (sf_context->thread_data == NULL) {
-        logError("file: "__FILE__", line: %d, "
-                "malloc %d bytes fail, errno: %d, error info: %s",
-                __LINE__, bytes, errno, strerror(errno));
-        return errno != 0 ? errno : ENOMEM;
+        return ENOMEM;
     }
     memset(sf_context->thread_data, 0, bytes);
 
     bytes = sizeof(struct worker_thread_context) * sf_context->work_threads;
-    thread_contexts = (struct worker_thread_context *)malloc(bytes);
+    thread_contexts = (struct worker_thread_context *)fc_malloc(bytes);
     if (thread_contexts == NULL) {
-        logError("file: "__FILE__", line: %d, "
-            "malloc %d bytes fail, errno: %d, error info: %s",
-            __LINE__, bytes, errno, strerror(errno));
-        return errno != 0 ? errno : ENOMEM;
+        return ENOMEM;
     }
 
     sf_context->thread_count = 0;
@@ -427,11 +422,8 @@ void sf_accept_loop_ex(SFContext *sf_context, const bool block)
     }
 
     bytes = sizeof(struct accept_thread_context) * count;
-    accept_contexts = (struct accept_thread_context *)malloc(bytes);
+    accept_contexts = (struct accept_thread_context *)fc_malloc(bytes);
     if (accept_contexts == NULL) {
-        logError("file: "__FILE__", line: %d, "
-                "malloc %d bytes fail, errno: %d, error info: %s",
-                __LINE__, bytes, errno, strerror(errno));
         return;
     }
 
