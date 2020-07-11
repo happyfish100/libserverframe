@@ -12,6 +12,8 @@ extern "C" {
 
 int sf_connect_to_server(const char *ip_addr, const int port, int *sock);
 
+void sf_enable_exit_on_oom();
+
 #ifdef __cplusplus
 }
 #endif
