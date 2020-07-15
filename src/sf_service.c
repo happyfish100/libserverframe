@@ -621,3 +621,11 @@ void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled)
         thread_data->notify.enabled = enabled;
     }
 }
+
+struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context)
+{
+    uint32_t index;
+    index = (uint32_t)((uint64_t)sf_context->work_threads *
+            (uint64_t)rand() / (uint64_t)RAND_MAX);
+    return sf_context->thread_data + index;
+}

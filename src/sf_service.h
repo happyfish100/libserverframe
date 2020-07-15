@@ -80,6 +80,12 @@ static inline void sf_enable_realloc_task_buffer_ex(SFContext *sf_context,
 #define sf_enable_realloc_task_buffer(enabled)  \
     sf_enable_realloc_task_buffer_ex(&g_sf_context, enabled)
 
+struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context);
+
+#define sf_get_random_thread_data()  \
+    sf_get_random_thread_data_ex(&g_sf_context)
+
+
 #ifdef __cplusplus
 }
 #endif
