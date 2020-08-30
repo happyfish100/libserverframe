@@ -25,7 +25,8 @@
 #include <sys/eventfd.h>
 #endif
 
-static bool bTerminateFlag = false;
+static bool terminate_flag = false;
+static sf_sig_quit_handler sig_quit_handler = NULL;
 
 static void sigQuitHandler(int sig);
 static void sigHupHandler(int sig);
@@ -476,12 +477,16 @@ static void sigDumpHandler(int sig)
 
 static void sigQuitHandler(int sig)
 {
-    if (!bTerminateFlag) {
-        bTerminateFlag = true;
+    if (!terminate_flag) {
+        terminate_flag = true;
         g_sf_global_vars.continue_flag = false;
+        if (sig_quit_handler != NULL) {
+            sig_quit_handler(sig);
+        }
+
         logCrit("file: "__FILE__", line: %d, "
-            "catch signal %d, program exiting...",
-            __LINE__, sig);
+                "catch signal %d, program exiting...",
+                __LINE__, sig);
     }
 }
 
@@ -628,4 +633,9 @@ struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context)
     index = (uint32_t)((uint64_t)sf_context->work_threads *
             (uint64_t)rand() / (uint64_t)RAND_MAX);
     return sf_context->thread_data + index;
+}
+
+void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler)
+{
+    sig_quit_handler = quit_handler;
 }

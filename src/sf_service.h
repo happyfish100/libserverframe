@@ -12,15 +12,11 @@
 #include "sf_types.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);
+typedef void (*sf_sig_quit_handler)(int sig);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-extern int g_server_outer_sock;
-extern int g_server_inner_sock;
-
-extern int g_worker_thread_count;
 
 int sf_service_init_ex2(SFContext *sf_context,
         sf_alloc_thread_extra_data_callback
@@ -85,6 +81,7 @@ struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context);
 #define sf_get_random_thread_data()  \
     sf_get_random_thread_data_ex(&g_sf_context)
 
+void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
 #ifdef __cplusplus
 }
