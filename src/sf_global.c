@@ -42,61 +42,30 @@ static inline void set_config_str_value(const char *value,
     }
 }
 
-int sf_load_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const char *section_name,
-        const int default_inner_port, const int default_outer_port)
+static int load_network_parameters(IniContext *pIniContext)
 {
-    char *pBasePath;
-    char *pRunByGroup;
-    char *pRunByUser;
+    int result;
     char *pMaxPkgSize;
     char *pMinBuffSize;
     char *pMaxBuffSize;
-    char *pThreadStackSize;
-    int result;
     int64_t max_pkg_size;
     int64_t min_buff_size;
     int64_t max_buff_size;
-    int64_t thread_stack_size;
 
-    pBasePath = iniGetStrValue(NULL, "base_path", pIniContext);
-    if (pBasePath == NULL) {
-        logError("file: "__FILE__", line: %d, "
-                "conf file \"%s\" must have item "
-                "\"base_path\"!", __LINE__, filename);
-        return ENOENT;
-    }
-
-    snprintf(g_sf_global_vars.base_path, sizeof(g_sf_global_vars.base_path),
-            "%s", pBasePath);
-    chopPath(g_sf_global_vars.base_path);
-    if (!fileExists(g_sf_global_vars.base_path)) {
-        logError("file: "__FILE__", line: %d, "
-                "\"%s\" can't be accessed, error info: %s",
-                __LINE__, g_sf_global_vars.base_path, strerror(errno));
-        return errno != 0 ? errno : ENOENT;
-    }
-    if (!isDir(g_sf_global_vars.base_path)) {
-        logError("file: "__FILE__", line: %d, "
-                "\"%s\" is not a directory!",
-                __LINE__, g_sf_global_vars.base_path);
-        return ENOTDIR;
-    }
-
-    g_sf_global_vars.connect_timeout = iniGetIntValue(NULL, "connect_timeout",
-            pIniContext, DEFAULT_CONNECT_TIMEOUT);
+    g_sf_global_vars.connect_timeout = iniGetIntValue(NULL,
+            "connect_timeout", pIniContext, DEFAULT_CONNECT_TIMEOUT);
     if (g_sf_global_vars.connect_timeout <= 0) {
         g_sf_global_vars.connect_timeout = DEFAULT_CONNECT_TIMEOUT;
     }
 
-    g_sf_global_vars.network_timeout = iniGetIntValue(NULL, "network_timeout",
-            pIniContext, DEFAULT_NETWORK_TIMEOUT);
+    g_sf_global_vars.network_timeout = iniGetIntValue(NULL,
+            "network_timeout", pIniContext, DEFAULT_NETWORK_TIMEOUT);
     if (g_sf_global_vars.network_timeout <= 0) {
         g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.max_connections = iniGetIntValue(NULL, "max_connections",
-            pIniContext, DEFAULT_MAX_CONNECTONS);
+    g_sf_global_vars.max_connections = iniGetIntValue(NULL,
+            "max_connections", pIniContext, DEFAULT_MAX_CONNECTONS);
     if (g_sf_global_vars.max_connections <= 0) {
         g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
     }
@@ -169,6 +138,49 @@ int sf_load_config_ex(const char *server_name, const char *filename,
                     g_sf_global_vars.max_buff_size,
                     g_sf_global_vars.min_buff_size);
             g_sf_global_vars.max_buff_size = g_sf_global_vars.min_buff_size;
+        }
+    }
+
+    return 0;
+}
+
+int sf_load_global_config_ex(const char *server_name, const char *filename,
+        IniContext *pIniContext, const bool load_network_params)
+{
+    int result;
+    char *pBasePath;
+    char *pRunByGroup;
+    char *pRunByUser;
+    char *pThreadStackSize;
+    int64_t thread_stack_size;
+
+    pBasePath = iniGetStrValue(NULL, "base_path", pIniContext);
+    if (pBasePath == NULL) {
+        logError("file: "__FILE__", line: %d, "
+                "conf file \"%s\" must have item "
+                "\"base_path\"!", __LINE__, filename);
+        return ENOENT;
+    }
+
+    snprintf(g_sf_global_vars.base_path, sizeof(g_sf_global_vars.base_path),
+            "%s", pBasePath);
+    chopPath(g_sf_global_vars.base_path);
+    if (!fileExists(g_sf_global_vars.base_path)) {
+        logError("file: "__FILE__", line: %d, "
+                "\"%s\" can't be accessed, error info: %s",
+                __LINE__, g_sf_global_vars.base_path, strerror(errno));
+        return errno != 0 ? errno : ENOENT;
+    }
+    if (!isDir(g_sf_global_vars.base_path)) {
+        logError("file: "__FILE__", line: %d, "
+                "\"%s\" is not a directory!",
+                __LINE__, g_sf_global_vars.base_path);
+        return ENOTDIR;
+    }
+
+    if (load_network_params) {
+        if ((result=load_network_parameters(pIniContext)) != 0) {
+            return result;
         }
     }
 
@@ -263,6 +275,19 @@ int sf_load_config_ex(const char *server_name, const char *filename,
         return result;
     }
 
+    return 0;
+}
+
+int sf_load_config_ex(const char *server_name, const char *filename,
+        IniContext *pIniContext, const char *section_name,
+        const int default_inner_port, const int default_outer_port)
+{
+    int result;
+    if ((result=sf_load_global_config(server_name,
+                    filename, pIniContext)) != 0)
+    {
+        return result;
+    }
     return sf_load_context_from_config(&g_sf_context, filename, pIniContext,
             section_name, default_inner_port, default_outer_port);
 }

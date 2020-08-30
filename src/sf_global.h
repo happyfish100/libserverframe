@@ -78,7 +78,18 @@ extern SFContext                 g_sf_context;
     } \
     } while (0)
 
-int sf_load_config(const char *server_name, const char *filename, 
+int sf_load_global_config_ex(const char *server_name, const char *filename,
+        IniContext *pIniContext, const bool load_network_params);
+
+static inline int sf_load_global_config(const char *server_name,
+        const char *filename, IniContext *pIniContext)
+{
+    const bool load_network_params = true;
+    return sf_load_global_config_ex(server_name, filename,
+            pIniContext, load_network_params);
+}
+
+int sf_load_config(const char *server_name, const char *filename,
         IniContext *pIniContext, const int default_inner_port,
         const int default_outer_port);
 
