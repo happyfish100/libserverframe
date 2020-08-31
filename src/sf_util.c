@@ -83,8 +83,8 @@ void sf_usage(const char *program)
             "[start | stop | restart]\n", program);
 }
 
-void sf_parse_daemon_mode_and_action(int argc, char *argv[],
-        bool *daemon_mode, char **action)
+void sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
+        bool *daemon_mode, char **action, const char *default_action)
 {
     int i;
 
@@ -101,7 +101,7 @@ void sf_parse_daemon_mode_and_action(int argc, char *argv[],
     if (argc - (*daemon_mode ? 0 : 1) > 2) {
         *action = argv[argc - 1];
     } else {
-        *action = NULL;
+        *action = (char *)default_action;
     }
 }
 
