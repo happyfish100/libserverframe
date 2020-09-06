@@ -46,6 +46,14 @@ struct accept_thread_context {
     int server_sock;
 };
 
+
+int sf_init_task(struct fast_task_info *task)
+{
+    task->connect_timeout = SF_G_CONNECT_TIMEOUT; //for client side
+    task->network_timeout = SF_G_NETWORK_TIMEOUT;
+    return 0;
+}
+
 static void *worker_thread_entrance(void *arg);
 
 static int sf_init_free_queues(const int task_arg_size,
@@ -82,7 +90,8 @@ static int sf_init_free_queues(const int task_arg_size,
     if ((result=free_queue_init_ex2(g_sf_global_vars.max_connections,
                     init_connections, alloc_conn_once, g_sf_global_vars.
                     min_buff_size, g_sf_global_vars.max_buff_size,
-                    task_arg_size, init_callback)) != 0)
+                    task_arg_size, init_callback != NULL ?
+                    init_callback : sf_init_task)) != 0)
     {
         return result;
     }

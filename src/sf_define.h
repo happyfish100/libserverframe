@@ -11,10 +11,11 @@
 #define SF_DEF_MAX_BUFF_SIZE  (64 * 1024)
 
 #define SF_NIO_STAGE_INIT       0  //set ioevent
-#define SF_NIO_STAGE_RECV       1  //recv
-#define SF_NIO_STAGE_SEND       2  //send
-#define SF_NIO_STAGE_FORWARDED  3  //deal the forwarded request
-#define SF_NIO_STAGE_CONTINUE   4  //notify the thread continue deal
+#define SF_NIO_STAGE_CONNECT    1  //do connect
+#define SF_NIO_STAGE_RECV       2  //do recv
+#define SF_NIO_STAGE_SEND       3  //do send
+#define SF_NIO_STAGE_FORWARDED  4  //deal the forwarded request
+#define SF_NIO_STAGE_CONTINUE   5  //notify the thread continue deal
 #define SF_NIO_STAGE_CLOSE      9  //cleanup the task
 
 #ifdef __cplusplus
