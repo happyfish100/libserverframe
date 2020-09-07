@@ -184,9 +184,8 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
         return -1;
     }
 
-    task->nio_stage = SF_NIO_STAGE_RECV;
-    task->event.callback = (IOEventCallback)sf_client_sock_read;
-    return 0;
+    task->nio_stage = SF_NIO_STAGE_HANDSHAKE;
+    return SF_CTX->deal_task(task);
 }
 
 static int sf_connect_server(struct fast_task_info *task)
@@ -202,9 +201,14 @@ static int sf_connect_server(struct fast_task_info *task)
     result = asyncconnectserverbyip(task->event.fd,
             task->server_ip, task->port);
     if (result == 0) {
-        task->nio_stage = SF_NIO_STAGE_RECV;
-        return sf_ioevent_add(task, (IOEventCallback)
-                sf_client_sock_read, task->network_timeout);
+        if ((result=sf_ioevent_add(task, (IOEventCallback)
+                sf_client_sock_read, task->network_timeout)) != 0)
+        {
+            return result;
+        }
+
+        task->nio_stage = SF_NIO_STAGE_HANDSHAKE;
+        return SF_CTX->deal_task(task);
     } else if (result == EINPROGRESS) {
         return sf_ioevent_add(task, (IOEventCallback)
                 sf_client_sock_connect, task->connect_timeout);
