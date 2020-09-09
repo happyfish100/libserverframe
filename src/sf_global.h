@@ -50,7 +50,9 @@ extern SFContext                 g_sf_context;
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
+#define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
+
 #define SF_G_WORK_THREADS        g_sf_context.work_threads
 #define SF_G_ALIVE_THREAD_COUNT  g_sf_context.thread_count
 #define SF_G_THREAD_INDEX(tdata) (int)(tdata - g_sf_context.thread_data)

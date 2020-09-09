@@ -44,29 +44,52 @@ static inline TaskCleanUpCallback sf_get_task_cleanup_func_ex(
     sf_get_task_cleanup_func_ex(&g_sf_context)
 
 void sf_recv_notify_read(int sock, short event, void *arg);
-int sf_send_add_event(struct fast_task_info *pTask);
+int sf_send_add_event(struct fast_task_info *task);
 int sf_client_sock_write(int sock, short event, void *arg);
 int sf_client_sock_read(int sock, short event, void *arg);
 
-void sf_task_finish_clean_up(struct fast_task_info *pTask);
+void sf_task_finish_clean_up(struct fast_task_info *task);
 
-int sf_nio_notify(struct fast_task_info *pTask, const int stage);
+int sf_nio_notify(struct fast_task_info *task, const int new_stage);
 
 int sf_set_read_event(struct fast_task_info *task);
 
-void sf_task_switch_thread(struct fast_task_info *pTask,
+void sf_task_switch_thread(struct fast_task_info *task,
         const int new_thread_index);
 
-static inline int sf_nio_forward_request(struct fast_task_info *pTask,
+static inline int sf_nio_forward_request(struct fast_task_info *task,
         const int new_thread_index)
 {
-    sf_task_switch_thread(pTask, new_thread_index);
-    return sf_nio_notify(pTask, SF_NIO_STAGE_FORWARDED);
+    sf_task_switch_thread(task, new_thread_index);
+    return sf_nio_notify(task, SF_NIO_STAGE_FORWARDED);
 }
 
-static inline bool sf_client_sock_in_read_stage(struct fast_task_info *pTask)
+static inline bool sf_client_sock_in_read_stage(struct fast_task_info *task)
 {
-    return (pTask->event.callback == (IOEventCallback)sf_client_sock_read);
+    return (task->event.callback == (IOEventCallback)sf_client_sock_read);
+}
+
+static inline void sf_nio_set_stage(struct fast_task_info *task,
+        const int new_stage)
+{
+    int old_stage;
+    old_stage = __sync_add_and_fetch(&task->nio_stage, 0);
+    if (new_stage != old_stage) {
+        __sync_bool_compare_and_swap(&task->nio_stage, old_stage, new_stage);
+    }
+}
+
+static inline bool sf_nio_swap_stage(struct fast_task_info *task,
+        const int old_stage, const int new_stage)
+{
+    return __sync_bool_compare_and_swap(&task->nio_stage, old_stage, new_stage);
+}
+
+static inline bool sf_nio_task_inprogress(struct fast_task_info *task)
+{
+    int stage;
+    stage = __sync_add_and_fetch(&task->nio_stage, 0);
+    return SF_NIO_STAGE_IS_INPROGRESS(stage);
 }
 
 #ifdef __cplusplus
