@@ -5,12 +5,16 @@ INC_PATH = -I/usr/include -I/usr/local/include
 LIB_PATH = $(LIBS) -lfastcommon 
 TARGET_LIB = $(TARGET_PREFIX)/$(LIB_VERSION)
 
-ALL_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h sf_func.h sf_util.h list.h
+ALL_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
+              sf_func.h sf_util.h sf_configs.h
+
 ALL_LIBS = libserverframe.so
 
 all: $(ALL_LIBS)
 
-libserverframe.so: sf_nio.lo sf_service.lo sf_global.lo sf_func.lo sf_util.lo
+libserverframe.so: sf_nio.lo sf_service.lo sf_global.lo sf_func.lo sf_util.lo \
+        sf_configs.lo
+
 	cc -shared -o $@ $^ $(LIB_PATH)
 
 .lo:

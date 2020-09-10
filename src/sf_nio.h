@@ -50,7 +50,11 @@ int sf_client_sock_read(int sock, short event, void *arg);
 
 void sf_task_finish_clean_up(struct fast_task_info *task);
 
-int sf_nio_notify(struct fast_task_info *task, const int new_stage);
+int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
+        const char *file, const int line);
+
+#define sf_nio_notify(task, new_stage) \
+    sf_nio_notify_ex(task, new_stage, __FILE__, __LINE__)
 
 int sf_set_read_event(struct fast_task_info *task);
 

@@ -14,7 +14,6 @@
 #include "fastcommon/common_define.h"
 #include "fastcommon/shared_func.h"
 #include "fastcommon/logger.h"
-#include "sf_define.h"
 #include "sf_nio.h"
 #include "sf_global.h"
 

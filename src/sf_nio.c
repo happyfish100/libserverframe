@@ -274,7 +274,8 @@ static int sf_nio_deal_task(struct fast_task_info *task)
     return result;
 }
 
-int sf_nio_notify(struct fast_task_info *task, const int new_stage)
+int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
+        const char *file, const int line)
 {
     int64_t n;
     int result;
@@ -288,9 +289,10 @@ int sf_nio_notify(struct fast_task_info *task, const int new_stage)
     {
         if (SF_NIO_STAGE_IS_INPROGRESS(old_stage)) {
             logWarning("file: "__FILE__", line: %d, "
+                    "from caller {file: %s, line: %d}, "
                     "client ip: %s, nio stage in progress, "
                     "current stage: %d, skip set to %d", __LINE__,
-                    task->client_ip, old_stage, new_stage);
+                    file, line, task->client_ip, old_stage, new_stage);
             return EBUSY;
         }
     }
@@ -299,9 +301,10 @@ int sf_nio_notify(struct fast_task_info *task, const int new_stage)
                 old_stage, new_stage))
     {
         logWarning("file: "__FILE__", line: %d, "
+                "from caller {file: %s, line: %d}, "
                 "client ip: %s, skip set stage to %d because stage "
-                "changed, current stage: %d", __LINE__, task->client_ip,
-                new_stage, SF_NIO_TASK_STAGE_FETCH(task));
+                "changed, current stage: %d", __LINE__, file, line,
+                task->client_ip, new_stage, SF_NIO_TASK_STAGE_FETCH(task));
         return EEXIST;
     }
 
