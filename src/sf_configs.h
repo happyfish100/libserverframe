@@ -1,7 +1,7 @@
-//sf_global.h
+//sf_configs.h
 
-#ifndef _SF_GLOBAL_H
-#define _SF_GLOBAL_H
+#ifndef _SF_CONFIGS_H
+#define _SF_CONFIGS_H
 
 #include "fastcommon/common_define.h"
 #include "fastcommon/ini_file_reader.h"
@@ -22,6 +22,12 @@ typedef struct sf_net_retry_config {
     int network_retry_interval_ms;
 } SFNetRetryConfig;
 
+typedef enum sf_data_read_rule {
+    sf_data_read_rule_any_available,
+    sf_data_read_rule_slave_first,
+    sf_data_read_rule_master_only,
+} SFDataReadRule;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,6 +37,23 @@ int sf_load_net_retry_config(SFNetRetryConfig *net_retry_cfg,
 
 void sf_net_retry_config_to_string(SFNetRetryConfig *net_retry_cfg,
         char *output, const int size);
+
+void sf_load_read_rule_config(SFDataReadRule *rule, IniFullContext *ini_ctx);
+
+static inline const char *sf_get_read_rule_caption(
+        const SFDataReadRule read_rule)
+{
+    switch (read_rule) {
+        case sf_data_read_rule_any_available:
+            return "any available";
+        case sf_data_read_rule_slave_first:
+            return "slave first";
+        case sf_data_read_rule_master_only:
+            return "master only";
+        default:
+            return "unknown";
+    }
+}
 
 #ifdef __cplusplus
 }

@@ -78,3 +78,24 @@ void sf_net_retry_config_to_string(SFNetRetryConfig *net_retry_cfg,
             net_retry_cfg->network_retry_times,
             net_retry_cfg->network_retry_interval_ms);
 }
+
+void sf_load_read_rule_config(SFDataReadRule *rule, IniFullContext *ini_ctx)
+{
+    char *read_rule;
+    read_rule = iniGetStrValue(ini_ctx->section_name,
+            "read_rule", ini_ctx->context);
+    if (read_rule == NULL || *read_rule == '\0') {
+        *rule = sf_data_read_rule_any_available;
+    } else if (strncasecmp(read_rule, "any", 3)) {
+        *rule = sf_data_read_rule_any_available;
+    } else if (strncasecmp(read_rule, "slave", 5)) {
+        *rule = sf_data_read_rule_slave_first;
+    } else if (strncasecmp(read_rule, "master", 6)) {
+        *rule = sf_data_read_rule_master_only;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, unkown read_rule: %s, set to any",
+                __LINE__, ini_ctx->filename, read_rule);
+        *rule = sf_data_read_rule_any_available;
+    }
+}
