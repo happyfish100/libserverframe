@@ -101,6 +101,19 @@ static inline const char *sf_get_read_rule_caption(
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \
                     counter <= retry_times) || (retry_times < 0))))
 
+#define SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx, \
+        retry_times, counter, result) \
+    if (SF_NET_RETRY_FINISHED(retry_times, counter, result)) { \
+        break;  \
+    }  \
+    do {  \
+        sf_calc_next_retry_interval(&net_retry_ctx); \
+        if (net_retry_ctx.interval_ms > 0) {         \
+            fc_sleep_ms(net_retry_ctx.interval_ms);  \
+        } \
+    } while (0)
+
+
 #ifdef __cplusplus
 }
 #endif
