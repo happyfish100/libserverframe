@@ -61,6 +61,8 @@ int sf_set_read_event(struct fast_task_info *task);
 void sf_task_switch_thread(struct fast_task_info *task,
         const int new_thread_index);
 
+void sf_task_detach_thread(struct fast_task_info *task);
+
 static inline int sf_nio_forward_request(struct fast_task_info *task,
         const int new_thread_index)
 {

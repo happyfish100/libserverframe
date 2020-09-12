@@ -38,7 +38,7 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
     sf_context->timeout_callback = timeout_callback;
 }
 
-static void sf_task_detach_thread(struct fast_task_info *task)
+void sf_task_detach_thread(struct fast_task_info *task)
 {
     ioevent_detach(&task->thread_data->ev_puller, task->event.fd);
 
@@ -213,6 +213,8 @@ static int sf_connect_server(struct fast_task_info *task)
         return sf_ioevent_add(task, (IOEventCallback)
                 sf_client_sock_connect, task->connect_timeout);
     } else {
+        close(task->event.fd);
+        task->event.fd = -1;
         logError("file: "__FILE__", line: %d, "
                 "connect to server %s:%d fail, errno: %d, "
                 "error info: %s", __LINE__, task->server_ip,
