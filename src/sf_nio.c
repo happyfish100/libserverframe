@@ -184,6 +184,9 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
         return -1;
     }
 
+    logInfo("file: "__FILE__", line: %d, "
+            "connect to server %s:%d successfully",
+            __LINE__, task->server_ip, task->port);
     sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
     return SF_CTX->deal_task(task);
 }
@@ -207,6 +210,9 @@ static int sf_connect_server(struct fast_task_info *task)
             return result;
         }
 
+        logInfo("file: "__FILE__", line: %d, "
+                "connect to server %s:%d successfully",
+                __LINE__, task->server_ip, task->port);
         sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
         return SF_CTX->deal_task(task);
     } else if (result == EINPROGRESS) {
