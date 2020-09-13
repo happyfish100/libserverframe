@@ -20,8 +20,8 @@ int sf_load_net_retry_config(SFNetRetryConfig *net_retry_cfg,
         IniFullContext *ini_ctx)
 {
     char *retry_interval_mode;
-    retry_interval_mode = iniGetStrValue(ini_ctx->section_name,
-            "retry_interval_mode", ini_ctx->context);
+    retry_interval_mode = iniGetStrValueEx(ini_ctx->section_name,
+            "retry_interval_mode", ini_ctx->context, true);
     if (retry_interval_mode == NULL || *retry_interval_mode == '\0') {
         net_retry_cfg->interval_mm.mode =
             sf_net_retry_interval_mode_multiple;
@@ -40,25 +40,25 @@ int sf_load_net_retry_config(SFNetRetryConfig *net_retry_cfg,
             sf_net_retry_interval_mode_multiple;
     }
 
-    net_retry_cfg->interval_mm.max_interval_ms = iniGetIntValue(
+    net_retry_cfg->interval_mm.max_interval_ms = iniGetIntValueEx(
             ini_ctx->section_name, "retry_max_interval_ms",
-            ini_ctx->context, DEFAULT_RETRY_MAX_INTERVAL_MS);
+            ini_ctx->context, DEFAULT_RETRY_MAX_INTERVAL_MS, true);
 
-    net_retry_cfg->connect.times = iniGetIntValue(
+    net_retry_cfg->connect.times = iniGetIntValueEx(
             ini_ctx->section_name, "connect_retry_times",
-            ini_ctx->context, DEFAULT_CONNECT_RETRY_TIMES);
+            ini_ctx->context, DEFAULT_CONNECT_RETRY_TIMES, true);
 
-    net_retry_cfg->connect.interval_ms = iniGetIntValue(
+    net_retry_cfg->connect.interval_ms = iniGetIntValueEx(
             ini_ctx->section_name, "connect_retry_interval_ms",
-            ini_ctx->context, DEFAULT_CONNECT_RETRY_INTERVAL_MS);
+            ini_ctx->context, DEFAULT_CONNECT_RETRY_INTERVAL_MS, true);
 
-    net_retry_cfg->network.times = iniGetIntValue(
+    net_retry_cfg->network.times = iniGetIntValueEx(
             ini_ctx->section_name, "network_retry_times",
-            ini_ctx->context, DEFAULT_NETWORK_RETRY_TIMES);
+            ini_ctx->context, DEFAULT_NETWORK_RETRY_TIMES, true);
 
-    net_retry_cfg->network.interval_ms = iniGetIntValue(
+    net_retry_cfg->network.interval_ms = iniGetIntValueEx(
             ini_ctx->section_name, "network_retry_interval_ms",
-            ini_ctx->context, DEFAULT_NETWORK_RETRY_INTERVAL_MS);
+            ini_ctx->context, DEFAULT_NETWORK_RETRY_INTERVAL_MS, true);
 
     return 0;
 }
@@ -82,8 +82,8 @@ void sf_net_retry_config_to_string(SFNetRetryConfig *net_retry_cfg,
 void sf_load_read_rule_config(SFDataReadRule *rule, IniFullContext *ini_ctx)
 {
     char *read_rule;
-    read_rule = iniGetStrValue(ini_ctx->section_name,
-            "read_rule", ini_ctx->context);
+    read_rule = iniGetStrValueEx(ini_ctx->section_name,
+            "read_rule", ini_ctx->context, true);
     if (read_rule == NULL || *read_rule == '\0') {
         *rule = sf_data_read_rule_any_available;
     } else if (strncasecmp(read_rule, "any", 3)) {
