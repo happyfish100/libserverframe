@@ -216,8 +216,10 @@ static int sf_connect_server(struct fast_task_info *task)
         sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
         return SF_CTX->deal_task(task);
     } else if (result == EINPROGRESS) {
-        return sf_ioevent_add(task, (IOEventCallback)
+        result = ioevent_set(task, task->thread_data, task->event.fd,
+                IOEVENT_READ | IOEVENT_WRITE, (IOEventCallback)
                 sf_client_sock_connect, task->connect_timeout);
+        return result > 0 ? -1 * result : result;
     } else {
         close(task->event.fd);
         task->event.fd = -1;

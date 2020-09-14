@@ -42,6 +42,9 @@
     ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
      (code == EAGAIN) || is_network_error(code))
 
+#define SF_UNIX_ERRNO(code, errno_for_overflow) \
+    (code < 256 ? code : errno_for_overflow)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

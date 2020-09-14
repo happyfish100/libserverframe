@@ -252,9 +252,17 @@ int sf_service_destroy_ex(SFContext *sf_context)
 static void *worker_thread_entrance(void *arg)
 {
     struct worker_thread_context *thread_ctx;
+    int thread_count;
 
     thread_ctx = (struct worker_thread_context *)arg;
-    __sync_fetch_and_add(&thread_ctx->sf_context->thread_count, 1);
+    thread_count = __sync_add_and_fetch(&thread_ctx->
+            sf_context->thread_count, 1);
+
+    logDebug("file: "__FILE__", line: %d, "
+            "worker thread enter, current thread index: %d, "
+            "current thread count: %d", __LINE__,
+            (int)(thread_ctx->thread_data - thread_ctx->
+                sf_context->thread_data), thread_count);
 
     ioevent_loop(thread_ctx->thread_data,
             sf_recv_notify_read,
@@ -262,7 +270,14 @@ static void *worker_thread_entrance(void *arg)
             &g_sf_global_vars.continue_flag);
     ioevent_destroy(&thread_ctx->thread_data->ev_puller);
 
-    __sync_fetch_and_sub(&thread_ctx->sf_context->thread_count, 1);
+    thread_count = __sync_sub_and_fetch(&thread_ctx->
+            sf_context->thread_count, 1);
+
+    logDebug("file: "__FILE__", line: %d, "
+            "worker thread exit, current thread index: %d, "
+            "current thread count: %d", __LINE__,
+            (int)(thread_ctx->thread_data - thread_ctx->
+                sf_context->thread_data), thread_count);
     return NULL;
 }
 
