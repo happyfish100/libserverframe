@@ -33,14 +33,23 @@
 #define SF_RETRIABLE_ERROR_MIN             9901
 #define SF_RETRIABLE_ERROR_MAX             9988
 #define SF_RETRIABLE_ERROR_NO_SERVER       9901  //no server available
-#define SF_RETRIABLE_ERROR_NOT_MASTER      9902  //i am not master
-#define SF_RETRIABLE_ERROR_NOT_ACTIVE      9903  //i am not active
-#define SF_RETRIABLE_ERROR_NO_CHANNEL      9904
-#define SF_RETRIABLE_ERROR_CHANNEL_INVALID 9905  //client should re-setup channel
+#define SF_RETRIABLE_ERROR_NOT_MASTER      9912  //i am not master
+#define SF_RETRIABLE_ERROR_NOT_ACTIVE      9913  //i am not active
+#define SF_RETRIABLE_ERROR_NO_CHANNEL      9914
+#define SF_RETRIABLE_ERROR_CHANNEL_INVALID 9915  //client should re-setup channel
+
+#define SF_FORCE_CLOSE_CONNECTION_ERROR_MIN  SF_RETRIABLE_ERROR_NOT_MASTER
+#define SF_FORCE_CLOSE_CONNECTION_ERROR_MAX  SF_RETRIABLE_ERROR_MAX
 
 #define SF_IS_RETRIABLE_ERROR(code) \
     ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
      (code == EAGAIN) || is_network_error(code))
+
+#define SF_FORCE_CLOSE_CONNECTION_ERROR(code) \
+    ((code >= SF_FORCE_CLOSE_CONNECTION_ERROR_MIN &&  \
+      code <= SF_FORCE_CLOSE_CONNECTION_ERROR_MAX) || \
+      (result == EINVAL) || (result != 0 && is_network_error(code)))
+
 
 #define SF_UNIX_ERRNO(code, errno_for_overflow) \
     (code < 256 ? code : errno_for_overflow)
