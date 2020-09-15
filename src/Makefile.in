@@ -8,12 +8,20 @@ TARGET_LIB = $(TARGET_PREFIX)/$(LIB_VERSION)
 ALL_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
               sf_func.h sf_util.h sf_configs.h
 
+SHARED_OBJS = sf_nio.lo sf_service.lo sf_global.lo \
+        sf_func.lo sf_util.lo sf_configs.lo sf_proto.lo \
+        idempotency/server/channel.lo \
+        idempotency/server/request_htable.lo  \
+        idempotency/server/channel_htable.lo  \
+        idempotency/client/receipt_handler.lo \
+        idempotency/client/client_channel.lo
+
+ALL_OBJS = $(SHARED_OBJS)
 ALL_LIBS = libserverframe.so
 
 all: $(ALL_LIBS)
 
-libserverframe.so: sf_nio.lo sf_service.lo sf_global.lo sf_func.lo sf_util.lo \
-        sf_configs.lo
+libserverframe.so: $(SHARED_OBJS)
 
 	cc -shared -o $@ $^ $(LIB_PATH)
 
@@ -33,5 +41,5 @@ install:
 
 	if [ ! -e $(TARGET_PREFIX)/lib/libserverframe.so ]; then ln -s $(TARGET_LIB)/libserverframe.so $(TARGET_PREFIX)/lib/libserverframe.so; fi
 clean:
-	rm -f *.lo $(ALL_LIBS) $(ALL_PRGS)
+	rm -f $(ALL_OBJS) $(ALL_LIBS) $(ALL_PRGS)
 

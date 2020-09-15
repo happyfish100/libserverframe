@@ -11,6 +11,8 @@
 #include "fastcommon/connection_pool.h"
 #include "fastcommon/fast_task_queue.h"
 
+#define FS_ERROR_INFO_SIZE   256
+
 typedef void (*sf_accept_done_callback)(struct fast_task_info *pTask,
         const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *pTask);
@@ -41,5 +43,24 @@ typedef struct sf_context {
     sf_recv_timeout_callback timeout_callback;
 } SFContext;
 
-#endif
+typedef struct {
+    int body_len;      //body length
+    short flags;
+    short status;
+    unsigned char cmd; //command
+} SFHeaderInfo;
 
+typedef struct {
+    SFHeaderInfo header;
+    char *body;
+} SFRequestInfo;
+
+typedef struct {
+    SFHeaderInfo header;
+    struct {
+        int length;
+        char message[FS_ERROR_INFO_SIZE];
+    } error;
+} SFResponseInfo;
+
+#endif
