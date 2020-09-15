@@ -25,25 +25,25 @@
 #define SF_TASK_BODY_LENGTH(task) \
     (task->length - sizeof(SFCommonProtoHeader))
 
-int service_deal_setup_channel(struct fast_task_info *task,
+int sf_server_deal_setup_channel(struct fast_task_info *task,
         int *task_type, IdempotencyChannel **channel,
         SFResponseInfo *response)
 {
     int result;
-    FSProtoSetupChannelReq *req;
-    FSProtoSetupChannelResp *resp;
+    SFProtoSetupChannelReq *req;
+    SFProtoSetupChannelResp *resp;
     uint32_t channel_id;
     int key;
 
-    response->header.cmd = FS_SERVICE_PROTO_SETUP_CHANNEL_RESP;
+    response->header.cmd = SF_SERVICE_PROTO_SETUP_CHANNEL_RESP;
     if ((result=sf_server_expect_body_length(response,
                     SF_TASK_BODY_LENGTH(task),
-                    sizeof(FSProtoSetupChannelReq))) != 0)
+                    sizeof(SFProtoSetupChannelReq))) != 0)
     {
         return result;
     }
 
-    req = (FSProtoSetupChannelReq *)(task->data + sizeof(SFCommonProtoHeader));
+    req = (SFProtoSetupChannelReq *)(task->data + sizeof(SFCommonProtoHeader));
     channel_id = buff2int(req->channel_id);
     key = buff2int(req->key);
     if (*channel != NULL) {
@@ -59,29 +59,29 @@ int service_deal_setup_channel(struct fast_task_info *task,
         return ENOMEM;
     }
 
-    *task_type = FS_SERVER_TASK_TYPE_CHANNEL_HOLDER;
+    *task_type = SF_SERVER_TASK_TYPE_CHANNEL_HOLDER;
 
-    resp = (FSProtoSetupChannelResp *)(task->data +
+    resp = (SFProtoSetupChannelResp *)(task->data +
             sizeof(SFCommonProtoHeader));
     int2buff((*channel)->id, resp->channel_id);
     int2buff((*channel)->key, resp->key);
-    response->header.body_len = sizeof(FSProtoSetupChannelResp);
+    response->header.body_len = sizeof(SFProtoSetupChannelResp);
     //TASK_ARG->context.response_done = true;
     return 0;
 }
 
-/*
-static int check_holder_channel(struct fast_task_info *task)
-{   
-    if (SERVER_TASK_TYPE != FS_SERVER_TASK_TYPE_CHANNEL_HOLDER) {
-        RESPONSE.error.length = sprintf(RESPONSE.error.message,
-                "unexpect task type: %d", SERVER_TASK_TYPE);
+static int check_holder_channel(const int task_type,
+        IdempotencyChannel *channel, SFResponseInfo *response)
+{
+    if (task_type != SF_SERVER_TASK_TYPE_CHANNEL_HOLDER) {
+        response->error.length = sprintf(response->error.message,
+                "unexpect task type: %d", task_type);
         return EINVAL;
     }
 
-    if (*channel == NULL) {
-        RESPONSE.error.length = sprintf(
-                RESPONSE.error.message,
+    if (channel == NULL) {
+        response->error.length = sprintf(
+                response->error.message,
                 "channel not exist");
         return SF_RETRIABLE_ERROR_NO_CHANNEL;
     }
@@ -89,21 +89,25 @@ static int check_holder_channel(struct fast_task_info *task)
     return 0;
 }
 
-int service_deal_close_channel(struct fast_task_info *task)
+int sf_server_deal_close_channel(struct fast_task_info *task,
+        int *task_type, IdempotencyChannel **channel,
+        SFResponseInfo *response)
 {
     int result;
-    if ((result=check_holder_channel(task)) != 0) {
+    if ((result=check_holder_channel(*task_type, *channel, response)) != 0) {
         return result;
     }
 
-    RESPONSE.header.cmd = FS_SERVICE_PROTO_CLOSE_CHANNEL_RESP;
     idempotency_channel_free(*channel);
     *channel = NULL;
-    *task_type = FS_SERVER_TASK_TYPE_NONE;
+    *task_type = SF_SERVER_TASK_TYPE_NONE;
+    response->header.cmd = SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP;
     return 0;
 }
 
-int service_deal_report_req_receipt(struct fast_task_info *task)
+int sf_server_deal_report_req_receipt(struct fast_task_info *task,
+        int *task_type, IdempotencyChannel **channel,
+        SFResponseInfo *response)
 {
     int result;
     int count;
@@ -111,35 +115,35 @@ int service_deal_report_req_receipt(struct fast_task_info *task)
     int body_len;
     int calc_body_len;
     int64_t req_id;
-    FSProtoReportReqReceiptHeader *body_header;
-    FSProtoReportReqReceiptBody *body_part;
-    FSProtoReportReqReceiptBody *body_end;
+    SFProtoReportReqReceiptHeader *body_header;
+    SFProtoReportReqReceiptBody *body_part;
+    SFProtoReportReqReceiptBody *body_end;
 
-    if ((result=check_holder_channel(task)) != 0) {
+    if ((result=check_holder_channel(*task_type, *channel, response)) != 0) {
         return result;
     }
 
     body_len = SF_TASK_BODY_LENGTH(task);
     if ((result=sf_server_check_min_body_length(response, body_len,
-                    sizeof(FSProtoReportReqReceiptHeader))) != 0)
+                    sizeof(SFProtoReportReqReceiptHeader))) != 0)
     {
         return result;
     }
 
-    body_header = (FSProtoReportReqReceiptHeader *)
+    body_header = (SFProtoReportReqReceiptHeader *)
     (task->data + sizeof(SFCommonProtoHeader));
     count = buff2int(body_header->count);
-    calc_body_len = sizeof(FSProtoReportReqReceiptHeader) +
-        sizeof(FSProtoReportReqReceiptBody) * count;
+    calc_body_len = sizeof(SFProtoReportReqReceiptHeader) +
+        sizeof(SFProtoReportReqReceiptBody) * count;
     if (body_len != calc_body_len) {
-        RESPONSE.error.length = sprintf(RESPONSE.error.message,
+        response->error.length = sprintf(response->error.message,
                 "body length: %d != calculated body length: %d",
                 body_len, calc_body_len);
         return EINVAL;
     }
 
     success = 0;
-    body_part = (FSProtoReportReqReceiptBody *)(body_header + 1);
+    body_part = (SFProtoReportReqReceiptBody *)(body_header + 1);
     body_end = body_part + count;
     for (; body_part < body_end; body_part++) {
         req_id = buff2long(body_part->req_id);
@@ -150,8 +154,6 @@ int service_deal_report_req_receipt(struct fast_task_info *task)
 
     logInfo("receipt count: %d, success: %d", count, success);
 
-    RESPONSE.header.cmd = FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
+    response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     return 0;
 }
-
-*/

@@ -11,9 +11,11 @@
 #include "fastcommon/connection_pool.h"
 #include "fastcommon/fast_task_queue.h"
 
-#define FS_ERROR_INFO_SIZE   256
-#define FS_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
-#define FS_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
+#define SF_ERROR_INFO_SIZE   256
+
+#define SF_SERVER_TASK_TYPE_NONE                 0
+#define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
+#define SF_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
 typedef void (*sf_accept_done_callback)(struct fast_task_info *pTask,
         const bool bInnerPort);
@@ -61,7 +63,7 @@ typedef struct {
     SFHeaderInfo header;
     struct {
         int length;
-        char message[FS_ERROR_INFO_SIZE];
+        char message[SF_ERROR_INFO_SIZE];
     } error;
 } SFResponseInfo;
 

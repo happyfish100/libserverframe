@@ -82,17 +82,17 @@ static int setup_channel_request(struct fast_task_info *task)
 {
     IdempotencyClientChannel *channel;
     SFCommonProtoHeader *header;
-    FSProtoSetupChannelReq *req;
+    SFProtoSetupChannelReq *req;
 
     channel = (IdempotencyClientChannel *)task->arg;
     header = (SFCommonProtoHeader *)task->data;
-    req = (FSProtoSetupChannelReq *)(header + 1);
+    req = (SFProtoSetupChannelReq *)(header + 1);
     int2buff(__sync_add_and_fetch(&channel->id, 0), req->channel_id);
     int2buff(__sync_add_and_fetch(&channel->key, 0), req->key);
 
-    FS_PROTO_SET_HEADER(header, FS_SERVICE_PROTO_SETUP_CHANNEL_REQ,
-            sizeof(FSProtoSetupChannelReq));
-    task->length = sizeof(SFCommonProtoHeader) + sizeof(FSProtoSetupChannelReq);
+    SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_SETUP_CHANNEL_REQ,
+            sizeof(SFProtoSetupChannelReq));
+    task->length = sizeof(SFCommonProtoHeader) + sizeof(SFProtoSetupChannelReq);
     return sf_send_add_event(task);
 }
 
@@ -101,9 +101,9 @@ static int check_report_req_receipt(struct fast_task_info *task,
 {
     IdempotencyClientChannel *channel;
     SFCommonProtoHeader *header;
-    FSProtoReportReqReceiptHeader *rheader;
-    FSProtoReportReqReceiptBody *rbody;
-    FSProtoReportReqReceiptBody *rstart;
+    SFProtoReportReqReceiptHeader *rheader;
+    SFProtoReportReqReceiptBody *rbody;
+    SFProtoReportReqReceiptBody *rstart;
     IdempotencyClientReceipt *last;
     IdempotencyClientReceipt *receipt;
     char *buff_end;
@@ -130,14 +130,14 @@ static int check_report_req_receipt(struct fast_task_info *task,
     }
 
     header = (SFCommonProtoHeader *)task->data;
-    rheader = (FSProtoReportReqReceiptHeader *)(header + 1);
-    rbody = rstart = (FSProtoReportReqReceiptBody *)(rheader + 1);
+    rheader = (SFProtoReportReqReceiptHeader *)(header + 1);
+    rbody = rstart = (SFProtoReportReqReceiptBody *)(rheader + 1);
     buff_end = task->data + task->size;
     last = NULL;
     receipt = channel->waiting_resp_qinfo.head;
     do {
         //check buffer remain space
-        if (buff_end - (char *)rbody < sizeof(FSProtoReportReqReceiptBody)) {
+        if (buff_end - (char *)rbody < sizeof(SFProtoReportReqReceiptBody)) {
             break;
         }
 
@@ -164,7 +164,7 @@ static int check_report_req_receipt(struct fast_task_info *task,
     int2buff(*count, rheader->count);
     task->length = (char *)rbody - task->data;
     int2buff(task->length - sizeof(SFCommonProtoHeader), header->body_len);
-    header->cmd = FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ;
+    header->cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ;
     return sf_send_add_event(task);
 }
 
@@ -216,13 +216,13 @@ static int deal_setup_channel_response(struct fast_task_info *task)
 {
     int result;
     IdempotencyReceiptThreadContext *thread_ctx;
-    FSProtoSetupChannelResp *resp;
+    SFProtoSetupChannelResp *resp;
     IdempotencyClientChannel *channel;
     int channel_id;
     int channel_key;
 
     if ((result=receipt_expect_body_length(task,
-                    sizeof(FSProtoSetupChannelResp))) != 0)
+                    sizeof(SFProtoSetupChannelResp))) != 0)
     {
         return result;
     }
@@ -236,7 +236,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
         return 0;
     }
 
-    resp = (FSProtoSetupChannelResp *)(task->data + sizeof(SFCommonProtoHeader));
+    resp = (SFProtoSetupChannelResp *)(task->data + sizeof(SFCommonProtoHeader));
     channel_id = buff2int(resp->channel_id);
     channel_key = buff2int(resp->key);
     idempotency_client_channel_set_id_key(channel, channel_id, channel_key);
@@ -330,10 +330,10 @@ static int receipt_deal_task(struct fast_task_info *task)
         }
 
         switch (((SFCommonProtoHeader *)task->data)->cmd) {
-            case FS_SERVICE_PROTO_SETUP_CHANNEL_RESP:
+            case SF_SERVICE_PROTO_SETUP_CHANNEL_RESP:
                 result = deal_setup_channel_response(task);
                 break;
-            case FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP:
+            case SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP:
                 result = deal_report_req_receipt_response(task);
                 break;
             default:
