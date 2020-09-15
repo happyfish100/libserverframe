@@ -2,7 +2,7 @@
 #ifndef _SF_IDEMPOTENCY_REQUEST_HTABLE_H
 #define _SF_IDEMPOTENCY_REQUEST_HTABLE_H
 
-#include "idempotency_types.h"
+#include "server_types.h"
 
 #ifdef __cplusplus
 extern "C" {

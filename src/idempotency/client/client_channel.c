@@ -16,11 +16,11 @@
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/fc_queue.h"
-#include "sf/sf_util.h"
-#include "sf/sf_func.h"
-#include "sf/sf_nio.h"
-#include "sf/sf_global.h"
-#include "sf/sf_service.h"
+#include "../../sf_util.h"
+#include "../../sf_func.h"
+#include "../../sf_nio.h"
+#include "../../sf_global.h"
+#include "../../sf_service.h"
 #include "client_channel.h"
 
 typedef struct {

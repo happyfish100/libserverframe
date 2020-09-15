@@ -1,18 +1,31 @@
 .SUFFIXES: .c .lo
 
 COMPILE = $(CC) $(CFLAGS) -fPIC
-INC_PATH = -I/usr/include -I/usr/local/include
+INC_PATH = -I/usr/local/include
 LIB_PATH = $(LIBS) -lfastcommon 
 TARGET_LIB = $(TARGET_PREFIX)/$(LIB_VERSION)
 
-ALL_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
-              sf_func.h sf_util.h sf_configs.h
+TOP_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
+              sf_func.h sf_util.h sf_configs.h sf_proto.h
+
+IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
+                      idempotency/server/server_channel.h  \
+                      idempotency/server/request_htable.h  \
+                      idempotency/server/channel_htable.h  \
+                      idempotency/server/server_handler.h
+
+IDEMP_CLIENT_HEADER = idempotency/client/client_types.h    \
+                      idempotency/client/receipt_handler.h \
+                      idempotency/client/client_channel.h
+
+ALL_HEADERS  = $(TOP_HEADERS) $(IDEMP_SERVER_HEADER) $(IDEMP_CLIENT_HEADER)
 
 SHARED_OBJS = sf_nio.lo sf_service.lo sf_global.lo \
         sf_func.lo sf_util.lo sf_configs.lo sf_proto.lo \
-        idempotency/server/channel.lo \
+        idempotency/server/server_channel.lo  \
         idempotency/server/request_htable.lo  \
         idempotency/server/channel_htable.lo  \
+        idempotency/server/server_handler.lo  \
         idempotency/client/receipt_handler.lo \
         idempotency/client/client_channel.lo
 
@@ -34,10 +47,13 @@ libserverframe.so: $(SHARED_OBJS)
 install:
 	mkdir -p $(TARGET_LIB)
 	mkdir -p $(TARGET_PREFIX)/lib
-	mkdir -p $(TARGET_PREFIX)/include/sf
+	mkdir -p $(TARGET_PREFIX)/include/sf/idempotency/server
+	mkdir -p $(TARGET_PREFIX)/include/sf/idempotency/client
 
 	install -m 755 $(ALL_LIBS) $(TARGET_LIB)
-	cp -f $(ALL_HEADERS) $(TARGET_PREFIX)/include/sf
+	cp -f $(TOP_HEADERS) $(TARGET_PREFIX)/include/sf
+	cp -f $(IDEMP_SERVER_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/server
+	cp -f $(IDEMP_CLIENT_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/client
 
 	if [ ! -e $(TARGET_PREFIX)/lib/libserverframe.so ]; then ln -s $(TARGET_LIB)/libserverframe.so $(TARGET_PREFIX)/lib/libserverframe.so; fi
 clean:

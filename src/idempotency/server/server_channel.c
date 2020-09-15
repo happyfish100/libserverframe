@@ -7,7 +7,7 @@
 #include "fastcommon/sched_thread.h"
 #include "sf/sf_global.h"
 #include "channel_htable.h"
-#include "channel.h"
+#include "server_channel.h"
 
 typedef struct {
     IdempotencyChannel **buckets;

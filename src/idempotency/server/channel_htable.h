@@ -2,7 +2,7 @@
 #ifndef _SF_IDEMPOTENCY_CHANNEL_HTABLE_H
 #define _SF_IDEMPOTENCY_CHANNEL_HTABLE_H
 
-#include "idempotency_types.h"
+#include "server_types.h"
 
 typedef struct channel_shared_locks {
     pthread_mutex_t *locks;

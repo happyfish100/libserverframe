@@ -11,12 +11,12 @@
 #include "sf_types.h"
 
 //for request idempotency
-#define FS_SERVICE_PROTO_SETUP_CHANNEL_REQ        51
-#define FS_SERVICE_PROTO_SETUP_CHANNEL_RESP       52
-#define FS_SERVICE_PROTO_CLOSE_CHANNEL_REQ        53
-#define FS_SERVICE_PROTO_CLOSE_CHANNEL_RESP       54
-#define FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ   55
-#define FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP  56
+#define FS_SERVICE_PROTO_SETUP_CHANNEL_REQ        111
+#define FS_SERVICE_PROTO_SETUP_CHANNEL_RESP       112
+#define FS_SERVICE_PROTO_CLOSE_CHANNEL_REQ        113
+#define FS_SERVICE_PROTO_CLOSE_CHANNEL_RESP       114
+#define FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ   115
+#define FS_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP  116
 
 #define FS_PROTO_MAGIC_CHAR        '@'
 #define FS_PROTO_SET_MAGIC(m)   \
@@ -105,6 +105,64 @@ static inline void sf_log_network_error_ex(SFResponseInfo *response,
 
 #define sf_log_network_error(response, conn, result)  \
     sf_log_network_error_ex(response, conn, result, __LINE__)
+
+
+static inline int sf_server_expect_body_length(SFResponseInfo *response,
+        const int body_length, const int expect_body_len)
+{
+    if (body_length != expect_body_len) {
+        response->error.length = sprintf(
+                response->error.message,
+                "request body length: %d != %d",
+                body_length, expect_body_len);
+        return EINVAL;
+    }
+
+    return 0;
+}
+
+static inline int sf_server_check_min_body_length(SFResponseInfo *response,
+        const int body_length, const int min_body_length)
+{
+    if (body_length < min_body_length) {
+        response->error.length = sprintf(
+                response->error.message,
+                "request body length: %d < %d",
+                body_length, min_body_length);
+        return EINVAL;
+    }
+
+    return 0;
+}
+
+static inline int sf_server_check_max_body_length(SFResponseInfo *response,
+        const int body_length, const int max_body_length)
+{
+    if (body_length > max_body_length) {
+        response->error.length = sprintf(
+                response->error.message,
+                "request body length: %d > %d",
+                body_length, max_body_length);
+        return EINVAL;
+    }
+
+    return 0;
+}
+
+static inline int sf_server_check_body_length(
+        SFResponseInfo *response, const int body_length,
+        const int min_body_length, const int max_body_length)
+{
+    int result;
+    if ((result=sf_server_check_min_body_length(response,
+                    body_length, min_body_length)) != 0)
+    {
+        return result;
+    }
+    return sf_server_check_max_body_length(response,
+            body_length, max_body_length);
+}
+
 
 #ifdef __cplusplus
 }

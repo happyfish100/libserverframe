@@ -12,6 +12,8 @@
 #include "fastcommon/fast_task_queue.h"
 
 #define FS_ERROR_INFO_SIZE   256
+#define FS_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
+#define FS_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
 typedef void (*sf_accept_done_callback)(struct fast_task_info *pTask,
         const bool bInnerPort);
