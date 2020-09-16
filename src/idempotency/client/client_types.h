@@ -8,6 +8,7 @@
 #include "fastcommon/fc_queue.h"
 
 typedef struct idempotency_client_config {
+    bool enabled;
     int channel_htable_capacity;
     int channel_heartbeat_interval;
     int channel_max_idle_time;

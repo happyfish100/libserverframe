@@ -41,6 +41,10 @@ IdempotencyClientConfig g_idempotency_client_cfg = {false, 3, 300};
 
 static int load_client_channel_config(IniFullContext *ini_ctx)
 {
+    g_idempotency_client_cfg.enabled = iniGetBoolValue(
+            ini_ctx->section_name, "enabled",
+            ini_ctx->context, false);
+
     g_idempotency_client_cfg.channel_htable_capacity = iniGetIntValue(
             ini_ctx->section_name, "channel_htable_capacity",
             ini_ctx->context, 1361);
@@ -72,9 +76,11 @@ static int load_client_channel_config(IniFullContext *ini_ctx)
 void idempotency_client_channel_config_to_string_ex(
         char *output, const int size, const bool add_comma)
 {
-    snprintf(output, size, "channel_htable_capacity=%d, "
+    snprintf(output, size, "idempotency enabled: %d, "
+            "channel_htable_capacity=%d, "
             "channel_heartbeat_interval=%ds, "
             "channel_max_idle_time=%ds%s",
+            g_idempotency_client_cfg.enabled,
             g_idempotency_client_cfg.channel_htable_capacity,
             g_idempotency_client_cfg.channel_heartbeat_interval,
             g_idempotency_client_cfg.channel_max_idle_time,

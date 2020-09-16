@@ -39,6 +39,13 @@ typedef struct sf_global_variables {
     SFConnectionStat connection_stat;
 } SFGlobalVariables;
 
+typedef struct sf_context_ini_config {
+    IniFullContext ini_ctx;
+    int default_inner_port;
+    int default_outer_port;
+    int default_work_threads;
+} SFContextIniConfig;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,29 +87,58 @@ extern SFContext                 g_sf_context;
     } \
     } while (0)
 
-int sf_load_global_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const bool load_network_params);
+#define SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext, \
+        section_name, def_inner_port, def_outer_port, def_work_threads) \
+    do { \
+        FAST_INI_SET_FULL_CTX_EX(config.ini_ctx, filename, \
+                section_name, pIniContext);   \
+        config.default_inner_port = def_inner_port; \
+        config.default_outer_port = def_outer_port; \
+        config.default_work_threads = def_work_threads; \
+    } while (0)
+
+int sf_load_global_config_ex(const char *server_name,
+        IniFullContext *ini_ctx, const bool load_network_params);
 
 static inline int sf_load_global_config(const char *server_name,
-        const char *filename, IniContext *pIniContext)
+        IniFullContext *ini_ctx)
 {
     const bool load_network_params = true;
-    return sf_load_global_config_ex(server_name, filename,
-            pIniContext, load_network_params);
+    return sf_load_global_config_ex(server_name,
+            ini_ctx, load_network_params);
 }
 
-int sf_load_config(const char *server_name, const char *filename,
-        IniContext *pIniContext, const int default_inner_port,
-        const int default_outer_port);
+int sf_load_config_ex(const char *server_name,
+        SFContextIniConfig *config);
 
-int sf_load_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const char *section_name,
-        const int default_inner_port, const int default_outer_port);
-
-int sf_load_context_from_config(SFContext *sf_context,
+static inline int sf_load_config(const char *server_name,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
-        const int default_outer_port);
+        const int default_outer_port)
+{
+    SFContextIniConfig config;
+
+    SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext,
+            section_name, default_inner_port, default_outer_port,
+            DEFAULT_WORK_THREADS);
+    return sf_load_config_ex(server_name, &config);
+}
+
+int sf_load_context_from_config_ex(SFContext *sf_context,
+        SFContextIniConfig *config);
+
+static inline int sf_load_context_from_config(SFContext *sf_context,
+        const char *filename, IniContext *pIniContext,
+        const char *section_name, const int default_inner_port,
+        const int default_outer_port)
+{
+    SFContextIniConfig config;
+
+    SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext,
+            section_name, default_inner_port, default_outer_port,
+            DEFAULT_WORK_THREADS);
+    return sf_load_context_from_config_ex(sf_context, &config);
+}
 
 void sf_global_config_to_string(char *output, const int size);
 

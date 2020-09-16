@@ -41,7 +41,7 @@ static inline void set_config_str_value(const char *value,
     }
 }
 
-static int load_network_parameters(IniContext *pIniContext)
+static int load_network_parameters(IniFullContext *ini_ctx)
 {
     int result;
     char *pMaxPkgSize;
@@ -51,20 +51,20 @@ static int load_network_parameters(IniContext *pIniContext)
     int64_t min_buff_size;
     int64_t max_buff_size;
 
-    g_sf_global_vars.connect_timeout = iniGetIntValue(NULL,
-            "connect_timeout", pIniContext, DEFAULT_CONNECT_TIMEOUT);
+    g_sf_global_vars.connect_timeout = iniGetIntValueEx(ini_ctx->section_name,
+            "connect_timeout", ini_ctx->context, DEFAULT_CONNECT_TIMEOUT, true);
     if (g_sf_global_vars.connect_timeout <= 0) {
         g_sf_global_vars.connect_timeout = DEFAULT_CONNECT_TIMEOUT;
     }
 
-    g_sf_global_vars.network_timeout = iniGetIntValue(NULL,
-            "network_timeout", pIniContext, DEFAULT_NETWORK_TIMEOUT);
+    g_sf_global_vars.network_timeout = iniGetIntValueEx(ini_ctx->section_name,
+            "network_timeout", ini_ctx->context, DEFAULT_NETWORK_TIMEOUT, true);
     if (g_sf_global_vars.network_timeout <= 0) {
         g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.max_connections = iniGetIntValue(NULL,
-            "max_connections", pIniContext, DEFAULT_MAX_CONNECTONS);
+    g_sf_global_vars.max_connections = iniGetIntValue(ini_ctx->section_name,
+            "max_connections", ini_ctx->context, DEFAULT_MAX_CONNECTONS);
     if (g_sf_global_vars.max_connections <= 0) {
         g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
     }
@@ -75,8 +75,8 @@ static int load_network_parameters(IniContext *pIniContext)
         return result;
     }
 
-    pMaxPkgSize = iniGetStrValue(NULL,
-            "max_pkg_size", pIniContext);
+    pMaxPkgSize = iniGetStrValue(ini_ctx->section_name,
+            "max_pkg_size", ini_ctx->context);
     if (pMaxPkgSize == NULL) {
         max_pkg_size = SF_DEF_MAX_PACKAGE_SIZE;
     }
@@ -92,8 +92,8 @@ static int load_network_parameters(IniContext *pIniContext)
     }
     g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
 
-    pMinBuffSize = iniGetStrValue(NULL,
-            "min_buff_size", pIniContext);
+    pMinBuffSize = iniGetStrValue(ini_ctx->section_name,
+            "min_buff_size", ini_ctx->context);
     if (pMinBuffSize == NULL) {
         min_buff_size = SF_DEF_MIN_BUFF_SIZE;
     }
@@ -109,8 +109,8 @@ static int load_network_parameters(IniContext *pIniContext)
     }
     g_sf_global_vars.min_buff_size = (int)min_buff_size;
 
-    pMaxBuffSize = iniGetStrValue(NULL,
-            "max_buff_size", pIniContext);
+    pMaxBuffSize = iniGetStrValue(ini_ctx->section_name,
+            "max_buff_size", ini_ctx->context);
     if (pMaxBuffSize == NULL) {
         max_buff_size = SF_DEF_MAX_BUFF_SIZE;
     }
@@ -143,8 +143,8 @@ static int load_network_parameters(IniContext *pIniContext)
     return 0;
 }
 
-int sf_load_global_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const bool load_network_params)
+int sf_load_global_config_ex(const char *server_name,
+        IniFullContext *ini_ctx, const bool load_network_params)
 {
     int result;
     char *pBasePath;
@@ -153,11 +153,11 @@ int sf_load_global_config_ex(const char *server_name, const char *filename,
     char *pThreadStackSize;
     int64_t thread_stack_size;
 
-    pBasePath = iniGetStrValue(NULL, "base_path", pIniContext);
+    pBasePath = iniGetStrValue(NULL, "base_path", ini_ctx->context);
     if (pBasePath == NULL) {
         logError("file: "__FILE__", line: %d, "
                 "conf file \"%s\" must have item "
-                "\"base_path\"!", __LINE__, filename);
+                "\"base_path\"!", __LINE__, ini_ctx->filename);
         return ENOENT;
     }
 
@@ -178,13 +178,13 @@ int sf_load_global_config_ex(const char *server_name, const char *filename,
     }
 
     if (load_network_params) {
-        if ((result=load_network_parameters(pIniContext)) != 0) {
+        if ((result=load_network_parameters(ini_ctx)) != 0) {
             return result;
         }
     }
 
-    pRunByGroup = iniGetStrValue(NULL, "run_by_group", pIniContext);
-    pRunByUser = iniGetStrValue(NULL, "run_by_user", pIniContext);
+    pRunByGroup = iniGetStrValue(NULL, "run_by_group", ini_ctx->context);
+    pRunByUser = iniGetStrValue(NULL, "run_by_user", ini_ctx->context);
     if (pRunByGroup == NULL) {
         *g_sf_global_vars.run_by_group = '\0';
     }
@@ -246,14 +246,14 @@ int sf_load_global_config_ex(const char *server_name, const char *filename,
     }
 
     g_sf_global_vars.sync_log_buff_interval = iniGetIntValue(NULL,
-            "sync_log_buff_interval", pIniContext,
+            "sync_log_buff_interval", ini_ctx->context,
             SYNC_LOG_BUFF_DEF_INTERVAL);
     if (g_sf_global_vars.sync_log_buff_interval <= 0) {
         g_sf_global_vars.sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
     }
 
-    pThreadStackSize = iniGetStrValue(NULL,
-            "thread_stack_size", pIniContext);
+    pThreadStackSize = iniGetStrValue(ini_ctx->section_name,
+            "thread_stack_size", ini_ctx->context);
     if (pThreadStackSize == NULL) {
         thread_stack_size = SF_DEF_THREAD_STACK_SIZE;
     }
@@ -265,11 +265,11 @@ int sf_load_global_config_ex(const char *server_name, const char *filename,
     g_sf_global_vars.thread_stack_size = (int)thread_stack_size;
 
     g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL,
-            "rotate_error_log", pIniContext, false);
+            "rotate_error_log", ini_ctx->context, false);
     g_sf_global_vars.log_file_keep_days = iniGetIntValue(NULL,
-            "log_file_keep_days", pIniContext, 0);
+            "log_file_keep_days", ini_ctx->context, 0);
 
-    load_log_level(pIniContext);
+    load_log_level(ini_ctx->context);
     if ((result=log_set_prefix(g_sf_global_vars.base_path, server_name)) != 0) {
         return result;
     }
@@ -277,32 +277,19 @@ int sf_load_global_config_ex(const char *server_name, const char *filename,
     return 0;
 }
 
-int sf_load_config_ex(const char *server_name, const char *filename,
-        IniContext *pIniContext, const char *section_name,
-        const int default_inner_port, const int default_outer_port)
+int sf_load_config_ex(const char *server_name, SFContextIniConfig *config)
 {
     int result;
-    if ((result=sf_load_global_config(server_name,
-                    filename, pIniContext)) != 0)
+    if ((result=sf_load_global_config_ex(server_name,
+                    &config->ini_ctx, true)) != 0)
     {
         return result;
     }
-    return sf_load_context_from_config(&g_sf_context, filename, pIniContext,
-            section_name, default_inner_port, default_outer_port);
+    return sf_load_context_from_config_ex(&g_sf_context, config);
 }
 
-int sf_load_config(const char *server_name, const char *filename,
-        IniContext *pIniContext, const int default_inner_port,
-        const int default_outer_port)
-{
-    return sf_load_config_ex(server_name, filename, pIniContext, "",
-            default_inner_port, default_outer_port);
-}
-
-int sf_load_context_from_config(SFContext *sf_context,
-        const char *filename, IniContext *pIniContext,
-        const char *section_name, const int default_inner_port,
-        const int default_outer_port)
+int sf_load_context_from_config_ex(SFContext *sf_context,
+        SFContextIniConfig *config)
 {
     char *inner_port;
     char *outer_port;
@@ -313,10 +300,13 @@ int sf_load_context_from_config(SFContext *sf_context,
 
     sf_context->inner_port = sf_context->outer_port = 0;
 
-    inner_port = iniGetStrValue(section_name, "inner_port", pIniContext);
-    outer_port = iniGetStrValue(section_name, "outer_port", pIniContext);
+    inner_port = iniGetStrValue(config->ini_ctx.section_name,
+            "inner_port", config->ini_ctx.context);
+    outer_port = iniGetStrValue(config->ini_ctx.section_name,
+            "outer_port", config->ini_ctx.context);
     if (inner_port == NULL && outer_port == NULL) {
-        port = iniGetIntValue(section_name, "port", pIniContext, 0);
+        port = iniGetIntValue(config->ini_ctx.section_name,
+                "port", config->ini_ctx.context, 0);
         if (port > 0) {
             sf_context->inner_port = sf_context->outer_port = port;
         }
@@ -330,19 +320,19 @@ int sf_load_context_from_config(SFContext *sf_context,
     }
 
     if (sf_context->inner_port <= 0) {
-        sf_context->inner_port = default_inner_port;
+        sf_context->inner_port = config->default_inner_port;
     }
     if (sf_context->outer_port <= 0) {
-        sf_context->outer_port = default_outer_port;
+        sf_context->outer_port = config->default_outer_port;
     }
 
-    inner_bind_addr = iniGetStrValue(section_name,
-            "inner_bind_addr", pIniContext);
-    outer_bind_addr = iniGetStrValue(section_name,
-            "outer_bind_addr", pIniContext);
+    inner_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
+            "inner_bind_addr", config->ini_ctx.context);
+    outer_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
+            "outer_bind_addr", config->ini_ctx.context);
     if (inner_bind_addr == NULL && outer_bind_addr == NULL) {
-        bind_addr = iniGetStrValue(section_name,
-                "bind_addr", pIniContext);
+        bind_addr = iniGetStrValue(config->ini_ctx.section_name,
+                "bind_addr", config->ini_ctx.context);
         if (bind_addr != NULL) {
             inner_bind_addr = outer_bind_addr = bind_addr;
         }
@@ -352,25 +342,27 @@ int sf_load_context_from_config(SFContext *sf_context,
     set_config_str_value(outer_bind_addr, sf_context->outer_bind_addr,
                 sizeof(sf_context->outer_bind_addr));
 
-    sf_context->accept_threads = iniGetIntValue(section_name,
-            "accept_threads", pIniContext, 1);
+    sf_context->accept_threads = iniGetIntValue(
+            config->ini_ctx.section_name,
+            "accept_threads", config->ini_ctx.context, 1);
     if (sf_context->accept_threads <= 0) {
         logError("file: "__FILE__", line: %d, "
-                "config file: %s, section: %s, "
-                "item \"accept_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, filename,
-                section_name, sf_context->accept_threads);
+                "config file: %s, section: %s, item \"accept_threads\" "
+                "is invalid, value: %d <= 0!", __LINE__, config->
+                ini_ctx.filename, config->ini_ctx.section_name,
+                sf_context->accept_threads);
         return EINVAL;
     }
 
-    sf_context->work_threads = iniGetIntValue(section_name,
-            "work_threads", pIniContext, DEFAULT_WORK_THREADS);
+    sf_context->work_threads = iniGetIntValue(
+            config->ini_ctx.section_name, "work_threads",
+            config->ini_ctx.context, config->default_work_threads);
     if (sf_context->work_threads <= 0) {
         logError("file: "__FILE__", line: %d, "
-                "config file: %s, section: %s, "
-                "item \"work_threads\" is invalid, "
-                "value: %d <= 0!", __LINE__, filename,
-                section_name, sf_context->work_threads);
+                "config file: %s, section: %s, item \"work_threads\" "
+                "is invalid, value: %d <= 0!", __LINE__, config->
+                ini_ctx.filename, config->ini_ctx.section_name,
+                sf_context->work_threads);
         return EINVAL;
     }
 
