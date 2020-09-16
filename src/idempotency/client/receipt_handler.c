@@ -168,6 +168,29 @@ static int check_report_req_receipt(struct fast_task_info *task,
     return sf_send_add_event(task);
 }
 
+static int close_channel_request(struct fast_task_info *task)
+{
+    IdempotencyClientChannel *channel;
+    SFCommonProtoHeader *header;
+
+    channel = (IdempotencyClientChannel *)task->arg;
+    idempotency_client_channel_set_id_key(channel, 0, 0);
+
+    header = (SFCommonProtoHeader *)task->data;
+    SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_CLOSE_CHANNEL_REQ, 0);
+    task->length = sizeof(SFCommonProtoHeader);
+    return sf_send_add_event(task);
+}
+
+static int active_test_request(struct fast_task_info *task)
+{
+    SFCommonProtoHeader *header;
+    header = (SFCommonProtoHeader *)task->data;
+    SF_PROTO_SET_HEADER(header, SF_PROTO_ACTIVE_TEST_REQ, 0);
+    task->length = sizeof(SFCommonProtoHeader);
+    return sf_send_add_event(task);
+}
+
 static inline void update_lru_chain(struct fast_task_info *task)
 {
     IdempotencyReceiptThreadContext *thread_ctx;
@@ -192,6 +215,8 @@ static int report_req_receipt_request(struct fast_task_info *task,
     if (count == 0) {
         result = sf_set_read_event(task);
     } else if (update_lru) {
+        ((IdempotencyClientChannel *)task->arg)->
+            last_report_time = g_current_time;
         update_lru_chain(task);
     }
 
@@ -336,6 +361,15 @@ static int receipt_deal_task(struct fast_task_info *task)
             case SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP:
                 result = deal_report_req_receipt_response(task);
                 break;
+            case SF_PROTO_ACTIVE_TEST_RESP:
+                result = 0;
+                break;
+            case SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP:
+                result = ECONNRESET; //force to close socket
+                logDebug("file: "__FILE__", line: %d, "
+                    "close channel to server %s:%d !!!",
+                    __LINE__, task->server_ip, task->port);
+                break;
             default:
                 logError("file: "__FILE__", line: %d, "
                         "response from server %s:%d, unexpect cmd: %d (%s)",
@@ -356,16 +390,64 @@ static int receipt_deal_task(struct fast_task_info *task)
     return result > 0 ? -1 * result : result;
 }
 
-static int receipt_thread_loop_callback(struct nio_thread_data *thread_data)
+static void receipt_thread_check_heartbeat(
+        IdempotencyReceiptThreadContext *thread_ctx)
 {
     IdempotencyClientChannel *channel;
     IdempotencyClientChannel *tmp;
-    IdempotencyReceiptThreadContext *thread_ctx;
 
-    thread_ctx = (IdempotencyReceiptThreadContext *)thread_data->arg;
     fc_list_for_each_entry_safe(channel, tmp, &thread_ctx->head, dlink) {
-        //check heartbeat
-        //channel->task
+        if (g_current_time - channel->last_pkg_time <
+                g_idempotency_client_cfg.channel_heartbeat_interval)
+        {
+            break;
+        }
+
+        if (sf_nio_task_is_idle(channel->task)) {
+            channel->last_pkg_time = g_current_time;
+            active_test_request(channel->task);
+        }
+    }
+}
+
+static void receipt_thread_close_idle_channel(
+        IdempotencyReceiptThreadContext *thread_ctx)
+{
+    IdempotencyClientChannel *channel;
+    IdempotencyClientChannel *tmp;
+
+    fc_list_for_each_entry_safe(channel, tmp, &thread_ctx->head, dlink) {
+        if (!sf_nio_task_is_idle(channel->task)) {
+            continue;
+        }
+
+        if (g_current_time - channel->last_report_time >
+                 g_idempotency_client_cfg.channel_max_idle_time)
+        {
+            logDebug("file: "__FILE__", line: %d, "
+                    "close channel to server %s:%d because idle too long",
+                    __LINE__, channel->task->server_ip, channel->task->port);
+            close_channel_request(channel->task);
+        }
+    }
+}
+
+static int receipt_thread_loop_callback(struct nio_thread_data *thread_data)
+{
+    IdempotencyReceiptThreadContext *thread_ctx;
+    thread_ctx = (IdempotencyReceiptThreadContext *)thread_data->arg;
+
+    if (g_current_time - thread_ctx->last_check_times.heartbeat > 0) {
+        thread_ctx->last_check_times.heartbeat = g_current_time;
+        receipt_thread_check_heartbeat(thread_ctx);
+    }
+
+    if ((g_idempotency_client_cfg.channel_max_idle_time > 0) &&
+            (g_current_time - thread_ctx->last_check_times.idle >
+             g_idempotency_client_cfg.channel_max_idle_time))
+    {
+        thread_ctx->last_check_times.idle = g_current_time;
+        receipt_thread_close_idle_channel(thread_ctx);
     }
 
     return 0;
@@ -382,11 +464,15 @@ static void *receipt_alloc_thread_extra_data(const int thread_index)
 
 int receipt_handler_init()
 {
-    receipt_thread_contexts = (IdempotencyReceiptThreadContext *)fc_malloc(
-            sizeof(IdempotencyReceiptThreadContext) * SF_G_WORK_THREADS);
+    int bytes;
+
+    bytes = sizeof(IdempotencyReceiptThreadContext) * SF_G_WORK_THREADS;
+    receipt_thread_contexts = (IdempotencyReceiptThreadContext *)
+        fc_malloc(bytes);
     if (receipt_thread_contexts == NULL) {
         return ENOMEM;
     }
+    memset(receipt_thread_contexts, 0, bytes);
 
     return sf_service_init_ex2(&g_sf_context,
             receipt_alloc_thread_extra_data, receipt_thread_loop_callback,

@@ -37,7 +37,51 @@ typedef struct {
 
 static ClientChannelContext channel_context;
 
-static int init_htable(ClientChannelHashtable *htable, const int hint_capacity)
+IdempotencyClientConfig g_idempotency_client_cfg = {false, 3, 300};
+
+static int load_client_channel_config(IniFullContext *ini_ctx)
+{
+    g_idempotency_client_cfg.channel_htable_capacity = iniGetIntValue(
+            ini_ctx->section_name, "channel_htable_capacity",
+            ini_ctx->context, 1361);
+    if (g_idempotency_client_cfg.channel_htable_capacity < 163) {
+        logWarning("file: "__FILE__", line: %d, "
+                "config file: %s, channel_htable_capacity: %d is "
+                "too small, set to 163", __LINE__, ini_ctx->filename,
+                g_idempotency_client_cfg.channel_htable_capacity);
+        g_idempotency_client_cfg.channel_htable_capacity = 163;
+    }
+
+    g_idempotency_client_cfg.channel_heartbeat_interval = iniGetIntValue(
+            ini_ctx->section_name, "channel_heartbeat_interval",
+            ini_ctx->context, 3);
+    if (g_idempotency_client_cfg.channel_heartbeat_interval <= 0) {
+        logWarning("file: "__FILE__", line: %d, "
+                "config file: %s, channel_heartbeat_interval: %d is "
+                "invalid, set to 3", __LINE__, ini_ctx->filename,
+                g_idempotency_client_cfg.channel_heartbeat_interval);
+        g_idempotency_client_cfg.channel_heartbeat_interval = 3;
+    }
+
+    g_idempotency_client_cfg.channel_max_idle_time = iniGetIntValue(
+            ini_ctx->section_name, "channel_max_idle_time",
+            ini_ctx->context, 3);
+    return 0;
+}
+
+void idempotency_client_channel_config_to_string_ex(
+        char *output, const int size, const bool add_comma)
+{
+    snprintf(output, size, "channel_htable_capacity=%d, "
+            "channel_heartbeat_interval=%ds, "
+            "channel_max_idle_time=%ds%s",
+            g_idempotency_client_cfg.channel_htable_capacity,
+            g_idempotency_client_cfg.channel_heartbeat_interval,
+            g_idempotency_client_cfg.channel_max_idle_time,
+            (add_comma ? ", " : ""));
+}
+
+static int init_htable(ClientChannelHashtable *htable)
 {
     int result;
     int bytes;
@@ -46,11 +90,8 @@ static int init_htable(ClientChannelHashtable *htable, const int hint_capacity)
         return result;
     }
 
-    if (hint_capacity <= 1024) {
-        htable->capacity = 1361;
-    } else {
-        htable->capacity = fc_ceil_prime(hint_capacity);
-    }
+    htable->capacity = fc_ceil_prime(g_idempotency_client_cfg.
+            channel_htable_capacity);
     bytes = sizeof(IdempotencyClientChannel *) * htable->capacity;
     htable->buckets = (IdempotencyClientChannel **)fc_malloc(bytes);
     if (htable->buckets == NULL) {
@@ -84,9 +125,14 @@ static int idempotency_channel_alloc_init(void *element, void *args)
             (&((IdempotencyClientReceipt *)NULL)->next));
 }
 
-int client_channel_init_ex(const int hint_capacity)
+int client_channel_init(IniFullContext *ini_ctx)
 {
     int result;
+
+    if ((result=load_client_channel_config(ini_ctx)) != 0) {
+        return result;
+    }
+
     if ((result=fast_mblock_init_ex1(&channel_context.channel_allocator,
                     "channel_info", sizeof(IdempotencyClientChannel),
                     64, 0, idempotency_channel_alloc_init, NULL, true)) != 0)
@@ -94,7 +140,7 @@ int client_channel_init_ex(const int hint_capacity)
         return result;
     }
 
-    if ((result=init_htable(&channel_context.htable, hint_capacity)) != 0) {
+    if ((result=init_htable(&channel_context.htable)) != 0) {
         return result;
     }
 
@@ -130,7 +176,7 @@ struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
     task->thread_data = g_sf_context.thread_data +
         hash_code % g_sf_context.work_threads;
     channel->in_ioevent = 1;
-    channel->last_connect_time = get_current_time();
+    channel->last_connect_time = g_current_time;
     if ((*err_no=sf_nio_notify(task, SF_NIO_STAGE_CONNECT)) != 0) {
         channel->in_ioevent = 0;
         free_queue_push(task);
@@ -143,16 +189,14 @@ int idempotency_client_channel_check_reconnect(
         IdempotencyClientChannel *channel)
 {
     int result;
-    time_t current_time;
 
     if (!__sync_bool_compare_and_swap(&channel->in_ioevent, 0, 1)) {
         return 0;
     }
 
-    current_time = get_current_time();
-    if (channel->last_connect_time >= current_time) {
+    if (channel->last_connect_time >= g_current_time) {
         sleep(1);
-        channel->last_connect_time = ++current_time;
+        channel->last_connect_time = g_current_time;
     }
 
     logDebug("file: "__FILE__", line: %d, "
@@ -162,7 +206,8 @@ int idempotency_client_channel_check_reconnect(
 
     channel->task->canceled = false;
     if ((result=sf_nio_notify(channel->task, SF_NIO_STAGE_CONNECT)) == 0) {
-        channel->last_connect_time = current_time;
+        channel->last_connect_time = g_current_time;
+        channel->last_report_time = g_current_time;
     } else {
         __sync_bool_compare_and_swap(&channel->in_ioevent, 1, 0); //rollback
     }

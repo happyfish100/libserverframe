@@ -56,6 +56,9 @@ int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
 #define sf_nio_notify(task, new_stage) \
     sf_nio_notify_ex(task, new_stage, __FILE__, __LINE__)
 
+#define sf_nio_task_is_idle(task) \
+    (task->offset == 0 && task->length == 0)
+
 int sf_set_read_event(struct fast_task_info *task);
 
 void sf_task_switch_thread(struct fast_task_info *task,

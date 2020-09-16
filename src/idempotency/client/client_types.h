@@ -7,6 +7,12 @@
 #include "fastcommon/fc_list.h"
 #include "fastcommon/fc_queue.h"
 
+typedef struct idempotency_client_config {
+    int channel_htable_capacity;
+    int channel_heartbeat_interval;
+    int channel_max_idle_time;
+} IdempotencyClientConfig;
+
 typedef struct idempotency_client_receipt {
     uint64_t req_id;
     struct idempotency_client_receipt *next;
@@ -16,10 +22,11 @@ typedef struct idempotency_client_channel {
     volatile uint32_t id;  //channel id, 0 for invalid
     volatile int key;      //channel key
     volatile char in_ioevent;
-    volatile char in_heartbeat;
+    //volatile char in_heartbeat;
     volatile char established;
-    time_t last_connect_time;
-    time_t last_pkg_time;  //last communication time
+    time_t last_connect_time;  //for connect frequency control
+    time_t last_pkg_time;      //last communication time
+    time_t last_report_time;   //last report time for rpc receipt
     pthread_lock_cond_pair_t lc_pair;  //for channel valid check and notify
     volatile uint64_t next_req_id;
     struct fast_mblock_man receipt_allocator;
@@ -32,6 +39,10 @@ typedef struct idempotency_client_channel {
 
 typedef struct idempotency_receipt_thread_context {
     struct fc_list_head head;  //LRU head for hearbeat
+    struct {
+        time_t heartbeat;
+        time_t idle;
+    } last_check_times;
 } IdempotencyReceiptThreadContext;
 
 #ifdef __cplusplus

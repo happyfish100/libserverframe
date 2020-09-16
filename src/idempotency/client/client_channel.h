@@ -3,6 +3,7 @@
 #ifndef IDEMPOTENCY_CLIENT_CHANNEL_H
 #define IDEMPOTENCY_CLIENT_CHANNEL_H
 
+#include "fastcommon/ini_file_reader.h"
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/fc_atomic.h"
@@ -12,10 +13,16 @@
 extern "C" {
 #endif
 
-#define client_channel_init() client_channel_init_ex(0)
+extern IdempotencyClientConfig g_idempotency_client_cfg;
 
-int client_channel_init_ex(const int hint_capacity);
+int client_channel_init(IniFullContext *ini_ctx);
 void client_channel_destroy();
+
+#define idempotency_client_channel_config_to_string(output, size) \
+    idempotency_client_channel_config_to_string_ex(output, size, false)
+
+void idempotency_client_channel_config_to_string_ex(
+        char *output, const int size, const bool add_comma);
 
 struct idempotency_client_channel *idempotency_client_channel_get(
         const char *server_ip, const short server_port,

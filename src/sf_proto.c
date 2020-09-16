@@ -187,6 +187,12 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
 const char *sf_get_cmd_caption(const int cmd)
 {
     switch (cmd) {
+        case SF_PROTO_ACK:
+            return "ACK";
+        case SF_PROTO_ACTIVE_TEST_REQ:
+            return "ACTIVE_TEST_REQ";
+        case SF_PROTO_ACTIVE_TEST_RESP:
+            return "ACTIVE_TEST_RESP";
         case SF_SERVICE_PROTO_SETUP_CHANNEL_REQ:
             return "SETUP_CHANNEL_REQ";
         case SF_SERVICE_PROTO_SETUP_CHANNEL_RESP:
