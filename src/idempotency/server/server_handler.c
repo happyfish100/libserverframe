@@ -65,8 +65,8 @@ int sf_server_deal_setup_channel(struct fast_task_info *task,
             sizeof(SFCommonProtoHeader));
     int2buff((*channel)->id, resp->channel_id);
     int2buff((*channel)->key, resp->key);
+    int2buff(task->size, resp->buffer_size);
     response->header.body_len = sizeof(SFProtoSetupChannelResp);
-    //TASK_ARG->context.response_done = true;
     return 0;
 }
 

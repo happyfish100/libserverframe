@@ -72,6 +72,8 @@ typedef struct sf_proto_setup_channel_req {
 typedef struct sf_proto_setup_channel_resp {
     char channel_id[4];
     char key[4];
+    char buffer_size[4];
+    char padding[4];
 } SFProtoSetupChannelResp;
 
 typedef struct sf_proto_report_req_receipt_header {

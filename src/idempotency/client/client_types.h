@@ -23,8 +23,8 @@ typedef struct idempotency_client_channel {
     volatile uint32_t id;  //channel id, 0 for invalid
     volatile int key;      //channel key
     volatile char in_ioevent;
-    //volatile char in_heartbeat;
     volatile char established;
+    int buffer_size;  //the min task size of the server and mine
     time_t last_connect_time;  //for connect frequency control
     time_t last_pkg_time;      //last communication time
     time_t last_report_time;   //last report time for rpc receipt

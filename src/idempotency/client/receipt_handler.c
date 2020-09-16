@@ -135,7 +135,7 @@ static int check_report_req_receipt(struct fast_task_info *task,
     header = (SFCommonProtoHeader *)task->data;
     rheader = (SFProtoReportReqReceiptHeader *)(header + 1);
     rbody = rstart = (SFProtoReportReqReceiptBody *)(rheader + 1);
-    buff_end = task->data + task->size;
+    buff_end = task->data + channel->buffer_size;
     last = NULL;
     receipt = channel->waiting_resp_qinfo.head;
     do {
@@ -250,6 +250,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     IdempotencyClientChannel *channel;
     int channel_id;
     int channel_key;
+    int buffer_size;
 
     if ((result=receipt_expect_body_length(task,
                     sizeof(SFProtoSetupChannelResp))) != 0)
@@ -269,11 +270,18 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     resp = (SFProtoSetupChannelResp *)(task->data + sizeof(SFCommonProtoHeader));
     channel_id = buff2int(resp->channel_id);
     channel_key = buff2int(resp->key);
+    buffer_size = buff2int(resp->buffer_size);
     idempotency_client_channel_set_id_key(channel, channel_id, channel_key);
     if (__sync_bool_compare_and_swap(&channel->established, 0, 1)) {
         thread_ctx = (IdempotencyReceiptThreadContext *)task->thread_data->arg;
         fc_list_add_tail(&channel->dlink, &thread_ctx->head);
     }
+    channel->buffer_size = FC_MIN(buffer_size, task->size);
+
+    logInfo("file: "__FILE__", line: %d, "
+            "peer buffer size: %d, mine buffer size: %d, "
+            "min buffer size: %d", __LINE__, buffer_size,
+            task->size, channel->buffer_size);
 
     PTHREAD_MUTEX_LOCK(&channel->lc_pair.lock);
     pthread_cond_broadcast(&channel->lc_pair.cond);
