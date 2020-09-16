@@ -65,7 +65,7 @@ static int load_client_channel_config(IniFullContext *ini_ctx)
 
     g_idempotency_client_cfg.channel_max_idle_time = iniGetIntValue(
             ini_ctx->section_name, "channel_max_idle_time",
-            ini_ctx->context, 3);
+            ini_ctx->context, 300);
     return 0;
 }
 

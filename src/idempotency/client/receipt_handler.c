@@ -51,10 +51,13 @@ static int receipt_recv_timeout_callback(struct fast_task_info *task)
         logError("file: "__FILE__", line: %d, "
                 "waiting receipt response from server %s:%d timeout",
                 __LINE__, task->server_ip, task->port);
-        return ETIMEDOUT;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "communication with server %s:%d timeout",
+                __LINE__, task->server_ip, task->port);
     }
 
-    return 0;
+    return ETIMEDOUT;
 }
 
 static void receipt_task_finish_cleanup(struct fast_task_info *task)
@@ -214,10 +217,12 @@ static int report_req_receipt_request(struct fast_task_info *task,
 
     if (count == 0) {
         result = sf_set_read_event(task);
-    } else if (update_lru) {
+    } else {
         ((IdempotencyClientChannel *)task->arg)->
             last_report_time = g_current_time;
-        update_lru_chain(task);
+        if (update_lru) {
+            update_lru_chain(task);
+        }
     }
 
     return 0;
