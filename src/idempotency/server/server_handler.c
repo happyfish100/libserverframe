@@ -157,3 +157,38 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     return 0;
 }
+
+IdempotencyRequest *sf_server_update_prepare_and_check(
+        struct fast_task_info *task, struct fast_mblock_man *
+        request_allocator, IdempotencyChannel *channel,
+        SFResponseInfo *response, int *result)
+{
+    SFProtoIdempotencyAdditionalHeader *adheader;
+    IdempotencyRequest *request;
+
+    if (!__sync_add_and_fetch(&channel->is_valid, 0)) {
+        response->error.length = sprintf(response->error.message,
+                "channel: %d is invalid", channel->id);
+        *result = SF_RETRIABLE_ERROR_CHANNEL_INVALID;
+        return NULL;
+    }
+
+    adheader = (SFProtoIdempotencyAdditionalHeader *)
+        (task->data + sizeof(SFCommonProtoHeader));
+    request = (IdempotencyRequest *)fast_mblock_alloc_object(request_allocator);
+    if (request == NULL) {
+        *result = ENOMEM;
+        return NULL;
+    }
+
+    request->finished = false;
+    request->req_id = buff2long(adheader->req_id);
+    *result = idempotency_channel_add_request(channel, request);
+    if (*result == EEXIST) {
+        if (!request->finished) {
+            *result = EAGAIN;
+        }
+    }
+
+    return request;
+}

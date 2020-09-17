@@ -21,6 +21,11 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
         int *task_type, IdempotencyChannel **channel,
         SFResponseInfo *response);
 
+IdempotencyRequest *sf_server_update_prepare_and_check(
+        struct fast_task_info *task, struct fast_mblock_man *
+        request_allocator, IdempotencyChannel *channel,
+        SFResponseInfo *response, int *result);
+
 #ifdef __cplusplus
 }
 #endif

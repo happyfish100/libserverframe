@@ -287,3 +287,23 @@ void idempotency_channel_free(IdempotencyChannel *channel)
             channel_context.timeout_ctx.reserve_interval;
     }
 }
+
+int idempotency_request_alloc_init(void *element, void *args)
+{
+    static int i = 0;
+
+    IdempotencyRequest *request;
+    request = (IdempotencyRequest *)element;
+    request->allocator = (struct fast_mblock_man *)args;
+    request->output.rsize = request->allocator->info.element_size -
+        sizeof(IdempotencyRequest);
+    request->output.response = request + 1;
+
+    if (++i % 100 == 0) {
+        logInfo("i: %d, element_size: %d, rsize: %d", i,
+                request->allocator->info.element_size,
+                request->output.rsize);
+    }
+
+    return 0;
+}

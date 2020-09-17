@@ -39,6 +39,8 @@ extern "C" {
                 &channel->request_htable, req_id);
     }
 
+    int idempotency_request_alloc_init(void *element, void *args);
+
 #ifdef __cplusplus
 }
 #endif

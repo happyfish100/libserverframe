@@ -35,7 +35,9 @@ int idempotency_request_htable_add(IdempotencyRequestHTable *htable,
     current = *bucket;
     while (current != NULL) {
         if (current->req_id == request->req_id) {
-            request->output = current->output;
+            request->output.result = current->output.result;
+            memcpy(request->output.response, current->output.response,
+                    request->output.rsize);
             request->finished = current->finished;
             result = EEXIST;
             break;

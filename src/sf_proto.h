@@ -64,6 +64,10 @@ typedef struct sf_common_proto_header {
     char padding[3];
 } SFCommonProtoHeader;
 
+typedef struct sf_proto_idempotency_additional_header {
+    char req_id[8];
+} SFProtoIdempotencyAdditionalHeader;
+
 typedef struct sf_proto_setup_channel_req {
     char channel_id[4]; //for hint
     char key[4];        //for validate when channel_id > 0

@@ -5,14 +5,17 @@
 #include "fastcommon/fast_mblock.h"
 #include "fastcommon/fast_timer.h"
 
+typedef struct idempotency_request_result {
+    int rsize;   //response size defined by application
+    int result;
+    void *response;
+} IdempotencyRequestResult;
+
 typedef struct idempotency_request {
     uint64_t req_id;
     volatile int ref_count;
     bool finished;
-    struct {
-        int result;
-        int inc_alloc;
-    } output;
+    IdempotencyRequestResult output;
     struct fast_mblock_man *allocator;  //for free
     struct idempotency_request *next;
 } IdempotencyRequest;
