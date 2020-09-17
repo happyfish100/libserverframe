@@ -475,7 +475,7 @@ static void *receipt_alloc_thread_extra_data(const int thread_index)
     return ctx;
 }
 
-int receipt_handler_init()
+static int do_init()
 {
     int bytes;
 
@@ -492,6 +492,21 @@ int receipt_handler_init()
             NULL, sf_proto_set_body_length, receipt_deal_task,
             receipt_task_finish_cleanup, receipt_recv_timeout_callback,
             1000, sizeof(SFCommonProtoHeader), 0, receipt_init_task);
+}
+
+int receipt_handler_init()
+{
+    int result;
+
+    if ((result=do_init()) != 0) {
+        return result;
+    }
+
+    sf_enable_thread_notify(true);
+    sf_set_remove_from_ready_list(false);
+    fc_sleep_ms(100);
+
+    return 0;
 }
 
 int receipt_handler_destroy()

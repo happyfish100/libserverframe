@@ -94,24 +94,25 @@ int sf_proto_set_body_length(struct fast_task_info *task);
 const char *sf_get_cmd_caption(const int cmd);
 
 static inline void sf_log_network_error_ex(SFResponseInfo *response,
-        const ConnectionInfo *conn, const int result, const int line)
+        const ConnectionInfo *conn, const int result,
+        const char *file, const int line)
 {
     if (response->error.length > 0) {
-        logError("file: "__FILE__", line: %d, "
-                "server %s:%d, %s", line,
+        logError("file: %s, line: %d, "
+                "server %s:%d, %s", file, line,
                 conn->ip_addr, conn->port,
                 response->error.message);
     } else {
-        logError("file: "__FILE__", line: %d, "
+        logError("file: %s, line: %d, "
                 "communicate with server %s:%d fail, "
-                "errno: %d, error info: %s", line,
+                "errno: %d, error info: %s", file, line,
                 conn->ip_addr, conn->port,
                 result, STRERROR(result));
     }
 }
 
 #define sf_log_network_error(response, conn, result)  \
-    sf_log_network_error_ex(response, conn, result, __LINE__)
+    sf_log_network_error_ex(response, conn, result, __FILE__, __LINE__)
 
 
 static inline int sf_server_expect_body_length(SFResponseInfo *response,
@@ -237,6 +238,16 @@ static inline void sf_proto_extract_header(SFCommonProtoHeader *header_proto,
     header_info->status = buff2short(header_proto->status);
 }
 
+static inline int sf_active_test(ConnectionInfo *conn,
+        SFResponseInfo *response, const int network_timeout)
+{
+    SFCommonProtoHeader proto_header;
+
+    SF_PROTO_SET_HEADER(&proto_header, SF_PROTO_ACTIVE_TEST_REQ, 0);
+    return sf_send_and_recv_none_body_response(conn, (char *)&proto_header,
+            sizeof(proto_header), response, network_timeout,
+            SF_PROTO_ACTIVE_TEST_RESP);
+}
 
 #ifdef __cplusplus
 }
