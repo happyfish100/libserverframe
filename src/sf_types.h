@@ -60,11 +60,13 @@ typedef struct {
 } SFRequestInfo;
 
 typedef struct {
+    int length;
+    char message[SF_ERROR_INFO_SIZE];
+} SFErrorInfo;
+
+typedef struct {
     SFHeaderInfo header;
-    struct {
-        int length;
-        char message[SF_ERROR_INFO_SIZE];
-    } error;
+    SFErrorInfo error;
 } SFResponseInfo;
 
 #endif

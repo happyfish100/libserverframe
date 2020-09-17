@@ -95,13 +95,15 @@ int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
     return 0;
 }
 
-int sf_send_and_recv_response(ConnectionInfo *conn, char *send_data,
+int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
         const int send_len, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
-        char *recv_data, const int expect_body_len)
+        char *recv_data, const int *expect_body_lens,
+        const int expect_body_len_count, int *body_len)
 {
     int result;
     int recv_bytes;
+    int i;
 
     if ((result=sf_send_and_check_response_header(conn,
                     send_data, send_len, response,
@@ -110,19 +112,48 @@ int sf_send_and_recv_response(ConnectionInfo *conn, char *send_data,
         return result;
     }
 
-    if (response->header.body_len != expect_body_len) {
-        response->error.length = sprintf(response->error.message,
-                "response body length: %d != %d",
-                response->header.body_len,
-                expect_body_len);
-        return EINVAL;
+    if (body_len != NULL) {
+        *body_len = response->header.body_len;
     }
-    if (expect_body_len == 0) {
+
+    if (response->header.body_len != expect_body_lens[0]) {
+        for (i=1; i<expect_body_len_count; i++) {
+            if (response->header.body_len == expect_body_lens[i]) {
+                break;
+            }
+        }
+
+        if (i == expect_body_len_count) {
+            if (expect_body_len_count == 1) {
+                response->error.length = sprintf(
+                        response->error.message,
+                        "response body length: %d != %d",
+                        response->header.body_len,
+                        expect_body_lens[0]);
+            } else {
+                response->error.length = sprintf(
+                        response->error.message,
+                        "response body length: %d not in [%d",
+                        response->header.body_len,
+                        expect_body_lens[0]);
+                for (i=1; i<expect_body_len_count; i++) {
+                    response->error.length += sprintf(
+                            response->error.message +
+                            response->error.length,
+                            ", %d", expect_body_lens[i]);
+                }
+                *(response->error.message + response->error.length++) = ']';
+                *(response->error.message + response->error.length) = '\0';
+            }
+            return EINVAL;
+        }
+    }
+    if (response->header.body_len == 0) {
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data,
-                    expect_body_len, network_timeout, &recv_bytes)) != 0)
+    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+                    header.body_len, network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
                 sizeof(response->error.message),

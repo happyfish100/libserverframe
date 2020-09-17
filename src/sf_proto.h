@@ -202,10 +202,20 @@ static inline int sf_send_and_check_response_header(ConnectionInfo *conn,
     return 0;
 }
 
-int sf_send_and_recv_response(ConnectionInfo *conn, char *send_data,
+int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
         const int send_len, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
-        char *recv_data, const int expect_body_len);
+        char *recv_data, const int *expect_body_lens,
+        const int expect_body_len_count, int *body_len);
+
+static inline int sf_send_and_recv_response(ConnectionInfo *conn,
+        char *send_data, const int send_len, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        char *recv_data, const int expect_body_len)
+{
+    return sf_send_and_recv_response_ex(conn, send_data, send_len, response,
+            network_timeout, expect_cmd, recv_data, &expect_body_len, 1, NULL);
+}
 
 static inline int sf_send_and_recv_none_body_response(ConnectionInfo *conn,
         char *send_data, const int send_len, SFResponseInfo *response,
