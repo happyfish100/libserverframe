@@ -16,7 +16,8 @@ IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
 
 IDEMP_CLIENT_HEADER = idempotency/client/client_types.h    \
                       idempotency/client/receipt_handler.h \
-                      idempotency/client/client_channel.h
+                      idempotency/client/client_channel.h  \
+                      idempotency/client/rpc_wrapper.h
 
 ALL_HEADERS  = $(TOP_HEADERS) $(IDEMP_SERVER_HEADER) $(IDEMP_CLIENT_HEADER)
 

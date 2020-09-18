@@ -36,6 +36,7 @@ int idempotency_request_htable_add(IdempotencyRequestHTable *htable,
     while (current != NULL) {
         if (current->req_id == request->req_id) {
             request->output.result = current->output.result;
+            request->output.flags = current->output.flags;
             memcpy(request->output.response, current->output.response,
                     request->output.rsize);
             request->finished = current->finished;

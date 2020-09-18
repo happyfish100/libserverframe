@@ -8,6 +8,7 @@
 #include "fastcommon/logger.h"
 #include "fastcommon/connection_pool.h"
 #include "fastcommon/sockopt.h"
+#include "sf_define.h"
 #include "sf_types.h"
 
 #define SF_PROTO_ACK                    116
@@ -252,6 +253,16 @@ static inline int sf_active_test(ConnectionInfo *conn,
             sizeof(proto_header), response, network_timeout,
             SF_PROTO_ACTIVE_TEST_RESP);
 }
+
+#define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
+    do {  \
+        if (SF_FORCE_CLOSE_CONNECTION_ERROR(result)) {  \
+            client_ctx->conn_manager.close_connection(client_ctx, conn);   \
+        } else if (client_ctx->conn_manager.release_connection != NULL) {  \
+            client_ctx->conn_manager.release_connection(client_ctx, conn); \
+        } \
+    } while (0)
+
 
 #ifdef __cplusplus
 }

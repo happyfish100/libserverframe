@@ -6,7 +6,8 @@
 #include "fastcommon/fast_timer.h"
 
 typedef struct idempotency_request_result {
-    int rsize;   //response size defined by application
+    short rsize;  //response size defined by application
+    short flags;  //for application
     int result;
     void *response;
 } IdempotencyRequestResult;

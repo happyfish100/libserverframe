@@ -84,11 +84,11 @@ static int load_network_parameters(IniFullContext *ini_ctx)
                     &max_pkg_size)) != 0)
     {
         return result;
-    } else if (max_pkg_size < 4096) {
+    } else if (max_pkg_size < 8192) {
         logWarning("file: "__FILE__", line: %d, "
-                "max_pkg_size: %d is too small, set to 4096",
+                "max_pkg_size: %d is too small, set to 8192",
                 __LINE__, (int)max_pkg_size);
-        max_pkg_size = 4096;
+        max_pkg_size = 8192;
     }
     g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
 
@@ -101,11 +101,11 @@ static int load_network_parameters(IniFullContext *ini_ctx)
                     &min_buff_size)) != 0)
     {
         return result;
-    } else if (min_buff_size < 2048) {
+    } else if (min_buff_size < 8192) {
         logWarning("file: "__FILE__", line: %d, "
-                "min_buff_size: %d is too small, set to 2048",
+                "min_buff_size: %d is too small, set to 8192",
                 __LINE__, (int)min_buff_size);
-        min_buff_size = 2048;
+        min_buff_size = 8192;
     }
     g_sf_global_vars.min_buff_size = (int)min_buff_size;
 

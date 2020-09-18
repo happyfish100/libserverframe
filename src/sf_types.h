@@ -17,11 +17,11 @@
 #define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
 #define SF_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
-typedef void (*sf_accept_done_callback)(struct fast_task_info *pTask,
+typedef void (*sf_accept_done_callback)(struct fast_task_info *task,
         const bool bInnerPort);
-typedef int (*sf_set_body_length_callback)(struct fast_task_info *pTask);
-typedef int (*sf_deal_task_func)(struct fast_task_info *pTask);
-typedef int (*sf_recv_timeout_callback)(struct fast_task_info *pTask);
+typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
+typedef int (*sf_deal_task_func)(struct fast_task_info *task);
+typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 
 typedef struct sf_context {
     struct nio_thread_data *thread_data;
