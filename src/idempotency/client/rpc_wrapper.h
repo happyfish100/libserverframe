@@ -10,6 +10,7 @@
     IdempotencyClientChannel *old_channel;  \
     int result;  \
     int i;       \
+    bool idempotency_enabled;  \
     uint64_t req_id;  \
     SFNetRetryIntervalContext net_retry_ctx;  \
     \
@@ -20,23 +21,26 @@
     } \
     connection_params = client_ctx->conn_manager. \
             get_connection_params(client_ctx, conn); \
+    idempotency_enabled = client_ctx->idempotency_enabled && \
+            connection_params != NULL;  \
     \
     sf_init_net_retry_interval_context(&net_retry_ctx, \
             &client_ctx->net_retry_cfg.interval_mm,    \
             &client_ctx->net_retry_cfg.network);       \
     \
     while (1) {  \
-        if (client_ctx->idempotency_enabled) {   \
+        if (idempotency_enabled) {   \
             req_id = idempotency_client_channel_next_seq_id(  \
                     connection_params->channel); \
         } else {  \
             req_id = 0;  \
         }  \
     \
-        old_channel = connection_params->channel; \
+        old_channel = connection_params != NULL ? \
+             connection_params->channel : NULL;   \
         i = 0; \
         while (1) { \
-            if (client_ctx->idempotency_enabled) {  \
+            if (idempotency_enabled) {  \
                 result = idempotency_client_channel_check_wait(  \
                         connection_params->channel);  \
             } else {  \
@@ -52,7 +56,7 @@
             }  \
     \
             if (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID && \
-                    client_ctx->idempotency_enabled)  \
+                    idempotency_enabled)  \
             {  \
                 idempotency_client_channel_check_reconnect( \
                         connection_params->channel);  \
@@ -74,17 +78,21 @@
     \
             connection_params = client_ctx->conn_manager. \
                 get_connection_params(client_ctx, conn);  \
-            if (connection_params->channel != old_channel) { \
+            if (connection_params != NULL && connection_params->channel != \
+                    old_channel) \
+            {  \
                 break; \
             }  \
         }  \
     \
-        if (connection_params->channel != old_channel) { /* master changed */ \
+        if (connection_params != NULL && connection_params->channel !=  \
+                old_channel)   \
+        { /* master changed */ \
             sf_reset_net_retry_interval(&net_retry_ctx); \
             continue; \
         } \
     \
-        if (client_ctx->idempotency_enabled) { \
+        if (idempotency_enabled) { \
             idempotency_client_channel_push( \
                     connection_params->channel, req_id); \
         } \
