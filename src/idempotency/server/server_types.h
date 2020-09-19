@@ -5,6 +5,15 @@
 #include "fastcommon/fast_mblock.h"
 #include "fastcommon/fast_timer.h"
 
+#define SF_IDEMPOTENCY_CHANNEL_ID_BITS    16
+#define SF_IDEMPOTENCY_REQUEST_ID_BITS    (64 - SF_IDEMPOTENCY_CHANNEL_ID_BITS)
+#define SF_IDEMPOTENCY_MAX_CHANNEL_COUNT  ((1 << SF_IDEMPOTENCY_CHANNEL_ID_BITS) - 1)
+#define SF_IDEMPOTENCY_MAX_CHANNEL_ID     SF_IDEMPOTENCY_MAX_CHANNEL_COUNT
+
+#define SF_IDEMPOTENCY_DEFAULT_REQUEST_HINT_CAPACITY      1023
+#define SF_IDEMPOTENCY_DEFAULT_CHANNEL_RESERVE_INTERVAL    600
+#define SF_IDEMPOTENCY_DEFAULT_CHANNEL_SHARED_LOCK_COUNT   163
+
 typedef struct idempotency_request_result {
     short rsize;  //response size defined by application
     short flags;  //for application
