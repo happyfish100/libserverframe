@@ -48,7 +48,8 @@
 #define SF_FORCE_CLOSE_CONNECTION_ERROR(code) \
     ((code >= SF_FORCE_CLOSE_CONNECTION_ERROR_MIN &&  \
       code <= SF_FORCE_CLOSE_CONNECTION_ERROR_MAX) || \
-      (result == EINVAL) || (result != 0 && is_network_error(code)))
+      (result == EINVAL) || (result == EOVERFLOW)  || \
+      (result != 0 && is_network_error(code)))
 
 
 #define SF_UNIX_ERRNO(code, errno_for_overflow) \

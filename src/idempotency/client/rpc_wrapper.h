@@ -4,7 +4,7 @@
 
 #include "../../sf_configs.h"
 
-#define SF_CLIENT_IDEMPOTENCY_UPDATE_WARPER(client_ctx, \
+#define SF_CLIENT_IDEMPOTENCY_UPDATE_WRAPPER(client_ctx, \
         GET_MASTER_CONNECTION, get_conn_arg1, update_callback, ...) \
     ConnectionInfo *conn;  \
     IdempotencyClientChannel *old_channel;  \
@@ -89,6 +89,48 @@
                     connection_params->channel, req_id); \
         } \
         break; \
+    } \
+    \
+    SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
+    return SF_UNIX_ERRNO(result, EIO)
+
+
+#define SF_CLIENT_IDEMPOTENCY_QUERY_WRAPPER(client_ctx, \
+        GET_READABLE_CONNECTION, get_conn_arg1, query_callback, ...) \
+    ConnectionInfo *conn;  \
+    int result;  \
+    int i;       \
+    SFNetRetryIntervalContext net_retry_ctx;  \
+    \
+    if ((conn=GET_READABLE_CONNECTION(client_ctx, \
+                    get_conn_arg1, &result)) == NULL) \
+    { \
+        return SF_UNIX_ERRNO(result, EIO); \
+    } \
+    \
+    sf_init_net_retry_interval_context(&net_retry_ctx, \
+            &client_ctx->net_retry_cfg.interval_mm,    \
+            &client_ctx->net_retry_cfg.network);       \
+    i = 0; \
+    while (1) { \
+        if ((result=query_callback(client_ctx,  \
+                        conn, ##__VA_ARGS__)) == 0) \
+        {  \
+            break;  \
+        }  \
+        SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx, client_ctx-> \
+                net_retry_cfg.network.times, ++i, result); \
+    \
+        logInfo("file: "__FILE__", line: %d, func: %s, "  \
+                "net retry result: %d, retry count: %d",  \
+                __LINE__, __FUNCTION__, result, i);       \
+    \
+        SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
+        if ((conn=GET_READABLE_CONNECTION(client_ctx,  \
+                        get_conn_arg1, &result)) == NULL)  \
+        {  \
+            return SF_UNIX_ERRNO(result, EIO);  \
+        }  \
     } \
     \
     SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
