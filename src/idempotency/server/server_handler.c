@@ -48,7 +48,8 @@ int sf_server_deal_setup_channel(struct fast_task_info *task,
     key = buff2int(req->key);
     if (*channel != NULL) {
         response->error.length = sprintf(response->error.message,
-                "channel already setup, the channel id: %d", (*channel)->id);
+                "channel already setup, the channel id: %d, task type: %d",
+                (*channel)->id, *task_type);
         return EEXIST;
     }
 
@@ -106,7 +107,7 @@ int sf_server_deal_close_channel(struct fast_task_info *task,
 }
 
 int sf_server_deal_report_req_receipt(struct fast_task_info *task,
-        int *task_type, IdempotencyChannel **channel,
+        const int task_type, IdempotencyChannel *channel,
         SFResponseInfo *response)
 {
     int result;
@@ -119,7 +120,7 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     SFProtoReportReqReceiptBody *body_part;
     SFProtoReportReqReceiptBody *body_end;
 
-    if ((result=check_holder_channel(*task_type, *channel, response)) != 0) {
+    if ((result=check_holder_channel(task_type, channel, response)) != 0) {
         return result;
     }
 
@@ -147,7 +148,7 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     body_end = body_part + count;
     for (; body_part < body_end; body_part++) {
         req_id = buff2long(body_part->req_id);
-        if (idempotency_channel_remove_request(*channel, req_id) == 0) {
+        if (idempotency_channel_remove_request(channel, req_id) == 0) {
             success++;
         }
     }

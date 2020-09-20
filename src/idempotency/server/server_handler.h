@@ -18,7 +18,7 @@ int sf_server_deal_close_channel(struct fast_task_info *task,
         SFResponseInfo *response);
 
 int sf_server_deal_report_req_receipt(struct fast_task_info *task,
-        int *task_type, IdempotencyChannel **channel,
+        const int task_type, IdempotencyChannel *channel,
         SFResponseInfo *response);
 
 IdempotencyRequest *sf_server_update_prepare_and_check(
