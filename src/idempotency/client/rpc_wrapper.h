@@ -64,11 +64,11 @@
     \
             SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx, client_ctx-> \
                     net_retry_cfg.network.times, ++i, result); \
-    \
+    /* \
             logInfo("file: "__FILE__", line: %d, func: %s, "  \
                     "net retry result: %d, retry count: %d",  \
                     __LINE__, __FUNCTION__, result, i);       \
-    \
+    */ \
             SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
             if ((conn=GET_MASTER_CONNECTION(client_ctx,  \
                             get_conn_arg1, &result)) == NULL)  \
@@ -128,11 +128,11 @@
         }  \
         SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx, client_ctx-> \
                 net_retry_cfg.network.times, ++i, result); \
-    \
+    /* \
         logInfo("file: "__FILE__", line: %d, func: %s, "  \
                 "net retry result: %d, retry count: %d",  \
                 __LINE__, __FUNCTION__, result, i);       \
-    \
+    */ \
         SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
         if ((conn=GET_READABLE_CONNECTION(client_ctx,  \
                         get_conn_arg1, &result)) == NULL)  \

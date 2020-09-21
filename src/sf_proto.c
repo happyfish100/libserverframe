@@ -240,3 +240,40 @@ const char *sf_get_cmd_caption(const int cmd)
             return "UNKOWN";
     }
 }
+
+int sf_proto_deal_ack(struct fast_task_info *task,
+        SFRequestInfo *request, SFResponseInfo *response)
+{
+    if (request->header.status != 0) {
+        if (request->header.body_len > 0) {
+            int remain_size;
+            int len;
+
+            response->error.length = sprintf(response->error.message,
+                    "message from peer %s:%u => ",
+                    task->client_ip, task->port);
+            remain_size = sizeof(response->error.message) -
+                response->error.length;
+            if (request->header.body_len >= remain_size) {
+                len = remain_size - 1;
+            } else {
+                len = request->header.body_len;
+            }
+
+            memcpy(response->error.message + response->error.length,
+                    request->body, len);
+            response->error.length += len;
+            *(response->error.message + response->error.length) = '\0';
+        }
+
+        return request->header.status;
+    }
+
+    if (request->header.body_len > 0) {
+        response->error.length = sprintf(response->error.message,
+                "ACK body length: %d != 0", request->header.body_len);
+        return -EINVAL;
+    }
+
+    return 0;
+}

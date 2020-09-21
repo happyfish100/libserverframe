@@ -254,6 +254,16 @@ static inline int sf_active_test(ConnectionInfo *conn,
             SF_PROTO_ACTIVE_TEST_RESP);
 }
 
+static inline int sf_proto_deal_actvie_test(struct fast_task_info *task,
+        SFRequestInfo *request, SFResponseInfo *response)
+{
+    return sf_server_expect_body_length(response,
+            request->header.body_len, 0);
+}
+
+int sf_proto_deal_ack(struct fast_task_info *task,
+        SFRequestInfo *request, SFResponseInfo *response);
+
 #define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
     do {  \
         if (SF_FORCE_CLOSE_CONNECTION_ERROR(result)) {  \

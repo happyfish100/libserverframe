@@ -278,11 +278,6 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     }
     channel->buffer_size = FC_MIN(buffer_size, task->size);
 
-    logInfo("file: "__FILE__", line: %d, "
-            "peer buffer size: %d, mine buffer size: %d, "
-            "min buffer size: %d", __LINE__, buffer_size,
-            task->size, channel->buffer_size);
-
     PTHREAD_MUTEX_LOCK(&channel->lc_pair.lock);
     pthread_cond_broadcast(&channel->lc_pair.cond);
     PTHREAD_MUTEX_UNLOCK(&channel->lc_pair.lock);
