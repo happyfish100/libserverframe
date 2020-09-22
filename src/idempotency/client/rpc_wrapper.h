@@ -88,7 +88,6 @@
         if (connection_params != NULL && connection_params->channel !=  \
                 old_channel)   \
         { /* master changed */ \
-            sf_reset_net_retry_interval(&net_retry_ctx); \
             continue; \
         } \
     \
