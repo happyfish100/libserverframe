@@ -51,10 +51,13 @@ int sf_client_sock_read(int sock, short event, void *arg);
 void sf_task_finish_clean_up(struct fast_task_info *task);
 
 int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
-        const char *file, const int line);
+        const int log_level, const char *file, const int line);
 
 #define sf_nio_notify(task, new_stage) \
-    sf_nio_notify_ex(task, new_stage, __FILE__, __LINE__)
+    sf_nio_notify_ex(task, new_stage, LOG_WARNING, __FILE__, __LINE__)
+
+#define sf_nio_notify_silence(task, new_stage) \
+    sf_nio_notify_ex(task, new_stage, LOG_NOTHING, __FILE__, __LINE__)
 
 #define sf_nio_task_is_idle(task) \
     (task->offset == 0 && task->length == 0)

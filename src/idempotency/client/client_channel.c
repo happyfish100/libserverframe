@@ -318,7 +318,7 @@ int idempotency_client_channel_push(struct idempotency_client_channel *channel,
     if (notify) {
         if (__sync_add_and_fetch(&channel->in_ioevent, 0)) {
             if (__sync_add_and_fetch(&channel->established, 0)) {
-                sf_nio_notify(channel->task, SF_NIO_STAGE_CONTINUE);
+                sf_nio_notify_silence(channel->task, SF_NIO_STAGE_CONTINUE);
             }
         } else {
             return idempotency_client_channel_check_reconnect(channel);
