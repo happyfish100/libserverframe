@@ -98,17 +98,19 @@ int sf_proto_set_body_length(struct fast_task_info *task);
 
 const char *sf_get_cmd_caption(const int cmd);
 
-static inline void sf_log_network_error_ex(SFResponseInfo *response,
+static inline void sf_log_network_error_ex1(SFResponseInfo *response,
         const ConnectionInfo *conn, const int result,
-        const char *file, const int line)
+        const int log_level, const char *file, const int line)
 {
     if (response->error.length > 0) {
-        logError("file: %s, line: %d, "
+        log_it_ex(&g_log_context, log_level,
+                "file: %s, line: %d, "
                 "server %s:%d, %s", file, line,
                 conn->ip_addr, conn->port,
                 response->error.message);
     } else {
-        logError("file: %s, line: %d, "
+        log_it_ex(&g_log_context, log_level,
+                "file: %s, line: %d, "
                 "communicate with server %s:%d fail, "
                 "errno: %d, error info: %s", file, line,
                 conn->ip_addr, conn->port,
@@ -116,8 +118,13 @@ static inline void sf_log_network_error_ex(SFResponseInfo *response,
     }
 }
 
-#define sf_log_network_error(response, conn, result)  \
-    sf_log_network_error_ex(response, conn, result, __FILE__, __LINE__)
+#define sf_log_network_error_ex(response, conn, result, log_level) \
+    sf_log_network_error_ex1(response, conn, result, \
+            log_level, __FILE__, __LINE__)
+
+#define sf_log_network_error(response, conn, result) \
+    sf_log_network_error_ex1(response, conn, result, \
+            LOG_ERR, __FILE__, __LINE__)
 
 
 static inline int sf_server_expect_body_length(SFResponseInfo *response,
