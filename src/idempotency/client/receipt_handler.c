@@ -111,14 +111,6 @@ static int check_report_req_receipt(struct fast_task_info *task)
     char *buff_end;
     int count;
 
-    if (task->length > 0) {
-        logWarning("file: "__FILE__", line: %d, "
-                "server %s:%d, task length: %d != 0, skip check "
-                "and report receipt request!", __LINE__,
-                task->server_ip, task->port, task->length);
-        return 0;
-    }
-
     channel = (IdempotencyClientChannel *)task->arg;
     if (channel->waiting_resp_qinfo.head != NULL) {
         return 0;
@@ -328,7 +320,7 @@ static int receipt_deal_task(struct fast_task_info *task)
             setup_channel_request(task);
             result = 0;
             break;
-        } else if (stage == SF_NIO_STAGE_CONTINUE) {
+        } else if (stage == SF_NIO_STAGE_CONTINUE && task->length == 0) {
             if (((IdempotencyClientChannel *)task->arg)->established) {
                 report_req_receipt_request(task, true);
             } else {
