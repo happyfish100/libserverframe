@@ -63,8 +63,8 @@ static int load_network_parameters(IniFullContext *ini_ctx)
         g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.max_connections = iniGetIntValue(ini_ctx->section_name,
-            "max_connections", ini_ctx->context, DEFAULT_MAX_CONNECTONS);
+    g_sf_global_vars.max_connections = iniGetIntValueEx(ini_ctx->section_name,
+            "max_connections", ini_ctx->context, DEFAULT_MAX_CONNECTONS, true);
     if (g_sf_global_vars.max_connections <= 0) {
         g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
     }
@@ -75,8 +75,8 @@ static int load_network_parameters(IniFullContext *ini_ctx)
         return result;
     }
 
-    pMaxPkgSize = iniGetStrValue(ini_ctx->section_name,
-            "max_pkg_size", ini_ctx->context);
+    pMaxPkgSize = iniGetStrValueEx(ini_ctx->section_name,
+            "max_pkg_size", ini_ctx->context, true);
     if (pMaxPkgSize == NULL) {
         max_pkg_size = SF_DEF_MAX_PACKAGE_SIZE;
     }
@@ -92,8 +92,8 @@ static int load_network_parameters(IniFullContext *ini_ctx)
     }
     g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
 
-    pMinBuffSize = iniGetStrValue(ini_ctx->section_name,
-            "min_buff_size", ini_ctx->context);
+    pMinBuffSize = iniGetStrValueEx(ini_ctx->section_name,
+            "min_buff_size", ini_ctx->context, true);
     if (pMinBuffSize == NULL) {
         min_buff_size = SF_DEF_MIN_BUFF_SIZE;
     }
@@ -109,8 +109,8 @@ static int load_network_parameters(IniFullContext *ini_ctx)
     }
     g_sf_global_vars.min_buff_size = (int)min_buff_size;
 
-    pMaxBuffSize = iniGetStrValue(ini_ctx->section_name,
-            "max_buff_size", ini_ctx->context);
+    pMaxBuffSize = iniGetStrValueEx(ini_ctx->section_name,
+            "max_buff_size", ini_ctx->context, true);
     if (pMaxBuffSize == NULL) {
         max_buff_size = SF_DEF_MAX_BUFF_SIZE;
     }
