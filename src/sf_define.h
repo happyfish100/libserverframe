@@ -30,6 +30,12 @@
 #define SF_NIO_STAGE_IS_INPROGRESS(stage)  \
     ((stage & SF_NIO_FLAG_INPROGRESS) != 0)
 
+
+#define SF_CLUSTER_ERROR_BINLOG_INCONSISTENT 9998
+#define SF_CLUSTER_ERROR_LEADER_INCONSISTENT 9999
+#define SF_CLUSTER_ERROR_MASTER_INCONSISTENT SF_CLUSTER_ERROR_LEADER_INCONSISTENT
+
+
 #define SF_RETRIABLE_ERROR_MIN             9901
 #define SF_RETRIABLE_ERROR_MAX             9988
 #define SF_RETRIABLE_ERROR_NO_SERVER       9901  //no server available
@@ -55,6 +61,9 @@
 #define SF_UNIX_ERRNO(code, errno_for_overflow) \
     (code < 256 ? code : errno_for_overflow)
 
+#define SF_BINLOG_SOURCE_USER        'U'  //by user call
+#define SF_BINLOG_SOURCE_REPLAY      'R'  //by binlog replay
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -65,4 +74,3 @@ extern "C" {
 #endif
 
 #endif
-
