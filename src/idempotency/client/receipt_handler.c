@@ -41,7 +41,7 @@ static int receipt_recv_timeout_callback(struct fast_task_info *task)
 
     if (SF_NIO_TASK_STAGE_FETCH(task) == SF_NIO_STAGE_CONNECT) {
         logError("file: "__FILE__", line: %d, "
-                "connect to server %s:%d timeout",
+                "connect to server %s:%u timeout",
                 __LINE__, task->server_ip, task->port);
         return ETIMEDOUT;
     }
@@ -49,11 +49,11 @@ static int receipt_recv_timeout_callback(struct fast_task_info *task)
     channel = (IdempotencyClientChannel *)task->arg;
     if (channel->waiting_resp_qinfo.head != NULL) {
         logError("file: "__FILE__", line: %d, "
-                "waiting receipt response from server %s:%d timeout",
+                "waiting receipt response from server %s:%u timeout",
                 __LINE__, task->server_ip, task->port);
     } else {
         logError("file: "__FILE__", line: %d, "
-                "communication with server %s:%d timeout",
+                "communication with server %s:%u timeout",
                 __LINE__, task->server_ip, task->port);
     }
 
@@ -77,7 +77,7 @@ static void receipt_task_finish_cleanup(struct fast_task_info *task)
     __sync_bool_compare_and_swap(&channel->in_ioevent, 1, 0);
 
     logDebug("file: "__FILE__", line: %d, "
-            "receipt task for server %s:%d exit",
+            "receipt task for server %s:%u exit",
             __LINE__, task->server_ip, task->port);
 }
 
@@ -216,7 +216,7 @@ static inline int receipt_expect_body_length(struct fast_task_info *task,
 {
     if ((int)(task->length - sizeof(SFCommonProtoHeader)) != expect_body_len) {
         logError("file: "__FILE__", line: %d, "
-                "server %s:%d, response body length: %d != %d",
+                "server %s:%u, response body length: %d != %d",
                 __LINE__, task->server_ip, task->port, (int)(task->length -
                     sizeof(SFCommonProtoHeader)), expect_body_len);
         return EINVAL;
@@ -244,7 +244,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     channel = (IdempotencyClientChannel *)task->arg;
     if (__sync_add_and_fetch(&channel->established, 0)) {
         logWarning("file: "__FILE__", line: %d, "
-                "response from server %s:%d, unexpected cmd: "
+                "response from server %s:%u, unexpected cmd: "
                 "SETUP_CHANNEL_RESP, ignore it!",
                 __LINE__, task->server_ip, task->port);
         return 0;
@@ -290,7 +290,7 @@ static inline int deal_report_req_receipt_response(struct fast_task_info *task)
     channel = (IdempotencyClientChannel *)task->arg;
     if (channel->waiting_resp_qinfo.head == NULL) {
         logWarning("file: "__FILE__", line: %d, "
-                "response from server %s:%d, unexpect cmd: "
+                "response from server %s:%u, unexpect cmd: "
                 "REPORT_REQ_RECEIPT_RESP", __LINE__,
                 task->server_ip, task->port);
         return 0;
@@ -338,7 +338,7 @@ static int receipt_deal_task(struct fast_task_info *task)
             msg_len = task->length - sizeof(SFCommonProtoHeader);
             message = task->data + sizeof(SFCommonProtoHeader);
             logError("file: "__FILE__", line: %d, "
-                    "response from server %s:%d, cmd: %d (%s), "
+                    "response from server %s:%u, cmd: %d (%s), "
                     "status: %d, error info: %.*s",
                     __LINE__, task->server_ip, task->port,
                     ((SFCommonProtoHeader *)task->data)->cmd,
@@ -360,12 +360,12 @@ static int receipt_deal_task(struct fast_task_info *task)
             case SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP:
                 result = ECONNRESET; //force to close socket
                 logDebug("file: "__FILE__", line: %d, "
-                    "close channel to server %s:%d !!!",
+                    "close channel to server %s:%u !!!",
                     __LINE__, task->server_ip, task->port);
                 break;
             default:
                 logError("file: "__FILE__", line: %d, "
-                        "response from server %s:%d, unexpect cmd: %d (%s)",
+                        "response from server %s:%u, unexpect cmd: %d (%s)",
                         __LINE__, task->server_ip, task->port,
                         ((SFCommonProtoHeader *)task->data)->cmd,
                         sf_get_cmd_caption(((SFCommonProtoHeader *)task->data)->cmd));
@@ -418,7 +418,7 @@ static void receipt_thread_close_idle_channel(
                  g_idempotency_client_cfg.channel_max_idle_time)
         {
             logDebug("file: "__FILE__", line: %d, "
-                    "close channel to server %s:%d because idle too long",
+                    "close channel to server %s:%u because idle too long",
                     __LINE__, channel->task->server_ip, channel->task->port);
             close_channel_request(channel->task);
         }

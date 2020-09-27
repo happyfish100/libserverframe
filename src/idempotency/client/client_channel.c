@@ -156,7 +156,7 @@ void client_channel_destroy()
 }
 
 struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
-        const uint32_t hash_code, const char *server_ip, const short port,
+        const uint32_t hash_code, const char *server_ip, const uint16_t port,
         int *err_no)
 {
     struct fast_task_info *task;
@@ -204,7 +204,7 @@ int idempotency_client_channel_check_reconnect(
     }
 
     logDebug("file: "__FILE__", line: %d, "
-            "trigger connect to server %s:%d",
+            "trigger connect to server %s:%u",
             __LINE__, channel->task->server_ip,
             channel->task->port);
 
@@ -219,7 +219,7 @@ int idempotency_client_channel_check_reconnect(
 }
 
 struct idempotency_client_channel *idempotency_client_channel_get(
-        const char *server_ip, const short server_port,
+        const char *server_ip, const uint16_t server_port,
         const int timeout, int *err_no)
 {
     int r;
@@ -232,7 +232,7 @@ struct idempotency_client_channel *idempotency_client_channel_get(
     IdempotencyClientChannel *current;
     IdempotencyClientChannel *channel;
 
-    key_len = snprintf(key, sizeof(key), "%s_%d", server_ip, server_port);
+    key_len = snprintf(key, sizeof(key), "%s_%u", server_ip, server_port);
     hash_code = simple_hash(key, key_len);
     bucket = channel_context.htable.buckets +
         hash_code % channel_context.htable.capacity;

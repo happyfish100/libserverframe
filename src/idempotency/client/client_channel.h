@@ -25,7 +25,7 @@ void idempotency_client_channel_config_to_string_ex(
         char *output, const int size, const bool add_comma);
 
 struct idempotency_client_channel *idempotency_client_channel_get(
-        const char *server_ip, const short server_port,
+        const char *server_ip, const uint16_t server_port,
         const int timeout, int *err_no);
 
 static inline uint64_t idempotency_client_channel_next_seq_id(

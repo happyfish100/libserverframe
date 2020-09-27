@@ -380,13 +380,13 @@ void sf_context_config_to_string(const SFContext *sf_context,
                     sf_context->outer_bind_addr) == 0))
     {
         len += snprintf(output + len, size - len,
-                "port=%d, bind_addr=%s",
+                "port=%u, bind_addr=%s",
                 sf_context->inner_port,
                 sf_context->inner_bind_addr);
     } else {
         len += snprintf(output + len, size - len,
-                "inner_port=%d, inner_bind_addr=%s, "
-                "outer_port=%d, outer_bind_addr=%s",
+                "inner_port=%u, inner_bind_addr=%s, "
+                "outer_port=%u, outer_bind_addr=%s",
                 sf_context->inner_port, sf_context->inner_bind_addr,
                 sf_context->outer_port, sf_context->outer_bind_addr);
     }

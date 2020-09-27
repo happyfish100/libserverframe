@@ -177,7 +177,7 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
 
     if (result != 0) {
         logError("file: "__FILE__", line: %d, "
-                "connect to server %s:%d fail, errno: %d, "
+                "connect to server %s:%u fail, errno: %d, "
                 "error info: %s", __LINE__, task->server_ip,
                 task->port, result, STRERROR(result));
         iovent_add_to_deleted_list(task);
@@ -185,7 +185,7 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
     }
 
     logInfo("file: "__FILE__", line: %d, "
-            "connect to server %s:%d successfully",
+            "connect to server %s:%u successfully",
             __LINE__, task->server_ip, task->port);
     sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
     return SF_CTX->deal_task(task);
@@ -211,7 +211,7 @@ static int sf_connect_server(struct fast_task_info *task)
         }
 
         logInfo("file: "__FILE__", line: %d, "
-                "connect to server %s:%d successfully",
+                "connect to server %s:%u successfully",
                 __LINE__, task->server_ip, task->port);
         sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
         return SF_CTX->deal_task(task);
@@ -224,7 +224,7 @@ static int sf_connect_server(struct fast_task_info *task)
         close(task->event.fd);
         task->event.fd = -1;
         logError("file: "__FILE__", line: %d, "
-                "connect to server %s:%d fail, errno: %d, "
+                "connect to server %s:%u fail, errno: %d, "
                 "error info: %s", __LINE__, task->server_ip,
                 task->port, result, STRERROR(result));
         return result > 0 ? -1 * result : result;
