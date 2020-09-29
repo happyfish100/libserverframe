@@ -582,9 +582,16 @@ static int binlog_wbuffer_alloc_init(void *element, void *args)
 
     wbuffer = (SFBinlogWriterBuffer *)element;
     writer = (SFBinlogWriterInfo *)args;
-    wbuffer->bf.alloc_size = writer->cfg.max_record_size;
-    wbuffer->bf.buff = (char *)(wbuffer + 1);
     wbuffer->writer = writer;
+    wbuffer->bf.alloc_size = writer->cfg.max_record_size;
+    if (writer->thread->use_fixed_buffer_size) {
+        wbuffer->bf.buff = (char *)(wbuffer + 1);
+    } else {
+        wbuffer->bf.buff = (char *)fc_malloc(writer->cfg.max_record_size);
+        if (wbuffer->bf.buff == NULL) {
+            return ENOMEM;
+        }
+    }
     return 0;
 }
 
@@ -656,20 +663,27 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         SFBinlogWriterInfo *writer, const int order_by,
-        const int max_record_size, const int writer_count)
+        const int max_record_size, const int writer_count,
+        const bool use_fixed_buffer_size)
 {
     const int alloc_elements_once = 1024;
+    int element_size;
     pthread_t tid;
     int result;
     int bytes;
 
     thread->order_by = order_by;
+    thread->use_fixed_buffer_size = use_fixed_buffer_size;
     writer->cfg.max_record_size = max_record_size;
     writer->thread = thread;
+
+    element_size = sizeof(SFBinlogWriterBuffer);
+    if (use_fixed_buffer_size) {
+        element_size += max_record_size;
+    }
     if ((result=fast_mblock_init_ex1(&thread->mblock, "binlog_wbuffer",
-                    sizeof(SFBinlogWriterBuffer) + max_record_size,
-                    alloc_elements_once, 0, binlog_wbuffer_alloc_init,
-                    writer, true)) != 0)
+                     element_size, alloc_elements_once, 0,
+                     binlog_wbuffer_alloc_init, writer, true)) != 0)
     {
         return result;
     }
@@ -697,12 +711,12 @@ int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
 {
     SFBinlogWriterBuffer *buffer;
     if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, next_version,
-            SF_BINLOG_BUFFER_TYPESET_NEXT_VERSION)) == NULL)
+                    SF_BINLOG_BUFFER_TYPESET_NEXT_VERSION)) == NULL)
     {
         return ENOMEM;
     }
 
-    sf_push_to_binlog_write_queue(writer->thread, buffer);
+    fc_queue_push(&writer->thread->queue, buffer);
     return 0;
 }
 

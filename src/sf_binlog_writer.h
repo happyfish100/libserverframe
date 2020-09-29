@@ -49,6 +49,7 @@ typedef struct binlog_writer_thread {
     struct fast_mblock_man mblock;
     struct fc_queue queue;
     volatile bool running;
+    bool use_fixed_buffer_size;
     int order_by;
     SFBinlogWriterPtrArray flush_writers;
 } SFBinlogWriterThread;
@@ -98,10 +99,13 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         SFBinlogWriterInfo *writer, const int order_by,
-        const int max_record_size, const int writer_count);
+        const int max_record_size, const int writer_count,
+        const bool use_fixed_buffer_size);
 
-#define sf_binlog_writer_init_thread(thread, writer, order_by, max_record_size) \
-    sf_binlog_writer_init_thread_ex(thread, writer, order_by, max_record_size, 1)
+#define sf_binlog_writer_init_thread(thread, \
+        writer, order_by, max_record_size)   \
+    sf_binlog_writer_init_thread_ex(thread, writer, \
+            order_by, max_record_size, 1, true)
 
 static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         const char *subdir_name, const int buffer_size,
@@ -171,8 +175,15 @@ static inline const char *sf_binlog_writer_get_filename(const char *subdir_name,
 int sf_binlog_writer_set_binlog_index(SFBinlogWriterInfo *writer,
         const int binlog_index);
 
-#define sf_push_to_binlog_write_queue(thread, buffer) \
+#define sf_push_to_binlog_thread_queue(thread, buffer) \
     fc_queue_push(&(thread)->queue, buffer)
+
+static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
+        SFBinlogWriterBuffer *buffer)
+{
+    buffer->type = SF_BINLOG_BUFFER_TYPEWRITE_TO_FILE;
+    fc_queue_push(&writer->thread->queue, buffer);
+}
 
 #ifdef __cplusplus
 }
