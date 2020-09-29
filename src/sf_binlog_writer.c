@@ -469,12 +469,12 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
     thread->flush_writers.count = 0;
     wbuffer = wb_head;
 
-    if (thread->order_by == SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION) {
+    if (thread->order_by == SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
         do {
             current = wbuffer;
             wbuffer = wbuffer->next;
 
-            if (current->type == SF_BINLOG_BUFFER_TYPESET_NEXT_VERSION) {
+            if (current->type == SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION) {
                 if (current->writer->version_ctx.ring.start !=
                         current->writer->version_ctx.ring.end)
                 {
@@ -662,9 +662,9 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
-        SFBinlogWriterInfo *writer, const int order_by,
-        const int max_record_size, const int writer_count,
-        const bool use_fixed_buffer_size)
+        SFBinlogWriterInfo *writer, const short order_mode,
+        const short order_by, const int max_record_size,
+        const int writer_count, const bool use_fixed_buffer_size)
 {
     const int alloc_elements_once = 1024;
     int element_size;
@@ -672,6 +672,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     int result;
     int bytes;
 
+    thread->order_mode = order_mode;
     thread->order_by = order_by;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
     writer->cfg.max_record_size = max_record_size;
@@ -706,12 +707,40 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
             SF_G_THREAD_STACK_SIZE);
 }
 
+int sf_binlog_writer_change_order_by(SFBinlogWriterThread *thread,
+        const short order_by)
+{
+    if (thread->order_by == order_by) {
+        return 0;
+    }
+
+    if (thread->order_mode != SF_BINLOG_THREAD_ORDER_MODE_VARY) {
+        logError("file: "__FILE__", line: %d, "
+                "unexpected order mode: %d, can't set "
+                "order by to %d!", __LINE__,
+                thread->order_mode, order_by);
+        return EINVAL;
+    }
+
+    thread->order_by = order_by;
+    return 0;
+}
+
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version)
 {
     SFBinlogWriterBuffer *buffer;
+
+    if (writer->thread->order_by != SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
+        logError("file: "__FILE__", line: %d, "
+                "unexpected order by type: %d, can't set "
+                "next version to %"PRId64"!", __LINE__,
+                writer->thread->order_by, next_version);
+        return EINVAL;
+    }
+
     if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, next_version,
-                    SF_BINLOG_BUFFER_TYPESET_NEXT_VERSION)) == NULL)
+                    SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION)) == NULL)
     {
         return ENOMEM;
     }
