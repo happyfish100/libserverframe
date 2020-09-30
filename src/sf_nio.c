@@ -98,7 +98,7 @@ static inline int set_write_event(struct fast_task_info *task)
         task->event.fd, IOEVENT_WRITE, task) != 0)
     {
         result = errno != 0 ? errno : ENOENT;
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
 
         logError("file: "__FILE__", line: %d, "
             "ioevent_modify fail, "
@@ -123,7 +123,7 @@ int sf_set_read_event(struct fast_task_info *task)
                 task->event.fd, IOEVENT_READ, task) != 0)
     {
         result = errno != 0 ? errno : ENOENT;
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
 
         logError("file: "__FILE__", line: %d, "
                 "ioevent_modify fail, "
@@ -180,7 +180,7 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
                 "connect to server %s:%u fail, errno: %d, "
                 "error info: %s", __LINE__, task->server_ip,
                 task->port, result, STRERROR(result));
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
         return -1;
     }
 
@@ -278,7 +278,7 @@ static int sf_nio_deal_task(struct fast_task_info *task)
     }
 
     if (result < 0) {
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
     }
 
     return result;
@@ -416,7 +416,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
         if (task->offset == 0 && task->req_count > 0) {
             if (SF_CTX->timeout_callback != NULL) {
                 if (SF_CTX->timeout_callback(task) != 0) {
-                    iovent_add_to_deleted_list(task);
+                    ioevent_add_to_deleted_list(task);
                     return -1;
                 }
             }
@@ -438,7 +438,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                         __LINE__, task->client_ip,  task->req_count);
             }
 
-            iovent_add_to_deleted_list(task);
+            ioevent_add_to_deleted_list(task);
             return -1;
         }
 
@@ -450,7 +450,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             "client ip: %s, recv error event: %d, "
             "close connection", __LINE__, task->client_ip, event);
 
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
         return -1;
     }
 
@@ -493,7 +493,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     __LINE__, task->client_ip,
                     errno, strerror(errno));
 
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
         } else if (bytes == 0) {
@@ -519,7 +519,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                         __LINE__, task->client_ip, sock);
             }
 
-            iovent_add_to_deleted_list(task);
+            ioevent_add_to_deleted_list(task);
             return -1;
         }
 
@@ -531,7 +531,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             }
 
             if (SF_CTX->set_body_length(task) != 0) {
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
             if (task->length < 0) {
@@ -540,7 +540,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     __LINE__, task->client_ip,
                     task->length);
 
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
 
@@ -552,7 +552,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                     task->client_ip, task->length,
                     g_sf_global_vars.max_pkg_size);
 
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
 
@@ -566,7 +566,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                             __LINE__, task->client_ip, task->size,
                             task->length);
 
-                    iovent_add_to_deleted_list(task);
+                    ioevent_add_to_deleted_list(task);
                     return -1;
                 }
 
@@ -577,7 +577,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
                             "from %d to %d fail", __LINE__,
                             task->client_ip, task->size, task->length);
 
-                    iovent_add_to_deleted_list(task);
+                    ioevent_add_to_deleted_list(task);
                     return -1;
                 }
 
@@ -592,7 +592,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             task->req_count++;
             sf_nio_set_stage(task, SF_NIO_STAGE_SEND);
             if (SF_CTX->deal_task(task) < 0) {  //fatal error
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
             break;
@@ -622,7 +622,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
             "remain: %d", __LINE__, task->client_ip, task->length,
             task->offset, task->length - task->offset);
 
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
         return -1;
     }
 
@@ -631,7 +631,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
             "client ip: %s, recv error event: %d, "
             "close connection", __LINE__, task->client_ip, event);
 
-        iovent_add_to_deleted_list(task);
+        ioevent_add_to_deleted_list(task);
         return -1;
     }
 
@@ -674,7 +674,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
                     __LINE__, task->client_ip,
                     errno, strerror(errno));
 
-                iovent_add_to_deleted_list(task);
+                ioevent_add_to_deleted_list(task);
                 return -1;
             }
         } else if (bytes == 0) {
@@ -683,7 +683,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
                 "connection disconnected",
                 __LINE__, task->client_ip, sock);
 
-            iovent_add_to_deleted_list(task);
+            ioevent_add_to_deleted_list(task);
             return -1;
         }
 

@@ -47,7 +47,7 @@ static void sf_memory_oom_notify_callback(const size_t curr_size)
     logCrit("file: "__FILE__", line: %d, "
             "alloc %"PRId64" bytes fail, exiting ...",
             __LINE__, (int64_t)curr_size);
-    SF_G_CONTINUE_FLAG = false;
+    sf_terminate_myself();
 }
 
 void sf_enable_exit_on_oom()

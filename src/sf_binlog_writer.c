@@ -571,7 +571,7 @@ static void *binlog_writer_func(void *arg)
             logCrit("file: "__FILE__", line: %d, "
                     "deal_binlog_records fail, "
                     "program exit!", __LINE__);
-            SF_G_CONTINUE_FLAG = false;
+            sf_terminate_myself();
         }
     }
 
