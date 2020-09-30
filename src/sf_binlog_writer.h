@@ -193,6 +193,10 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
     fc_queue_push(&writer->thread->queue, buffer);
 }
 
+int sf_binlog_writer_get_last_lines(const char *subdir_name,
+        const int current_write_index, char *buff,
+        const int buff_size, int *count, int *length);
+
 #ifdef __cplusplus
 }
 #endif

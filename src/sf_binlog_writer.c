@@ -767,3 +767,46 @@ int sf_binlog_writer_set_binlog_index(SFBinlogWriterInfo *writer,
 
     return open_writable_binlog(writer);
 }
+
+int sf_binlog_writer_get_last_lines(const char *subdir_name,
+        const int current_write_index, char *buff,
+        const int buff_size, int *count, int *length)
+{
+    int result;
+    int remain_count;
+    int current_count;
+    int current_index;
+    int i;
+    char filename[PATH_MAX];
+    string_t lines;
+
+    current_index = current_write_index;
+    *length = 0;
+    remain_count = *count;
+    for (i=0; i<2; i++) {
+        current_count = remain_count;
+        sf_binlog_writer_get_filename(subdir_name,
+                current_index, filename, sizeof(filename));
+        result = fc_get_last_lines(filename, buff + *length,
+                buff_size - *length, &lines, &current_count);
+        if (result == 0) {
+            memmove(buff + *length, lines.str, lines.len);
+            *length += lines.len;
+            remain_count -= current_count;
+            if (remain_count == 0) {
+                break;
+            }
+        } else if (result != ENOENT) {
+            *count = 0;
+            return result;
+        }
+        if (current_index == 0) {
+            break;
+        }
+
+        --current_index;  //try previous binlog file
+    }
+
+    *count -= remain_count;
+    return 0;
+}
