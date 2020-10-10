@@ -105,9 +105,8 @@ int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
     int recv_bytes;
     int i;
 
-    if ((result=sf_send_and_check_response_header(conn,
-                    send_data, send_len, response,
-                    network_timeout, expect_cmd)) != 0)
+    if ((result=sf_send_and_check_response_header(conn, send_data, send_len,
+                    response, network_timeout, expect_cmd)) != 0)
     {
         return result;
     }
@@ -161,6 +160,45 @@ int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
                 "errno: %d, error info: %s", recv_bytes,
                 response->header.body_len,
                 result, STRERROR(result));
+    }
+    return result;
+}
+
+int sf_send_and_recv_response_ex1(ConnectionInfo *conn, char *send_data,
+        const int send_len, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        char *recv_data, const int buff_size, int *body_len)
+{
+    int result;
+
+    if ((result=sf_send_and_check_response_header(conn, send_data, send_len,
+                    response, network_timeout, expect_cmd)) != 0)
+    {
+        *body_len = 0;
+        return result;
+    }
+
+    if (response->header.body_len == 0) {
+        *body_len = 0;
+        return 0;
+    }
+
+    if (response->header.body_len > buff_size) {
+        response->error.length = sprintf(response->error.message,
+                "response body length: %d exceeds buffer size: %d",
+                response->header.body_len, buff_size);
+        *body_len = 0;
+        return EOVERFLOW;
+    }
+
+    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+                    header.body_len, network_timeout, body_len)) != 0)
+    {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "recv body fail, recv bytes: %d, expect body length: %d, "
+                "errno: %d, error info: %s", *body_len, response->
+                header.body_len, result, STRERROR(result));
     }
     return result;
 }

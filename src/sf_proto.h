@@ -215,6 +215,11 @@ static inline int sf_send_and_check_response_header(ConnectionInfo *conn,
     return 0;
 }
 
+int sf_send_and_recv_response_ex1(ConnectionInfo *conn, char *send_data,
+        const int send_len, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        char *recv_data, const int buff_size, int *body_len);
+
 int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
         const int send_len, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
