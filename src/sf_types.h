@@ -69,7 +69,7 @@ typedef struct {
     SFErrorInfo error;
 } SFResponseInfo;
 
-typedef struct fs_binlog_file_position {
+typedef struct sf_binlog_file_position {
     int index;      //current binlog file
     int64_t offset; //current file offset
 } SFBinlogFilePosition;
@@ -80,5 +80,11 @@ typedef struct server_binlog_buffer {
     char *end;     //data end ptr
     int size;      //the buffer size (capacity)
 } SFBinlogBuffer;
+
+typedef struct sf_space_stat {
+    int64_t total;
+    int64_t avail;
+    int64_t used;
+} SFSpaceStat;
 
 #endif
