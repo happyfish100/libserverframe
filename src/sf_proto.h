@@ -281,7 +281,7 @@ static inline int sf_active_test(ConnectionInfo *conn,
             SF_PROTO_ACTIVE_TEST_RESP);
 }
 
-static inline int sf_proto_deal_actvie_test(struct fast_task_info *task,
+static inline int sf_proto_deal_active_test(struct fast_task_info *task,
         SFRequestInfo *request, SFResponseInfo *response)
 {
     return sf_server_expect_body_length(response,
