@@ -324,13 +324,11 @@ static inline int deal_report_req_receipt_response(struct fast_task_info *task)
     return 0;
 }
 
-static int receipt_deal_task(struct fast_task_info *task)
+static int receipt_deal_task(struct fast_task_info *task, const int stage)
 {
     int result;
-    int stage;
 
     do {
-        stage = SF_NIO_TASK_STAGE_FETCH(task);
         if (stage == SF_NIO_STAGE_HANDSHAKE) {
             setup_channel_request(task);
             result = 0;

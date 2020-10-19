@@ -128,7 +128,7 @@ int sf_set_read_event(struct fast_task_info *task)
 {
     int result;
 
-    sf_nio_set_stage(task, SF_NIO_STAGE_RECV);
+    task->nio_stages.current = SF_NIO_STAGE_RECV;
     if (task->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
     }
@@ -202,8 +202,7 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
     logInfo("file: "__FILE__", line: %d, "
             "connect to server %s:%u successfully",
             __LINE__, task->server_ip, task->port);
-    sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
-    return SF_CTX->deal_task(task);
+    return SF_CTX->deal_task(task, SF_NIO_STAGE_HANDSHAKE);
 }
 
 static int sf_connect_server(struct fast_task_info *task)
@@ -228,8 +227,7 @@ static int sf_connect_server(struct fast_task_info *task)
         logInfo("file: "__FILE__", line: %d, "
                 "connect to server %s:%u successfully",
                 __LINE__, task->server_ip, task->port);
-        sf_nio_set_stage(task, SF_NIO_STAGE_HANDSHAKE);
-        return SF_CTX->deal_task(task);
+        return SF_CTX->deal_task(task, SF_NIO_STAGE_HANDSHAKE);
     } else if (result == EINPROGRESS) {
         result = ioevent_set(task, task->thread_data, task->event.fd,
                 IOEVENT_READ | IOEVENT_WRITE, (IOEventCallback)
@@ -249,12 +247,10 @@ static int sf_connect_server(struct fast_task_info *task)
 static int sf_nio_deal_task(struct fast_task_info *task)
 {
     int result;
-    int stage;
 
-    stage = SF_NIO_TASK_STAGE_FETCH(task);
-    switch (SF_NIO_STAGE_ONLY(stage)) {
+    switch (task->nio_stages.notify) {
         case SF_NIO_STAGE_INIT:
-            sf_nio_set_stage(task, SF_NIO_STAGE_RECV);
+            task->nio_stages.current = SF_NIO_STAGE_RECV;
             result = sf_nio_init(task);
             break;
         case SF_NIO_STAGE_CONNECT:
@@ -271,14 +267,14 @@ static int sf_nio_deal_task(struct fast_task_info *task)
             result = sf_send_add_event(task);
             break;
         case SF_NIO_STAGE_CONTINUE:   //continue deal
-            result = SF_CTX->deal_task(task);
+            result = SF_CTX->deal_task(task, SF_NIO_STAGE_CONTINUE);
             break;
         case SF_NIO_STAGE_FORWARDED:  //forward by other thread
             if ((result=sf_ioevent_add(task, (IOEventCallback)
                             sf_client_sock_read,
                             task->network_timeout)) == 0)
             {
-                result = SF_CTX->deal_task(task);
+                result = SF_CTX->deal_task(task, SF_NIO_STAGE_SEND);
             }
             break;
         case SF_NIO_STAGE_CLOSE:
@@ -286,8 +282,8 @@ static int sf_nio_deal_task(struct fast_task_info *task)
             break;
         default:
             logError("file: "__FILE__", line: %d, "
-                    "client ip: %s, invalid stage: %d",
-                    __LINE__, task->client_ip, stage);
+                    "client ip: %s, invalid notify stage: %d",
+                    __LINE__, task->client_ip, task->nio_stages.notify);
             result = -EINVAL;
             break;
     }
@@ -299,49 +295,16 @@ static int sf_nio_deal_task(struct fast_task_info *task)
     return result;
 }
 
-int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
-        const int log_level, const char *file, const int line)
+int sf_nio_notify(struct fast_task_info *task, const int stage)
 {
     int64_t n;
     int result;
-    int old_stage;
     bool notify;
 
-    old_stage = SF_NIO_TASK_STAGE_FETCH(task);
-    if (!(new_stage == SF_NIO_STAGE_INIT ||
-            new_stage == SF_NIO_STAGE_CONNECT ||
-            new_stage == SF_NIO_STAGE_CLOSE))
-    {
-        if (SF_NIO_STAGE_IS_INPROGRESS(old_stage)) {
-            if (FC_LOG_BY_LEVEL(log_level)) {
-                log_it_ex(&g_log_context, log_level,
-                        "file: "__FILE__", line: %d, "
-                        "from caller {file: %s, line: %d}, "
-                        "client ip: %s, nio stage in progress, "
-                        "current stage: %d, skip set to %d", __LINE__,
-                        file, line, task->client_ip, old_stage, new_stage);
-            }
-            return EBUSY;
-        }
-    }
-
-    if (!__sync_bool_compare_and_swap(&task->nio_stage,
-                old_stage, new_stage))
-    {
-        if (FC_LOG_BY_LEVEL(log_level)) {
-            log_it_ex(&g_log_context, log_level,
-                    "file: "__FILE__", line: %d, "
-                    "from caller {file: %s, line: %d}, "
-                    "client ip: %s, skip set stage to %d because stage "
-                    "changed, current stage: %d", __LINE__, file, line,
-                    task->client_ip, new_stage, SF_NIO_TASK_STAGE_FETCH(task));
-        }
-        return EEXIST;
-    }
-
+    PTHREAD_MUTEX_LOCK(&task->thread_data->waiting_queue.lock);
+    task->nio_stages.notify = stage;
     task->next = NULL;
 
-    pthread_mutex_lock(&task->thread_data->waiting_queue.lock);
     if (task->thread_data->waiting_queue.tail == NULL) {
         task->thread_data->waiting_queue.head = task;
         notify = true;
@@ -350,7 +313,7 @@ int sf_nio_notify_ex(struct fast_task_info *task, const int new_stage,
         notify = false;
     }
     task->thread_data->waiting_queue.tail = task;
-    pthread_mutex_unlock(&task->thread_data->waiting_queue.lock);
+    PTHREAD_MUTEX_UNLOCK(&task->thread_data->waiting_queue.lock);
 
     if (notify) {
         n = 1;
@@ -383,10 +346,10 @@ void sf_recv_notify_read(int sock, short event, void *arg)
                 __LINE__, sock, errno, STRERROR(errno));
     }
 
-    pthread_mutex_lock(&thread_data->waiting_queue.lock);
+    PTHREAD_MUTEX_LOCK(&thread_data->waiting_queue.lock);
     current = thread_data->waiting_queue.head;
     thread_data->waiting_queue.head = thread_data->waiting_queue.tail = NULL;
-    pthread_mutex_unlock(&thread_data->waiting_queue.lock);
+    PTHREAD_MUTEX_UNLOCK(&thread_data->waiting_queue.lock);
 
     while (current != NULL) {
         task = current;
@@ -403,7 +366,7 @@ int sf_send_add_event(struct fast_task_info *task)
     task->offset = 0;
     if (task->length > 0) {
         /* direct send */
-        sf_nio_set_stage(task, SF_NIO_STAGE_SEND);
+        task->nio_stages.current = SF_NIO_STAGE_SEND;
         if (sf_client_sock_write(task->event.fd, IOEVENT_WRITE, task) < 0) {
             return errno != 0 ? errno : EIO;
         }
@@ -414,15 +377,13 @@ int sf_send_add_event(struct fast_task_info *task)
 
 int sf_client_sock_read(int sock, short event, void *arg)
 {
-    int stage;
     int bytes;
     int recv_bytes;
     int total_read;
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
-    stage = SF_NIO_TASK_STAGE_FETCH(task);
-    if (task->canceled || (SF_NIO_STAGE_ONLY(stage) != SF_NIO_STAGE_RECV)) {
+    if (task->canceled || (task->nio_stages.current != SF_NIO_STAGE_RECV)) {
         return 0;
     }
 
@@ -467,18 +428,6 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
         ioevent_add_to_deleted_list(task);
         return -1;
-    }
-
-    if (stage != SF_NIO_STAGE_RECV_INPROGRESS) {
-        if (!__sync_bool_compare_and_swap(&task->nio_stage,
-                    stage, SF_NIO_STAGE_RECV_INPROGRESS))
-        {
-            logWarning("file: "__FILE__", line: %d, "
-                    "client ip: %s, nio stage change from %d to %d, "
-                    "skip read!", __LINE__, task->client_ip, stage,
-                    SF_NIO_TASK_STAGE_FETCH(task));
-            return 0;
-        }
     }
 
     total_read = 0;
@@ -605,8 +554,8 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
         if (task->offset >= task->length) { //recv done
             task->req_count++;
-            sf_nio_set_stage(task, SF_NIO_STAGE_SEND);
-            if (SF_CTX->deal_task(task) < 0) {  //fatal error
+            task->nio_stages.current = SF_NIO_STAGE_SEND;
+            if (SF_CTX->deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
                 ioevent_add_to_deleted_list(task);
                 return -1;
             }
@@ -619,15 +568,13 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
 int sf_client_sock_write(int sock, short event, void *arg)
 {
-    int stage;
     int bytes;
     int total_write;
     struct fast_task_info *task;
 
     //assert(sock >= 0);
     task = (struct fast_task_info *)arg;
-    stage = SF_NIO_TASK_STAGE_FETCH(task);
-    if (task->canceled || (SF_NIO_STAGE_ONLY(stage) != SF_NIO_STAGE_SEND)) {
+    if (task->canceled || (task->nio_stages.current != SF_NIO_STAGE_SEND)) {
         return 0;
     }
 
@@ -648,18 +595,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
         ioevent_add_to_deleted_list(task);
         return -1;
-    }
-
-    if (stage != SF_NIO_STAGE_SEND_INPROGRESS) {
-        if (!__sync_bool_compare_and_swap(&task->nio_stage,
-                    stage, SF_NIO_STAGE_SEND_INPROGRESS))
-        {
-            logWarning("file: "__FILE__", line: %d, "
-                    "client ip: %s, nio stage change from %d to %d, "
-                    "skip write!", __LINE__, task->client_ip, stage,
-                    SF_NIO_TASK_STAGE_FETCH(task));
-            return 0;
-        }
     }
 
     total_write = 0;
