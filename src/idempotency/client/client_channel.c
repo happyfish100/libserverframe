@@ -197,7 +197,7 @@ struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
     channel->in_ioevent = 1;
     channel->last_connect_time = g_current_time;
     if ((*err_no=sf_nio_notify(task, SF_NIO_STAGE_CONNECT)) != 0) {
-        channel->in_ioevent = 0;
+        channel->in_ioevent = 0;   //rollback
         free_queue_push(task);
         return NULL;
     }

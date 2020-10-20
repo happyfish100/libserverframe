@@ -21,6 +21,7 @@
 #include "fastcommon/sockopt.h"
 
 #define SF_DEF_THREAD_STACK_SIZE (64 * 1024)
+#define SF_MIN_THREAD_STACK_SIZE (64 * 1024)
 #define SF_DEF_MAX_PACKAGE_SIZE  (64 * 1024)
 #define SF_DEF_MIN_BUFF_SIZE  (64 * 1024)
 #define SF_DEF_MAX_BUFF_SIZE  (64 * 1024)

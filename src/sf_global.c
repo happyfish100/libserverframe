@@ -267,15 +267,19 @@ int sf_load_global_config_ex(const char *server_name,
         g_sf_global_vars.sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
     }
 
-    pThreadStackSize = iniGetStrValue(ini_ctx->section_name,
-            "thread_stack_size", ini_ctx->context);
+    pThreadStackSize = iniGetStrValueEx(ini_ctx->section_name,
+            "thread_stack_size", ini_ctx->context, true);
     if (pThreadStackSize == NULL) {
         thread_stack_size = SF_DEF_THREAD_STACK_SIZE;
-    }
-    else if ((result=parse_bytes(pThreadStackSize, 1,
+    } else if ((result=parse_bytes(pThreadStackSize, 1,
                     &thread_stack_size)) != 0)
     {
         return result;
+    } else if (thread_stack_size < SF_MIN_THREAD_STACK_SIZE) {
+        logWarning("file: "__FILE__", line: %d, "
+                "thread_stack_size : %d is too small, set to %d",
+                __LINE__, (int)thread_stack_size, SF_MIN_THREAD_STACK_SIZE);
+        thread_stack_size = SF_MIN_THREAD_STACK_SIZE;
     }
     g_sf_global_vars.thread_stack_size = (int)thread_stack_size;
 
