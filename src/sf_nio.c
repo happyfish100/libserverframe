@@ -247,8 +247,10 @@ static int sf_connect_server(struct fast_task_info *task)
 static int sf_nio_deal_task(struct fast_task_info *task)
 {
     int result;
+    int stage;
 
-    switch (task->nio_stages.notify) {
+    stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
+    switch (stage) {
         case SF_NIO_STAGE_INIT:
             task->nio_stages.current = SF_NIO_STAGE_RECV;
             result = sf_nio_init(task);
@@ -283,7 +285,7 @@ static int sf_nio_deal_task(struct fast_task_info *task)
         default:
             logError("file: "__FILE__", line: %d, "
                     "client ip: %s, invalid notify stage: %d",
-                    __LINE__, task->client_ip, task->nio_stages.notify);
+                    __LINE__, task->client_ip, stage);
             result = -EINVAL;
             break;
     }
@@ -292,6 +294,8 @@ static int sf_nio_deal_task(struct fast_task_info *task)
         ioevent_add_to_deleted_list(task);
     }
 
+    __sync_bool_compare_and_swap(&task->nio_stages.notify,
+            stage, SF_NIO_STAGE_NONE);
     return result;
 }
 
@@ -301,8 +305,13 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     int result;
     bool notify;
 
+    if (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
+                SF_NIO_STAGE_NONE, stage))
+    {
+        return EAGAIN;
+    }
+
     PTHREAD_MUTEX_LOCK(&task->thread_data->waiting_queue.lock);
-    task->nio_stages.notify = stage;
     task->next = NULL;
 
     if (task->thread_data->waiting_queue.tail == NULL) {
