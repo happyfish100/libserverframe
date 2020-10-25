@@ -351,10 +351,11 @@ static int deal_record_by_version(SFBinlogWriterBuffer *wb)
     writer = wb->writer;
     distance = wb->version - writer->version_ctx.next;
     if (distance >= (writer->version_ctx.ring.size - 1)) {
-        logWarning("file: "__FILE__", line: %d, "
+        logWarning("file: "__FILE__", line: %d, subdir_name: %s, "
                 "current version: %"PRId64" is too large, "
                 "exceeds %"PRId64" + %d", __LINE__,
-                wb->version, writer->version_ctx.next,
+                writer->cfg.subdir_name, wb->version,
+                writer->version_ctx.next,
                 writer->version_ctx.ring.size - 1);
         repush_to_queue(writer->thread, wb);
         fc_sleep_ms(10);

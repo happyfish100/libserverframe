@@ -75,8 +75,10 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
                     response->error.length, result, STRERROR(result));
         }
     } else {
-        response->error.length = 0;
-        response->error.message[0] = '\0';
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "response status %d, error info: %s",
+                response->header.status, STRERROR(response->header.status));
     }
 
     return response->header.status;

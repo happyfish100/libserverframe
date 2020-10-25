@@ -308,6 +308,10 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     if (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
                 SF_NIO_STAGE_NONE, stage))
     {
+        logDebug("file: "__FILE__", line: %d, "
+                "current stage: %d != %d, skip set stage to %d",
+                __LINE__, __sync_fetch_and_sub(&task->nio_stages.notify, 0),
+                SF_NIO_STAGE_NONE, stage);
         return EAGAIN;
     }
 

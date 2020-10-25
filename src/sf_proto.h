@@ -63,6 +63,12 @@
         int2buff(_body_len, (header)->body_len); \
     } while (0)
 
+#define SF_PROTO_SET_HEADER_EX(header, _cmd, _flags, _body_len) \
+    do {  \
+        SF_PROTO_SET_HEADER(header, _cmd, _body_len); \
+        short2buff(_flags, (header)->flags); \
+    } while (0)
+
 #define SF_PROTO_SET_RESPONSE_HEADER(proto_header, resp_header) \
     do {  \
         (proto_header)->cmd = (resp_header).cmd;       \

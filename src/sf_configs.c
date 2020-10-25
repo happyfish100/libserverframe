@@ -94,13 +94,14 @@ void sf_net_retry_config_to_string(SFNetRetryConfig *net_retry_cfg,
             net_retry_cfg->network.interval_ms);
 }
 
-void sf_load_read_rule_config(SFDataReadRule *rule, IniFullContext *ini_ctx)
+void sf_load_read_rule_config_ex(SFDataReadRule *rule,
+        IniFullContext *ini_ctx, const SFDataReadRule def_rule)
 {
     char *read_rule;
     read_rule = iniGetStrValueEx(ini_ctx->section_name,
             "read_rule", ini_ctx->context, true);
     if (read_rule == NULL || *read_rule == '\0') {
-        *rule = sf_data_read_rule_any_available;
+        *rule = def_rule;
     } else if (strncasecmp(read_rule, "any", 3) == 0) {
         *rule = sf_data_read_rule_any_available;
     } else if (strncasecmp(read_rule, "slave", 5) == 0) {

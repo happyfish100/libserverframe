@@ -94,7 +94,8 @@ static inline int sf_calc_next_retry_interval(SFNetRetryIntervalContext *ctx)
     return ctx->interval_ms;
 }
 
-void sf_load_read_rule_config(SFDataReadRule *rule, IniFullContext *ini_ctx);
+void sf_load_read_rule_config_ex(SFDataReadRule *rule,
+        IniFullContext *ini_ctx, const SFDataReadRule def_rule);
 
 static inline const char *sf_get_read_rule_caption(
         const SFDataReadRule read_rule)
@@ -111,6 +112,8 @@ static inline const char *sf_get_read_rule_caption(
     }
 }
 
+#define sf_load_read_rule_config(rule, ini_ctx) \
+    sf_load_read_rule_config_ex(rule, ini_ctx, sf_data_read_rule_master_only)
 
 #define SF_NET_RETRY_FINISHED(retry_times, counter, result)  \
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \
