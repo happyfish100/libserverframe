@@ -40,12 +40,6 @@
 
 struct sf_binlog_writer_info;
 
-typedef struct sf_binlog_writer_ptr_array {
-    struct sf_binlog_writer_info **entries;
-    int count;
-    int alloc;
-} SFBinlogWriterPtrArray;
-
 typedef struct sf_binlog_writer_buffer {
     int64_t version;
     BufferInfo bf;
@@ -70,7 +64,10 @@ typedef struct binlog_writer_thread {
     bool use_fixed_buffer_size;
     short order_mode;
     short order_by;
-    SFBinlogWriterPtrArray flush_writers;
+    struct {
+        struct sf_binlog_writer_info *head;
+        struct sf_binlog_writer_info *tail;
+    } flush_writers;
 } SFBinlogWriterThread;
 
 typedef struct sf_binlog_writer_info {
@@ -96,6 +93,10 @@ typedef struct sf_binlog_writer_info {
     } version_ctx;
     SFBinlogBuffer binlog_buffer;
     SFBinlogWriterThread *thread;
+    struct {
+        bool in_queue;
+        struct sf_binlog_writer_info *next;
+    } flush;
 } SFBinlogWriterInfo;
 
 typedef struct sf_binlog_writer_context {
