@@ -348,6 +348,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
 void sf_recv_notify_read(int sock, short event, void *arg)
 {
     int64_t n;
+    int stage;
     struct nio_thread_data *thread_data;
     struct fast_task_info *task;
     struct fast_task_info *current;
@@ -370,6 +371,12 @@ void sf_recv_notify_read(int sock, short event, void *arg)
 
         if (!task->canceled) {
             sf_nio_deal_task(task);
+        } else {
+            stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
+            if (stage != SF_NIO_STAGE_NONE) {
+                __sync_bool_compare_and_swap(&task->nio_stages.notify,
+                        stage, SF_NIO_STAGE_NONE);
+            }
         }
     }
 }
