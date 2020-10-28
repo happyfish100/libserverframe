@@ -37,6 +37,7 @@
 #include "fastcommon/fast_task_queue.h"
 #include "fastcommon/ioevent_loop.h"
 #include "sf_global.h"
+#include "sf_service.h"
 #include "sf_nio.h"
 
 #define SF_CTX  ((SFContext *)(task->ctx))
@@ -97,7 +98,7 @@ void sf_task_finish_clean_up(struct fast_task_info *task)
     task->event.fd = -1;
 
     __sync_fetch_and_sub(&g_sf_global_vars.connection_stat.current_count, 1);
-    free_queue_push(task);
+    sf_release_task(task);
 }
 
 static inline int set_write_event(struct fast_task_info *task)
@@ -305,10 +306,25 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     int result;
     bool notify;
 
+    if (__sync_add_and_fetch(&task->canceled, 0)) {
+        if (stage == SF_NIO_STAGE_CONTINUE) {
+            if (task->continue_callback != NULL) {
+                return task->continue_callback(task);
+            } else {
+                return 0;
+            }
+        } else {
+            logWarning("file: "__FILE__", line: %d, "
+                    "unexpected notify stage: %d, task %p "
+                    "already canceled", __LINE__, stage, task);
+            return ECANCELED;
+        }
+    }
+
     if (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
                 SF_NIO_STAGE_NONE, stage))
     {
-        logDebug("file: "__FILE__", line: %d, "
+        logWarning("file: "__FILE__", line: %d, "
                 "current stage: %d != %d, skip set stage to %d",
                 __LINE__, __sync_fetch_and_sub(&task->nio_stages.notify, 0),
                 SF_NIO_STAGE_NONE, stage);
@@ -374,6 +390,11 @@ void sf_recv_notify_read(int sock, short event, void *arg)
         } else {
             stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
             if (stage != SF_NIO_STAGE_NONE) {
+                if (stage == SF_NIO_STAGE_CONTINUE &&
+                        task->continue_callback != NULL)
+                {
+                    task->continue_callback(task);
+                }
                 __sync_bool_compare_and_swap(&task->nio_stages.notify,
                         stage, SF_NIO_STAGE_NONE);
             }
@@ -395,19 +416,39 @@ int sf_send_add_event(struct fast_task_info *task)
     return 0;
 }
 
+static inline int check_task(struct fast_task_info *task,
+        const short event, const int expect_stage)
+{
+    if (task->canceled) {
+        return ENOTCONN;
+    }
+
+    if (event & IOEVENT_ERROR) {
+        logDebug("file: "__FILE__", line: %d, "
+                "client ip: %s, expect stage: %d, recv error event: %d, "
+                "close connection", __LINE__, task->client_ip,
+                expect_stage, event);
+
+        ioevent_add_to_deleted_list(task);
+        return -1;
+    }
+
+    return task->nio_stages.current == expect_stage ? 0 : EAGAIN;
+}
+
 int sf_client_sock_read(int sock, short event, void *arg)
 {
+    int result;
     int bytes;
     int recv_bytes;
     int total_read;
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
-    if (task->canceled || (task->nio_stages.current != SF_NIO_STAGE_RECV)) {
-        return 0;
+    if ((result=check_task(task, event, SF_NIO_STAGE_RECV)) != 0) {
+        return result >= 0 ? 0 : -1;
     }
 
-    //assert(sock >= 0);
     if (event & IOEVENT_TIMEOUT) {
         if (task->offset == 0 && task->req_count > 0) {
             if (SF_CTX->timeout_callback != NULL) {
@@ -439,15 +480,6 @@ int sf_client_sock_read(int sock, short event, void *arg)
         }
 
         return 0;
-    }
-
-    if (event & IOEVENT_ERROR) {
-        logDebug("file: "__FILE__", line: %d, "
-            "client ip: %s, recv error event: %d, "
-            "close connection", __LINE__, task->client_ip, event);
-
-        ioevent_add_to_deleted_list(task);
-        return -1;
     }
 
     total_read = 0;
@@ -588,14 +620,14 @@ int sf_client_sock_read(int sock, short event, void *arg)
 
 int sf_client_sock_write(int sock, short event, void *arg)
 {
+    int result;
     int bytes;
     int total_write;
     struct fast_task_info *task;
 
-    //assert(sock >= 0);
     task = (struct fast_task_info *)arg;
-    if (task->canceled || (task->nio_stages.current != SF_NIO_STAGE_SEND)) {
-        return 0;
+    if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
+        return result >= 0 ? 0 : -1;
     }
 
     if (event & IOEVENT_TIMEOUT) {
@@ -603,15 +635,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
             "client ip: %s, send timeout. total length: %d, offset: %d, "
             "remain: %d", __LINE__, task->client_ip, task->length,
             task->offset, task->length - task->offset);
-
-        ioevent_add_to_deleted_list(task);
-        return -1;
-    }
-
-    if (event & IOEVENT_ERROR) {
-        logDebug("file: "__FILE__", line: %d, "
-            "client ip: %s, recv error event: %d, "
-            "close connection", __LINE__, task->client_ip, event);
 
         ioevent_add_to_deleted_list(task);
         return -1;

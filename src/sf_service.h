@@ -100,6 +100,63 @@ void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
 int sf_init_task(struct fast_task_info *task);
 
+#define sf_alloc_init_task(sf_context, sock) \
+    sf_alloc_init_task_ex(sf_context, sock, 1)
+
+static inline struct fast_task_info *sf_alloc_init_task_ex(
+        SFContext *sf_context, const int sock, const int init_reffer)
+{
+    struct fast_task_info *task;
+
+    task = free_queue_pop();
+    if (task == NULL) {
+        logError("file: "__FILE__", line: %d, "
+                "malloc task buff failed, you should "
+                "increase the parameter: max_connections",
+                __LINE__);
+        return NULL;
+    }
+    __sync_add_and_fetch(&task->reffer_count, init_reffer);
+    __sync_bool_compare_and_swap(&task->canceled, 1, 0);
+    task->ctx = sf_context;
+    task->event.fd = sock;
+
+    return task;
+}
+
+#define sf_hold_task(task) __sync_add_and_fetch(&task->reffer_count, 1)
+
+/*
+#define sf_hold_task(task) \
+    logInfo("file: "__FILE__", line: %d, " \
+            "hold task %p, reffer: %d",    \
+            __LINE__, task, __sync_add_and_fetch(&task->reffer_count, 1))
+            */
+
+#define sf_try_hold_task_to_twice(task) \
+    __sync_bool_compare_and_swap(&task->reffer_count, 1, 2)
+
+static inline void sf_release_task(struct fast_task_info *task)
+{
+    int reffer_count;
+    if ((reffer_count=__sync_sub_and_fetch(&task->reffer_count, 1)) == 0) {
+        int free_count = free_queue_count();
+        int alloc_count = free_queue_alloc_connections();
+        logInfo("file: "__FILE__", line: %d, "
+                "push task %p to queue, alloc: %d, "
+                "used: %d, freed: %d", __LINE__, task,
+                alloc_count, alloc_count - free_count, free_count);
+
+        free_queue_push(task);
+    } else {
+        /*
+        logInfo("file: "__FILE__", line: %d, "
+                "release task %p, current reffer: %d",
+                __LINE__, task, reffer_count);
+                */
+    }
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -380,22 +380,16 @@ static void *accept_thread_entrance(void *arg)
             continue;
         }
 
-        task = free_queue_pop();
-        if (task == NULL) {
-            logError("file: "__FILE__", line: %d, "
-                    "malloc task buff failed, you should "
-                    "increase the parameter: max_connections",
-                    __LINE__);
+        if ((task=sf_alloc_init_task(accept_context->
+                        sf_context, incomesock)) == NULL)
+        {
             close(incomesock);
             continue;
         }
+
         getPeerIpAddPort(incomesock, task->client_ip,
                 sizeof(task->client_ip), &port);
         task->port = port;
-
-        task->canceled = false;
-        task->ctx = accept_context->sf_context;
-        task->event.fd = incomesock;
         task->thread_data = accept_context->sf_context->thread_data +
             incomesock % accept_context->sf_context->work_threads;
         if (accept_context->sf_context->accept_done_func != NULL) {
@@ -406,7 +400,7 @@ static void *accept_thread_entrance(void *arg)
 
         if (sf_nio_notify(task, SF_NIO_STAGE_INIT) != 0) {
             close(incomesock);
-            free_queue_push(task);
+            sf_release_task(task);
         }
     }
 

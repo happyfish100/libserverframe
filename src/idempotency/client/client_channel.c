@@ -176,21 +176,13 @@ struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
 {
     struct fast_task_info *task;
 
-    task = free_queue_pop();
-    if (task == NULL) {
-        logError("file: "__FILE__", line: %d, "
-                "malloc task buff failed, you should "
-                "increase the parameter: max_connections",
-                __LINE__);
+    if ((task=sf_alloc_init_task(&g_sf_context, -1)) == NULL) {
         *err_no = ENOMEM;
         return NULL;
     }
 
     snprintf(task->server_ip, sizeof(task->server_ip), "%s", server_ip);
     task->port = port;
-    task->canceled = false;
-    task->ctx = &g_sf_context;
-    task->event.fd = -1;
     task->arg = channel;
     task->thread_data = g_sf_context.thread_data +
         hash_code % g_sf_context.work_threads;
@@ -198,7 +190,7 @@ struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
     channel->last_connect_time = g_current_time;
     if ((*err_no=sf_nio_notify(task, SF_NIO_STAGE_CONNECT)) != 0) {
         channel->in_ioevent = 0;   //rollback
-        free_queue_push(task);
+        sf_release_task(task);
         return NULL;
     }
     return task;
@@ -223,7 +215,7 @@ int idempotency_client_channel_check_reconnect(
             __LINE__, channel->task->server_ip,
             channel->task->port);
 
-    channel->task->canceled = false;
+    __sync_bool_compare_and_swap(&channel->task->canceled, 1, 0);
     if ((result=sf_nio_notify(channel->task, SF_NIO_STAGE_CONNECT)) == 0) {
         channel->last_connect_time = g_current_time;
         channel->last_report_time = g_current_time;
