@@ -23,6 +23,7 @@
 #include <string.h>
 #include <pthread.h>
 #include "sf_global.h"
+#include "sf_define.h"
 #include "sf_util.h"
 
 int64_t getticks() 
@@ -172,4 +173,26 @@ ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
     }
 
     return pScheduleEntry;
+}
+
+const char *sf_strerror(const int errnum)
+{
+    switch (errnum) {
+        case SF_CLUSTER_ERROR_BINLOG_INCONSISTENT:
+            return "binlog inconsistent";
+        case SF_CLUSTER_ERROR_LEADER_INCONSISTENT:
+            return "leader or master inconsistent";
+        case SF_RETRIABLE_ERROR_NO_SERVER:
+            return "no server available";
+        case SF_RETRIABLE_ERROR_NOT_MASTER:
+            return "i am not master";
+        case SF_RETRIABLE_ERROR_NOT_ACTIVE:
+            return "i am not active";
+        case SF_RETRIABLE_ERROR_NO_CHANNEL:
+            return "idempotency channel not exist";
+        case SF_RETRIABLE_ERROR_CHANNEL_INVALID:
+            return "idempotency channel is invalid";
+        default:
+            return STRERROR(errnum);
+    }
 }

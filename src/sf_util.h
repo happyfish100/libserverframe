@@ -79,6 +79,8 @@ int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
         ScheduleEntry *pScheduleEntry);
 
+const char *sf_strerror(const int errnum);
+
 #ifdef __cplusplus
 }
 #endif

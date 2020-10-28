@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include "fastcommon/shared_func.h"
+#include "sf_util.h"
 #include "sf_proto.h"
 
 int sf_proto_set_body_length(struct fast_task_info *task)
@@ -76,9 +77,9 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
         }
     } else {
         response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "response status %d, error info: %s",
-                response->header.status, STRERROR(response->header.status));
+                sizeof(response->error.message), "response status %d, "
+                "error info: %s", response->header.status,
+                sf_strerror(response->header.status));
     }
 
     return response->header.status;
