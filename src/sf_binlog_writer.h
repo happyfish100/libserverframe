@@ -60,7 +60,7 @@ typedef struct sf_binlog_writer_buffer_ring {
 typedef struct binlog_writer_thread {
     struct fast_mblock_man mblock;
     struct fc_queue queue;
-    volatile bool running;
+    bool running;
     bool use_fixed_buffer_size;
     short order_mode;
     short order_by;

@@ -74,20 +74,12 @@ static inline void idempotency_client_channel_set_id_key(
 static inline int idempotency_client_channel_check_wait_ex(
         struct idempotency_client_channel *channel, const int timeout)
 {
-    struct timespec ts;
-
     if (__sync_add_and_fetch(&channel->established, 0)) {
         return 0;
     }
 
     idempotency_client_channel_check_reconnect(channel);
-    PTHREAD_MUTEX_LOCK(&channel->lc_pair.lock);
-    ts.tv_sec = get_current_time() + timeout;
-    ts.tv_nsec = 0;
-    pthread_cond_timedwait(&channel->lc_pair.cond,
-            &channel->lc_pair.lock, &ts);
-    PTHREAD_MUTEX_UNLOCK(&channel->lc_pair.lock);
-
+    lcp_timedwait_sec(&channel->lc_pair, timeout);
     return __sync_add_and_fetch(&channel->established, 0) ? 0 : ETIMEDOUT;
 }
 
