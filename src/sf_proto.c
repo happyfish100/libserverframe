@@ -26,9 +26,9 @@ int sf_proto_set_body_length(struct fast_task_info *task)
     header = (SFCommonProtoHeader *)task->data;
     if (!SF_PROTO_CHECK_MAGIC(header->magic)) {
         logError("file: "__FILE__", line: %d, "
-                "client ip: %s, magic "SF_PROTO_MAGIC_FORMAT
+                "peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT
                 " is invalid, expect: "SF_PROTO_MAGIC_FORMAT,
-                __LINE__, task->client_ip,
+                __LINE__, task->client_ip, task->port,
                 SF_PROTO_MAGIC_PARAMS(header->magic),
                 SF_PROTO_MAGIC_EXPECT_PARAMS);
         return EINVAL;

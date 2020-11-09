@@ -144,9 +144,9 @@ static int open_next_binlog(SFBinlogWriterInfo *writer)
         char bak_filename[PATH_MAX];
         char date_str[32];
 
-        sprintf(bak_filename, "%s.%s", writer->file.name,
-                formatDatetime(g_current_time, "%Y%m%d%H%M%S",
-                    date_str, sizeof(date_str)));
+        snprintf(bak_filename, sizeof(bak_filename), "%s.%s",
+                writer->file.name, formatDatetime(g_current_time,
+                    "%Y%m%d%H%M%S", date_str, sizeof(date_str)));
         if (rename(writer->file.name, bak_filename) == 0) {
             logWarning("file: "__FILE__", line: %d, "
                     "binlog file %s exist, rename to %s",

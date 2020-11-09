@@ -304,6 +304,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
 {
     int64_t n;
     int result;
+    int old_stage;
     bool notify;
 
     if (__sync_add_and_fetch(&task->canceled, 0)) {
@@ -321,19 +322,19 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
         }
     }
 
-    if (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
+    while (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
                 SF_NIO_STAGE_NONE, stage))
     {
-        if (__sync_fetch_and_add(&task->nio_stages.notify, 0) == stage) {
+        old_stage = __sync_fetch_and_add(&task->nio_stages.notify, 0);
+        if (old_stage == stage) {
             logDebug("file: "__FILE__", line: %d, "
                     "current stage: %d equals to the target, skip set",
                     __LINE__, stage);
             return 0;
-        } else {
+        } else if (old_stage != SF_NIO_STAGE_NONE) {
             logWarning("file: "__FILE__", line: %d, "
                     "current stage: %d != %d, skip set stage to %d",
-                    __LINE__, __sync_fetch_and_add(&task->nio_stages.notify, 0),
-                    SF_NIO_STAGE_NONE, stage);
+                    __LINE__, old_stage, SF_NIO_STAGE_NONE, stage);
             return EAGAIN;
         }
     }
