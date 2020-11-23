@@ -377,7 +377,7 @@ void sf_recv_notify_read(int sock, short event, void *arg)
     struct fast_task_info *task;
     struct fast_task_info *current;
 
-    thread_data = (struct nio_thread_data *)arg;
+    thread_data = ((struct ioevent_notify_entry *)arg)->thread_data;
     if (read(sock, &n, sizeof(n)) < 0) {
         logWarning("file: "__FILE__", line: %d, "
                 "read from eventfd %d fail, errno: %d, error info: %s",
