@@ -39,6 +39,7 @@ typedef struct sf_global_variables {
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
+    int task_buffer_extra_size;
     int thread_stack_size;
     int sync_log_buff_interval; //sync log buff to disk every interval seconds
 
@@ -113,30 +114,33 @@ extern SFContext                 g_sf_context;
     } while (0)
 
 int sf_load_global_config_ex(const char *server_name,
-        IniFullContext *ini_ctx, const bool load_network_params);
+        IniFullContext *ini_ctx, const bool load_network_params,
+        const int task_buffer_extra_size);
 
 static inline int sf_load_global_config(const char *server_name,
         IniFullContext *ini_ctx)
 {
     const bool load_network_params = true;
-    return sf_load_global_config_ex(server_name,
-            ini_ctx, load_network_params);
+    const int task_buffer_extra_size = 0;
+
+    return sf_load_global_config_ex(server_name, ini_ctx,
+            load_network_params, task_buffer_extra_size);
 }
 
 int sf_load_config_ex(const char *server_name,
-        SFContextIniConfig *config);
+        SFContextIniConfig *config, const int task_buffer_extra_size);
 
 static inline int sf_load_config(const char *server_name,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
-        const int default_outer_port)
+        const int default_outer_port, const int task_buffer_extra_size)
 {
     SFContextIniConfig config;
 
     SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext,
             section_name, default_inner_port, default_outer_port,
             DEFAULT_WORK_THREADS);
-    return sf_load_config_ex(server_name, &config);
+    return sf_load_config_ex(server_name, &config, task_buffer_extra_size);
 }
 
 int sf_load_context_from_config_ex(SFContext *sf_context,
@@ -169,4 +173,3 @@ void sf_log_config_ex(const char *other_config);
 #endif
 
 #endif
-
