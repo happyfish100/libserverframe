@@ -60,12 +60,8 @@ static int load_network_parameters(IniFullContext *ini_ctx,
         const int task_buffer_extra_size)
 {
     int result;
-    char *pMaxPkgSize;
     char *pMinBuffSize;
     char *pMaxBuffSize;
-    int64_t max_pkg_size;
-    int64_t min_buff_size;
-    int64_t max_buff_size;
 
     g_sf_global_vars.connect_timeout = iniGetIntValueEx(ini_ctx->section_name,
             "connect_timeout", ini_ctx->context, DEFAULT_CONNECT_TIMEOUT, true);
@@ -91,61 +87,27 @@ static int load_network_parameters(IniFullContext *ini_ctx,
         return result;
     }
 
-    pMaxPkgSize = iniGetStrValueEx(ini_ctx->section_name,
-            "max_pkg_size", ini_ctx->context, true);
-    if (pMaxPkgSize == NULL) {
-        max_pkg_size = SF_DEF_MAX_PACKAGE_SIZE;
-    }
-    else if ((result=parse_bytes(pMaxPkgSize, 1,
-                    &max_pkg_size)) != 0)
-    {
-        return result;
-    } else if (max_pkg_size < 8192) {
-        logWarning("file: "__FILE__", line: %d, "
-                "max_pkg_size: %d is too small, set to 8192",
-                __LINE__, (int)max_pkg_size);
-        max_pkg_size = 8192;
-    }
-    g_sf_global_vars.max_pkg_size = (int)max_pkg_size;
-
+    g_sf_global_vars.max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
+            "max_pkg_size", SF_DEF_MAX_PACKAGE_SIZE, 1, 8192,
+            SF_MAX_NETWORK_BUFF_SIZE, true);
     pMinBuffSize = iniGetStrValueEx(ini_ctx->section_name,
             "min_buff_size", ini_ctx->context, true);
-    if (pMinBuffSize == NULL) {
-        min_buff_size = SF_DEF_MIN_BUFF_SIZE;
-    }
-    else if ((result=parse_bytes(pMinBuffSize, 1,
-                    &min_buff_size)) != 0)
-    {
-        return result;
-    } else if (min_buff_size < 8192) {
-        logWarning("file: "__FILE__", line: %d, "
-                "min_buff_size: %d is too small, set to 8192",
-                __LINE__, (int)min_buff_size);
-        min_buff_size = 8192;
-    }
-    g_sf_global_vars.min_buff_size = (int)min_buff_size;
-
     pMaxBuffSize = iniGetStrValueEx(ini_ctx->section_name,
             "max_buff_size", ini_ctx->context, true);
-    if (pMaxBuffSize == NULL) {
-        max_buff_size = SF_DEF_MAX_BUFF_SIZE;
-    }
-    else if ((result=parse_bytes(pMaxBuffSize, 1,
-                    &max_buff_size)) != 0)
-    {
-        return result;
-    }
-    g_sf_global_vars.max_buff_size = (int)max_buff_size;
-
     if (pMinBuffSize == NULL || pMaxBuffSize == NULL) {
         g_sf_global_vars.min_buff_size = g_sf_global_vars.max_pkg_size;
         g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
-    }
-    else {
+    } else {
+        g_sf_global_vars.min_buff_size = iniGetByteCorrectValueEx(ini_ctx,
+            "min_buff_size", SF_DEF_MIN_BUFF_SIZE, 1, 8192,
+            SF_MAX_NETWORK_BUFF_SIZE, true);
+        g_sf_global_vars.max_buff_size = iniGetByteCorrectValueEx(ini_ctx,
+            "max_buff_size", SF_DEF_MAX_BUFF_SIZE, 1, 8192,
+            SF_MAX_NETWORK_BUFF_SIZE, true);
+
         if (g_sf_global_vars.max_buff_size < g_sf_global_vars.max_pkg_size) {
             g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
         }
-
         if (g_sf_global_vars.max_buff_size < g_sf_global_vars.min_buff_size) {
             logWarning("file: "__FILE__", line: %d, "
                     "max_buff_size: %d < min_buff_size: %d, "
@@ -177,8 +139,6 @@ int sf_load_global_config_ex(const char *server_name,
     char *pBasePath;
     char *pRunByGroup;
     char *pRunByUser;
-    char *pThreadStackSize;
-    int64_t thread_stack_size;
 
     g_sf_global_vars.task_buffer_extra_size = task_buffer_extra_size;
     pBasePath = iniGetStrValue(NULL, "base_path", ini_ctx->context);
@@ -282,21 +242,9 @@ int sf_load_global_config_ex(const char *server_name,
         g_sf_global_vars.sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
     }
 
-    pThreadStackSize = iniGetStrValueEx(ini_ctx->section_name,
-            "thread_stack_size", ini_ctx->context, true);
-    if (pThreadStackSize == NULL) {
-        thread_stack_size = SF_DEF_THREAD_STACK_SIZE;
-    } else if ((result=parse_bytes(pThreadStackSize, 1,
-                    &thread_stack_size)) != 0)
-    {
-        return result;
-    } else if (thread_stack_size < SF_MIN_THREAD_STACK_SIZE) {
-        logWarning("file: "__FILE__", line: %d, "
-                "thread_stack_size : %d is too small, set to %d",
-                __LINE__, (int)thread_stack_size, SF_MIN_THREAD_STACK_SIZE);
-        thread_stack_size = SF_MIN_THREAD_STACK_SIZE;
-    }
-    g_sf_global_vars.thread_stack_size = (int)thread_stack_size;
+    g_sf_global_vars.thread_stack_size = iniGetByteCorrectValueEx(ini_ctx,
+            "thread_stack_size", SF_DEF_THREAD_STACK_SIZE, 1,
+            SF_MIN_THREAD_STACK_SIZE, SF_MAX_THREAD_STACK_SIZE, true);
 
     g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL,
             "rotate_error_log", ini_ctx->context, false);

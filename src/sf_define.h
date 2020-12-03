@@ -20,11 +20,13 @@
 
 #include "fastcommon/sockopt.h"
 
-#define SF_DEF_THREAD_STACK_SIZE (64 * 1024)
-#define SF_MIN_THREAD_STACK_SIZE (64 * 1024)
-#define SF_DEF_MAX_PACKAGE_SIZE  (64 * 1024)
-#define SF_DEF_MIN_BUFF_SIZE  (64 * 1024)
-#define SF_DEF_MAX_BUFF_SIZE  (64 * 1024)
+#define SF_DEF_THREAD_STACK_SIZE  (64 * 1024)
+#define SF_MIN_THREAD_STACK_SIZE  (64 * 1024)
+#define SF_MAX_THREAD_STACK_SIZE  (2 * 1024 * 1024 * 1024LL)
+#define SF_DEF_MAX_PACKAGE_SIZE   (64 * 1024)
+#define SF_DEF_MIN_BUFF_SIZE      (64 * 1024)
+#define SF_DEF_MAX_BUFF_SIZE      (64 * 1024)
+#define SF_MAX_NETWORK_BUFF_SIZE  (2 * 1024 * 1024 * 1024LL)
 
 #define SF_NIO_STAGE_NONE        0
 #define SF_NIO_STAGE_INIT        1  //set ioevent
