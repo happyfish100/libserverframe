@@ -34,7 +34,7 @@
 
 SFGlobalVariables g_sf_global_vars = {
     DEFAULT_CONNECT_TIMEOUT, DEFAULT_NETWORK_TIMEOUT,
-    {'/', 't', 'm', 'p', '\0'}, true, DEFAULT_MAX_CONNECTONS,
+    {'/', 't', 'm', 'p', '\0'}, true, true, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
     SYNC_LOG_BUFF_DEF_INTERVAL, 0, 0, 0, {'\0'}, {'\0'}, false, 0, {0, 0}
@@ -165,6 +165,9 @@ int sf_load_global_config_ex(const char *server_name,
         return ENOTDIR;
     }
 
+    g_sf_global_vars.tcp_quick_ack = iniGetBoolValue(NULL,
+            "tcp_quick_ack", ini_ctx->context, true);
+    tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
     if (load_network_params) {
         if ((result=load_network_parameters(ini_ctx,
                         task_buffer_extra_size)) != 0)
@@ -390,8 +393,9 @@ void sf_global_config_to_string(char *output, const int size)
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%s, max_pkg_size=%s, "
             "min_buff_size=%s, max_buff_size=%s, task_buffer_extra_size=%d, "
-            "log_level=%s, sync_log_buff_interval=%d, rotate_error_log=%d, "
-            "log_file_keep_days=%d, run_by_group=%s, run_by_user=%s",
+            "tcp_quick_ack=%d, log_level=%s, sync_log_buff_interval=%d, "
+            "rotate_error_log=%d, log_file_keep_days=%d, "
+            "run_by_group=%s, run_by_user=%s",
             g_sf_global_vars.base_path,
             g_sf_global_vars.max_connections,
             g_sf_global_vars.connect_timeout,
@@ -402,6 +406,7 @@ void sf_global_config_to_string(char *output, const int size)
             int_to_comma_str(g_sf_global_vars.min_buff_size, sz_min_buff_size),
             int_to_comma_str(g_sf_global_vars.max_buff_size, sz_max_buff_size),
             g_sf_global_vars.task_buffer_extra_size,
+            g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
             g_sf_global_vars.sync_log_buff_interval,
             g_sf_global_vars.rotate_error_log,

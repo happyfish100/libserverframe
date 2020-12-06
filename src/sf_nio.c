@@ -547,6 +547,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             return -1;
         }
 
+        TCP_SET_QUICK_ACK(sock);
         total_read += bytes;
         task->offset += bytes;
         if (task->length == 0) { //header

@@ -35,6 +35,7 @@ typedef struct sf_global_variables {
     char base_path[MAX_PATH_SIZE];
 
     volatile bool continue_flag;
+    bool tcp_quick_ack;
     int max_connections;
     int max_pkg_size;
     int min_buff_size;
