@@ -41,7 +41,7 @@
 struct sf_binlog_writer_info;
 
 typedef struct sf_binlog_writer_buffer {
-    int64_t version;
+    SFVersionRange version;
     BufferInfo bf;
     int type;    //for versioned writer
     struct sf_binlog_writer_info *writer;
@@ -162,12 +162,18 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_buffer(
     return (SFBinlogWriterBuffer *)fast_mblock_alloc_object(&thread->mblock);
 }
 
-#define sf_binlog_writer_alloc_versioned_buffer(writer, version) \
+#define sf_binlog_writer_alloc_one_version_buffer(writer, version) \
     sf_binlog_writer_alloc_versioned_buffer_ex(writer, version, \
-            SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE)
+            version, SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE)
+
+#define sf_binlog_writer_alloc_multi_version_buffer(writer, \
+        first_version, last_version) \
+    sf_binlog_writer_alloc_versioned_buffer_ex(writer, first_version, \
+            last_version, SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE)
 
 static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
-        SFBinlogWriterInfo *writer, const int64_t version, const int type)
+        SFBinlogWriterInfo *writer, const int64_t first_version,
+        const int64_t last_version, const int type)
 {
     SFBinlogWriterBuffer *buffer;
     buffer = (SFBinlogWriterBuffer *)fast_mblock_alloc_object(
@@ -175,7 +181,8 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
     if (buffer != NULL) {
         buffer->type = type;
         buffer->writer = writer;
-        buffer->version = version;
+        buffer->version.first = first_version;
+        buffer->version.last = last_version;
     }
     return buffer;
 }

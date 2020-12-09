@@ -102,4 +102,9 @@ typedef struct sf_space_stat {
     int64_t used;
 } SFSpaceStat;
 
+typedef struct sf_version_range {
+    int64_t first; //including
+    int64_t last;  //including
+} SFVersionRange;
+
 #endif
