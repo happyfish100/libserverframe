@@ -38,6 +38,9 @@
 #define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).end - (buffer).buff)
 #define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
 
+#define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
+    (buffer)->version.first = (buffer)->version.last = ver
+
 struct sf_binlog_writer_info;
 
 typedef struct sf_binlog_writer_buffer {
