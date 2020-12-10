@@ -23,6 +23,11 @@
 #include "fastcommon/fc_list.h"
 #include "fastcommon/pthread_func.h"
 
+typedef enum {
+    sf_sharding_htable_key_ids_one = 1,
+    sf_sharding_htable_key_ids_two = 2
+} SFShardingHtableKeyType;
+
 struct sf_sharding_hash_entry;
 struct sf_htable_sharding;
 
@@ -93,6 +98,7 @@ typedef struct sf_htable_sharding_context {
         struct fast_mblock_man *elts;
     } allocators;
 
+    SFShardingHtableKeyType key_type;  //id count in the hash entry
     sf_sharding_htable_insert_callback insert_callback;
     sf_sharding_htable_find_callback find_callback;
     sf_sharding_htable_accept_reclaim_callback accept_reclaim_callback;
@@ -104,6 +110,7 @@ extern "C" {
 #endif
 
     int sf_sharding_htable_init(SFHtableShardingContext *sharding_ctx,
+            const SFShardingHtableKeyType key_type,
             sf_sharding_htable_insert_callback insert_callback,
             sf_sharding_htable_find_callback find_callback,
             sf_sharding_htable_accept_reclaim_callback reclaim_callback,

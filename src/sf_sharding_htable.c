@@ -115,6 +115,7 @@ static int init_sharding_array(SFHtableShardingContext *sharding_ctx,
 }
 
 int sf_sharding_htable_init(SFHtableShardingContext *sharding_ctx,
+        const SFShardingHtableKeyType key_type,
         sf_sharding_htable_insert_callback insert_callback,
         sf_sharding_htable_find_callback find_callback,
         sf_sharding_htable_accept_reclaim_callback reclaim_callback,
@@ -144,6 +145,7 @@ int sf_sharding_htable_init(SFHtableShardingContext *sharding_ctx,
         return result;
     }
 
+    sharding_ctx->key_type = key_type;
     sharding_ctx->insert_callback = insert_callback;
     sharding_ctx->find_callback = find_callback;
     sharding_ctx->accept_reclaim_callback = reclaim_callback;
@@ -163,25 +165,31 @@ int sf_sharding_htable_init(SFHtableShardingContext *sharding_ctx,
     return 0;
 }
 
-static inline int compare_key(const SFTwoIdsHashKey *key1,
-        const SFTwoIdsHashKey *key2)
+static inline int compare_key(SFHtableShardingContext *sharding_ctx,
+        const SFTwoIdsHashKey *key1, const SFTwoIdsHashKey *key2)
 {
     int sub;
-    if ((sub=fc_compare_int64(key1->id1, key2->id1)) != 0) {
-        return sub;
-    }
 
-    return fc_compare_int64(key1->id2, key2->id2);
+    if (sharding_ctx->key_type == sf_sharding_htable_key_ids_one) {
+        return fc_compare_int64(key1->id1, key2->id1);
+    } else {
+        if ((sub=fc_compare_int64(key1->id1, key2->id1)) != 0) {
+            return sub;
+        }
+
+        return fc_compare_int64(key1->id2, key2->id2);
+    }
 }
 
-static inline SFShardingHashEntry *htable_find(const SFTwoIdsHashKey *key,
-        struct fc_list_head *bucket)
+static inline SFShardingHashEntry *htable_find(
+        SFHtableShardingContext *sharding_ctx,
+        const SFTwoIdsHashKey *key, struct fc_list_head *bucket)
 {
     int r;
     SFShardingHashEntry *current;
 
     fc_list_for_each_entry(current, bucket, dlinks.htable) {
-        r = compare_key(key, &current->key);
+        r = compare_key(sharding_ctx, key, &current->key);
         if (r < 0) {
             return NULL;
         } else if (r == 0) {
@@ -192,8 +200,8 @@ static inline SFShardingHashEntry *htable_find(const SFTwoIdsHashKey *key,
     return NULL;
 }
 
-static inline void htable_insert(SFShardingHashEntry *entry,
-        struct fc_list_head *bucket)
+static inline void htable_insert(SFHtableShardingContext *sharding_ctx,
+        SFShardingHashEntry *entry, struct fc_list_head *bucket)
 {
     struct fc_list_head *previous;
     struct fc_list_head *current;
@@ -202,7 +210,7 @@ static inline void htable_insert(SFShardingHashEntry *entry,
     previous = bucket;
     fc_list_for_each(current, bucket) {
         pe = fc_list_entry(current, SFShardingHashEntry, dlinks.htable);
-        if (compare_key(&entry->key, &pe->key) < 0) {
+        if (compare_key(sharding_ctx, &entry->key, &pe->key) < 0) {
             break;
         }
 
@@ -304,7 +312,8 @@ static inline SFShardingHashEntry *htable_entry_alloc(
     SFShardingHashEntry *entry; \
     uint64_t hash_code;    \
     \
-    hash_code = key->id1 + key->id2;  \
+    hash_code = sf_sharding_htable_key_ids_one == sharding_ctx-> \
+                key_type ? key->id1 : key->id1 + key->id2; \
     sharding = sharding_ctx->sharding_array.entries +   \
         hash_code % sharding_ctx->sharding_array.count; \
     bucket = sharding->hashtable.buckets +   \
@@ -318,7 +327,7 @@ void *sf_sharding_htable_find(SFHtableShardingContext
     SET_SHARDING_AND_BUCKET(sharding_ctx, key);
 
     PTHREAD_MUTEX_LOCK(&sharding->lock);
-    entry = htable_find(key, bucket);
+    entry = htable_find(sharding_ctx, key, bucket);
     if (entry != NULL && sharding_ctx->find_callback != NULL) {
         data = sharding_ctx->find_callback(entry, arg);
     } else {
@@ -338,7 +347,7 @@ int sf_sharding_htable_insert(SFHtableShardingContext
 
     PTHREAD_MUTEX_LOCK(&sharding->lock);
     do {
-        if ((entry=htable_find(key, bucket)) == NULL) {
+        if ((entry=htable_find(sharding_ctx, key, bucket)) == NULL) {
             if ((entry=htable_entry_alloc(sharding)) == NULL) {
                 result = ENOMEM;
                 break;
@@ -346,7 +355,7 @@ int sf_sharding_htable_insert(SFHtableShardingContext
 
             new_create = true;
             entry->key = *key;
-            htable_insert(entry, bucket);
+            htable_insert(sharding_ctx, entry, bucket);
             fc_list_add_tail(&entry->dlinks.lru, &sharding->lru);
         } else {
             new_create = false;
