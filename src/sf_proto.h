@@ -32,10 +32,12 @@
 #define SF_PROTO_ACTIVE_TEST_RESP       118
 
 //for request idempotency
-#define SF_SERVICE_PROTO_SETUP_CHANNEL_REQ        121
-#define SF_SERVICE_PROTO_SETUP_CHANNEL_RESP       122
-#define SF_SERVICE_PROTO_CLOSE_CHANNEL_REQ        123
-#define SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP       124
+#define SF_SERVICE_PROTO_SETUP_CHANNEL_REQ        119
+#define SF_SERVICE_PROTO_SETUP_CHANNEL_RESP       120
+#define SF_SERVICE_PROTO_CLOSE_CHANNEL_REQ        121
+#define SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP       122
+#define SF_SERVICE_PROTO_REBIND_CHANNEL_REQ       123
+#define SF_SERVICE_PROTO_REBIND_CHANNEL_RESP      124
 #define SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ   125
 #define SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP  126
 
@@ -101,6 +103,11 @@ typedef struct sf_proto_setup_channel_resp {
     char buffer_size[4];
     char padding[4];
 } SFProtoSetupChannelResp;
+
+typedef struct sf_proto_rebind_channel_req {
+    char channel_id[4];
+    char key[4];
+} SFProtoRebindChannelReq;
 
 typedef struct sf_proto_report_req_receipt_header {
     char count[4];
@@ -296,6 +303,9 @@ static inline int sf_proto_deal_active_test(struct fast_task_info *task,
 
 int sf_proto_deal_ack(struct fast_task_info *task,
         SFRequestInfo *request, SFResponseInfo *response);
+
+int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
+        const uint32_t channel_id, const int key, const int network_timeout);
 
 #define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
     do {  \

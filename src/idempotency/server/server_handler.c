@@ -207,3 +207,49 @@ IdempotencyRequest *sf_server_update_prepare_and_check(
 
     return request;
 }
+
+int sf_server_deal_rebind_channel(struct fast_task_info *task,
+        int *server_task_type, IdempotencyChannel **channel,
+        SFResponseInfo *response)
+{
+    int result;
+    uint32_t channel_id;
+    int key;
+    SFProtoRebindChannelReq *req;
+
+    if ((result=sf_server_expect_body_length(response,
+                    SF_TASK_BODY_LENGTH(task),
+                    sizeof(SFProtoRebindChannelReq))) != 0)
+    {
+        return result;
+    }
+
+    if (*server_task_type != SF_SERVER_TASK_TYPE_CHANNEL_USER) {
+        response->error.length = sprintf(response->error.message,
+                "invalid task type: %d != %d", *server_task_type,
+                SF_SERVER_TASK_TYPE_CHANNEL_USER);
+        return EINVAL;
+    }
+
+    if (*channel == NULL) {
+        response->error.length = sprintf(response->error.message,
+                "no channel binded");
+        return EINVAL;
+    }
+    idempotency_channel_release(*channel, false);
+
+    req = (SFProtoRebindChannelReq *)(task->data + sizeof(SFCommonProtoHeader));
+    channel_id = buff2int(req->channel_id);
+    key = buff2int(req->key);
+    *channel = idempotency_channel_find_and_hold(channel_id, key, &result);
+    if (*channel == NULL) {
+        response->error.length = sprintf(response->error.message,
+                "find channel fail, channel id: %d, result: %d",
+                channel_id, result);
+        *server_task_type = SF_SERVER_TASK_TYPE_NONE;
+        return SF_RETRIABLE_ERROR_NO_CHANNEL;
+    }
+
+    response->header.cmd = SF_SERVICE_PROTO_REBIND_CHANNEL_RESP;
+    return 0;
+}

@@ -288,6 +288,10 @@ const char *sf_get_cmd_caption(const int cmd)
             return "CLOSE_CHANNEL_REQ";
         case SF_SERVICE_PROTO_CLOSE_CHANNEL_RESP:
             return "CLOSE_CHANNEL_RESP";
+        case SF_SERVICE_PROTO_REBIND_CHANNEL_REQ:
+            return "REBIND_CHANNEL_REQ";
+        case SF_SERVICE_PROTO_REBIND_CHANNEL_RESP:
+            return "REBIND_CHANNEL_RESP";
         case SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ:
             return "REPORT_REQ_RECEIPT_REQ";
         case SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP:
@@ -332,4 +336,31 @@ int sf_proto_deal_ack(struct fast_task_info *task,
     }
 
     return 0;
+}
+
+int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
+        const uint32_t channel_id, const int key, const int network_timeout)
+{
+    char out_buff[sizeof(SFCommonProtoHeader) +
+        sizeof(SFProtoRebindChannelReq)];
+    SFCommonProtoHeader *header;
+    SFProtoRebindChannelReq *req;
+    SFResponseInfo response;
+    int result;
+
+    header = (SFCommonProtoHeader *)out_buff;
+    req = (SFProtoRebindChannelReq *)(header + 1);
+    int2buff(channel_id, req->channel_id);
+    int2buff(key, req->key);
+    SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_REBIND_CHANNEL_REQ,
+            sizeof(SFProtoRebindChannelReq));
+    response.error.length = 0;
+    if ((result=sf_send_and_recv_none_body_response(conn, out_buff,
+                    sizeof(out_buff), &response, network_timeout,
+                    SF_SERVICE_PROTO_REBIND_CHANNEL_RESP)) != 0)
+    {
+        sf_log_network_error(&response, conn, result);
+    }
+
+    return result;
 }

@@ -24,6 +24,7 @@
     ConnectionInfo *conn;  \
     IdempotencyClientChannel *old_channel;  \
     int result;  \
+    int conn_result;  \
     int i;       \
     bool idempotency_enabled;  \
     uint64_t req_id;  \
@@ -70,11 +71,21 @@
                 }  \
             }  \
     \
+            conn_result = result;  \
             if (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID && \
                     idempotency_enabled)  \
             {  \
-                idempotency_client_channel_check_reconnect( \
-                        connection_params->channel);  \
+                if (idempotency_client_channel_check_wait(    \
+                            connection_params->channel) == 0) \
+                { \
+                    if ((conn_result=sf_proto_rebind_idempotency_channel( \
+                                conn, connection_params->channel->id, \
+                                connection_params->channel->key,      \
+                                client_ctx->network_timeout)) == 0)   \
+                    { \
+                        continue; \
+                    } \
+                } \
             }  \
     \
             SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx, client_ctx-> \
@@ -84,7 +95,7 @@
                     "net retry result: %d, retry count: %d",  \
                     __LINE__, __FUNCTION__, result, i);       \
     */ \
-            SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result); \
+            SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, conn_result); \
             if ((conn=GET_MASTER_CONNECTION(client_ctx,  \
                             get_conn_arg1, &result)) == NULL)  \
             {  \

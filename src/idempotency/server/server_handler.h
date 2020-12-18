@@ -41,6 +41,10 @@ IdempotencyRequest *sf_server_update_prepare_and_check(
         request_allocator, IdempotencyChannel *channel,
         SFResponseInfo *response, int *result);
 
+int sf_server_deal_rebind_channel(struct fast_task_info *task,
+        int *server_task_type, IdempotencyChannel **channel,
+        SFResponseInfo *response);
+
 #ifdef __cplusplus
 }
 #endif
