@@ -154,6 +154,16 @@ static inline void sf_log_network_error_ex1(SFResponseInfo *response,
     sf_log_network_error_ex1(response, conn, result, \
             LOG_ERR, __FILE__, __LINE__)
 
+#define sf_log_network_error_for_update(response, conn, result)  \
+        sf_log_network_error_ex(response, conn, result,         \
+                (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
+                LOG_DEBUG : LOG_ERR)
+
+#define sf_log_network_error_for_delete(response, \
+        conn, result, enoent_log_level)  \
+        sf_log_network_error_ex(response, conn, result,         \
+                (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
+                LOG_DEBUG : ((result == ENOENT) ? enoent_log_level : LOG_ERR))
 
 static inline int sf_server_expect_body_length(SFResponseInfo *response,
         const int body_length, const int expect_body_len)
