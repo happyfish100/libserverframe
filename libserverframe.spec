@@ -2,7 +2,7 @@
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe
-Version: 1.1.0
+Version: 1.1.1
 Release: 1%{?dist}
 Summary: mc common framework library
 License: GPL
@@ -12,9 +12,9 @@ Source: http://github.com/happyfish100/libfastcommon/%{name}-%{version}.tar.gz
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n) 
 
-BuildRequires: libfastcommon-devel >= 1.0.44
+BuildRequires: libfastcommon-devel >= 1.0.45
 Requires: %__cp %__mv %__chmod %__grep %__mkdir %__install %__id
-Requires: libfastcommon >= 1.0.44
+Requires: libfastcommon >= 1.0.45
 %description
 common framework library 
 commit version: %{CommitVersion}
