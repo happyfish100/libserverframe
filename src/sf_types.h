@@ -118,4 +118,16 @@ typedef struct sf_log_config {
     int64_t rotate_on_size;
 } SFLogConfig;
 
+typedef struct sf_slow_log_config {
+    bool enabled;
+    int log_slower_than_ms;
+    char filename_prefix[64];
+    SFLogConfig log_cfg;
+} SFSlowLogConfig;
+
+typedef struct sf_slow_log_context {
+    SFSlowLogConfig cfg;
+    LogContext ctx;
+} SFSlowLogContext;
+
 #endif

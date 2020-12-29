@@ -157,9 +157,28 @@ static inline int sf_load_context_from_config(SFContext *sf_context,
     return sf_load_context_from_config_ex(sf_context, &config);
 }
 
+int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
+        SFLogConfig *log_cfg);
+
+int sf_load_slow_log_config_ex(IniFullContext *ini_ctx, LogContext *log_ctx,
+        SFSlowLogConfig *slow_log_cfg);
+
+static inline int sf_load_slow_log_config(const char *config_file,
+        IniContext *ini_context, LogContext *log_ctx,
+        SFSlowLogConfig *slow_log_cfg)
+{
+    IniFullContext ini_ctx;
+
+    FAST_INI_SET_FULL_CTX_EX(ini_ctx, config_file, "slow_log", ini_context);
+    return sf_load_slow_log_config_ex(&ini_ctx, log_ctx, slow_log_cfg);
+}
+
 void sf_set_log_rotate_size(LogContext *context, const int64_t log_rotate_size);
 
-void sf_log_config_to_string(SFLogConfig *log_cfg,
+void sf_log_config_to_string_ex(SFLogConfig *log_cfg, const char *caption,
+        const char *other_config, char *output, const int size);
+
+void sf_slow_log_config_to_string(SFSlowLogConfig *slow_log_cfg,
         const char *caption, char *output, const int size);
 
 void sf_global_config_to_string(char *output, const int size);
@@ -170,6 +189,9 @@ void sf_context_config_to_string(const SFContext *sf_context,
 void sf_log_config_ex(const char *other_config);
 
 #define sf_log_config() sf_log_config_ex(NULL)
+
+#define sf_log_config_to_string(log_cfg, caption, output, size)  \
+    sf_log_config_to_string_ex(log_cfg, caption, NULL, output, size)
 
 #ifdef __cplusplus
 }

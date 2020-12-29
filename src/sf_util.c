@@ -151,14 +151,16 @@ ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
         INIT_SCHEDULE_ENTRY_EX(*pScheduleEntry, sched_generate_next_id(),
                 log_cfg->rotate_time, 86400, log_notify_rotate, pContext);
         pScheduleEntry++;
+    }
 
-        if (log_cfg->keep_days > 0) {
-            log_set_keep_days(pContext, log_cfg->keep_days);
-            INIT_SCHEDULE_ENTRY_EX(*pScheduleEntry, sched_generate_next_id(),
-                    log_cfg->delete_old_time, 86400, log_delete_old_files,
-                    pContext);
-            pScheduleEntry++;
-        }
+    if ((log_cfg->rotate_everyday || log_cfg->rotate_on_size > 0) &&
+            (log_cfg->keep_days > 0))
+    {
+        log_set_keep_days(pContext, log_cfg->keep_days);
+        INIT_SCHEDULE_ENTRY_EX(*pScheduleEntry, sched_generate_next_id(),
+                log_cfg->delete_old_time, 86400, log_delete_old_files,
+                pContext);
+        pScheduleEntry++;
     }
 
     return pScheduleEntry;

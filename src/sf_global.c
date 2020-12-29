@@ -188,6 +188,35 @@ int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
     return 0;
 }
 
+int sf_load_slow_log_config_ex(IniFullContext *ini_ctx, LogContext *log_ctx,
+        SFSlowLogConfig *slow_log_cfg)
+{
+    int result;
+    char *filename_prefix;
+
+    if ((result=sf_load_log_config(ini_ctx, log_ctx,
+                    &slow_log_cfg->log_cfg)) != 0)
+    {
+        return result;
+    }
+
+    slow_log_cfg->enabled = iniGetBoolValue(ini_ctx->section_name,
+            "enabled", ini_ctx->context, false);
+    slow_log_cfg->log_slower_than_ms = iniGetIntValue(ini_ctx->section_name,
+            "log_slower_than_ms", ini_ctx->context, 100);
+    filename_prefix = iniGetStrValue(ini_ctx->section_name,
+            "filename_prefix", ini_ctx->context);
+    if (filename_prefix == NULL || *filename_prefix == '\0') {
+        strcpy(slow_log_cfg->filename_prefix, "slow");
+    } else {
+        snprintf(slow_log_cfg->filename_prefix,
+                sizeof(slow_log_cfg->filename_prefix),
+                "%s", filename_prefix);
+    }
+
+    return 0;
+}
+
 int sf_load_global_config_ex(const char *server_name,
         IniFullContext *ini_ctx, const bool load_network_params,
         const int task_buffer_extra_size)
@@ -437,19 +466,44 @@ void sf_context_config_to_string(const SFContext *sf_context,
             sf_context->accept_threads, sf_context->work_threads);
 }
 
-void sf_log_config_to_string(SFLogConfig *log_cfg,
-        const char *caption, char *output, const int size)
+void sf_log_config_to_string_ex(SFLogConfig *log_cfg, const char *caption,
+        const char *other_config, char *output, const int size)
 {
     snprintf(output, size,
-            "%s: {sync_log_buff_interval=%d, rotate_everyday=%d, "
+            "%s: {%s%ssync_log_buff_interval=%d, rotate_everyday=%d, "
             "rotate_time=%02d:%02d, rotate_on_size=%"PRId64", "
             "compress_old=%d, compress_days_before=%d, keep_days=%d, "
             "delete_old_time=%02d:%02d}", caption,
+            other_config != NULL ? other_config : "",
+            other_config != NULL ? ", " : "",
             log_cfg->sync_log_buff_interval, log_cfg->rotate_everyday,
             log_cfg->rotate_time.hour, log_cfg->rotate_time.minute,
             log_cfg->rotate_on_size, log_cfg->compress_old,
             log_cfg->compress_days_before, log_cfg->keep_days,
             log_cfg->delete_old_time.hour, log_cfg->delete_old_time.minute);
+}
+
+void sf_slow_log_config_to_string(SFSlowLogConfig *slow_log_cfg,
+        const char *caption, char *output, const int size)
+{
+    int len;
+    char slow_log_buff[256];
+
+    len = snprintf(slow_log_buff, sizeof(slow_log_buff),
+            "enabled=%d", slow_log_cfg->enabled);
+    if (!slow_log_cfg->enabled) {
+        snprintf(output, size, "%s: {%s}",
+                caption, slow_log_buff);
+        return;
+    }
+
+    snprintf(slow_log_buff + len, sizeof(slow_log_buff) - len,
+            ", filename_prefix=%s, log_slower_than_ms=%d",
+            slow_log_cfg->filename_prefix,
+            slow_log_cfg->log_slower_than_ms);
+
+    sf_log_config_to_string_ex(&slow_log_cfg->log_cfg, caption,
+            slow_log_buff, output, size);
 }
 
 void sf_global_config_to_string(char *output, const int size)
@@ -483,7 +537,7 @@ void sf_global_config_to_string(char *output, const int size)
                 );
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,
-            "error_log_file", output + len, size - len);
+            "error_log", output + len, size - len);
 }
 
 void sf_log_config_ex(const char *other_config)

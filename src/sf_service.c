@@ -600,12 +600,12 @@ int sf_setup_signal_handler()
     return 0;
 }
 
+#define LOG_SCHEDULE_ENTRIES_COUNT 3
+
 int sf_startup_schedule(pthread_t *schedule_tid)
 {
-#define SCHEDULE_ENTRIES_COUNT 3
-
     ScheduleArray scheduleArray;
-    ScheduleEntry scheduleEntries[SCHEDULE_ENTRIES_COUNT];
+    ScheduleEntry scheduleEntries[LOG_SCHEDULE_ENTRIES_COUNT];
 
     scheduleArray.entries = scheduleEntries;
     sf_setup_schedule(&g_log_context, &g_sf_global_vars.error_log,
@@ -613,6 +613,28 @@ int sf_startup_schedule(pthread_t *schedule_tid)
     return sched_start(&scheduleArray, schedule_tid,
             g_sf_global_vars.thread_stack_size, (bool * volatile)
             &g_sf_global_vars.continue_flag);
+}
+
+int sf_add_slow_log_schedule(LogContext *pContext,
+        SFSlowLogConfig *slow_log_cfg)
+{
+    int result;
+    ScheduleArray scheduleArray;
+    ScheduleEntry scheduleEntries[LOG_SCHEDULE_ENTRIES_COUNT];
+
+    if (!slow_log_cfg->enabled) {
+        return 0;
+    }
+
+    if ((result=sf_logger_init(pContext, slow_log_cfg->
+                    filename_prefix)) != 0)
+    {
+        return result;
+    }
+
+    scheduleArray.entries = scheduleEntries;
+    sf_setup_schedule(pContext, &slow_log_cfg->log_cfg, &scheduleArray);
+    return sched_add_entries(&scheduleArray);
 }
 
 void sf_set_current_time()
