@@ -32,8 +32,9 @@
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_memory.h"
-#include "sf_global.h"
 #include "sf_nio.h"
+#include "sf_util.h"
+#include "sf_global.h"
 #include "sf_service.h"
 
 #if defined(OS_LINUX)
@@ -605,36 +606,10 @@ int sf_startup_schedule(pthread_t *schedule_tid)
 
     ScheduleArray scheduleArray;
     ScheduleEntry scheduleEntries[SCHEDULE_ENTRIES_COUNT];
-    int index;
 
     scheduleArray.entries = scheduleEntries;
-    scheduleArray.count = 0;
-
-    memset(scheduleEntries, 0, sizeof(scheduleEntries));
-
-    index = scheduleArray.count++;
-    INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
-            TIME_NONE, TIME_NONE, 0,
-             g_sf_global_vars.sync_log_buff_interval,
-             log_sync_func, &g_log_context);
-
-    if (g_sf_global_vars.rotate_error_log) {
-        log_set_rotate_time_format(&g_log_context, "%Y%m%d");
-
-        index = scheduleArray.count++;
-        INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
-                0, 0, 0, 86400, log_notify_rotate, &g_log_context);
-
-        if (g_sf_global_vars.log_file_keep_days > 0) {
-            log_set_keep_days(&g_log_context,
-                    g_sf_global_vars.log_file_keep_days);
-
-            index = scheduleArray.count++;
-            INIT_SCHEDULE_ENTRY(scheduleEntries[index], sched_generate_next_id(),
-                    1, 0, 0, 86400, log_delete_old_files, &g_log_context);
-        }
-    }
-
+    sf_setup_schedule(&g_log_context, &g_sf_global_vars.error_log,
+            &scheduleArray);
     return sched_start(&scheduleArray, schedule_tid,
             g_sf_global_vars.thread_stack_size, (bool * volatile)
             &g_sf_global_vars.continue_flag);

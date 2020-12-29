@@ -20,6 +20,7 @@
 
 #include "fastcommon/logger.h"
 #include "fastcommon/sched_thread.h"
+#include "sf_types.h"
 
 #ifdef DEBUG_FLAG  /*only for format check*/
 
@@ -77,7 +78,16 @@ void sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
 int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 
 ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
-        ScheduleEntry *pScheduleEntry);
+        SFLogConfig *log_cfg, ScheduleEntry *pScheduleEntry);
+
+static inline void sf_setup_schedule(struct log_context *pContext,
+        SFLogConfig *log_cfg, ScheduleArray *scheduleArray)
+{
+    ScheduleEntry *scheduleEntry;
+    scheduleEntry = sf_logger_set_schedule_entry(pContext,
+            log_cfg, scheduleArray->entries);
+    scheduleArray->count = scheduleEntry - scheduleArray->entries;
+}
 
 const char *sf_strerror(const int errnum);
 

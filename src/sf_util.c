@@ -140,36 +140,25 @@ int sf_logger_init(LogContext *pContext, const char *filename_prefix)
 }
 
 ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
-        ScheduleEntry *pScheduleEntry)
+        SFLogConfig *log_cfg, ScheduleEntry *pScheduleEntry)
 {
-    pScheduleEntry->id = sched_generate_next_id();
-    pScheduleEntry->time_base.hour = TIME_NONE;
-    pScheduleEntry->time_base.minute = TIME_NONE;
-    pScheduleEntry->interval = g_sf_global_vars.sync_log_buff_interval;
-    pScheduleEntry->task_func = log_sync_func;
-    pScheduleEntry->func_args = pContext;
+    INIT_SCHEDULE_ENTRY(*pScheduleEntry, sched_generate_next_id(),
+            TIME_NONE, TIME_NONE, 0, log_cfg->sync_log_buff_interval,
+            log_sync_func, pContext);
     pScheduleEntry++;
 
-    pScheduleEntry->id = sched_generate_next_id();
-    pScheduleEntry->time_base.hour = 0;
-    pScheduleEntry->time_base.minute = 0;
-    pScheduleEntry->time_base.second = 0;
-    pScheduleEntry->interval = 86400;
-    pScheduleEntry->task_func = log_notify_rotate;
-    pScheduleEntry->func_args = pContext;
-    pScheduleEntry++;
-
-    if (g_sf_global_vars.log_file_keep_days > 0) {
-        log_set_keep_days(pContext, g_sf_global_vars.log_file_keep_days);
-
-        pScheduleEntry->id = sched_generate_next_id();
-        pScheduleEntry->time_base.hour = 1;
-        pScheduleEntry->time_base.minute = 30;
-        pScheduleEntry->time_base.second = 0;
-        pScheduleEntry->interval = 86400;
-        pScheduleEntry->task_func = log_delete_old_files;
-        pScheduleEntry->func_args = pContext;
+    if (log_cfg->rotate_everyday) {
+        INIT_SCHEDULE_ENTRY_EX(*pScheduleEntry, sched_generate_next_id(),
+                log_cfg->rotate_time, 86400, log_notify_rotate, pContext);
         pScheduleEntry++;
+
+        if (log_cfg->keep_days > 0) {
+            log_set_keep_days(pContext, log_cfg->keep_days);
+            INIT_SCHEDULE_ENTRY_EX(*pScheduleEntry, sched_generate_next_id(),
+                    log_cfg->delete_old_time, 86400, log_delete_old_files,
+                    pContext);
+            pScheduleEntry++;
+        }
     }
 
     return pScheduleEntry;

@@ -37,7 +37,7 @@ SFGlobalVariables g_sf_global_vars = {
     {'/', 't', 'm', 'p', '\0'}, true, true, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
-    SYNC_LOG_BUFF_DEF_INTERVAL, 0, 0, 0, {'\0'}, {'\0'}, false, 0, {0, 0}
+    0, 0, 0, {'\0'}, {'\0'}, {SYNC_LOG_BUFF_DEF_INTERVAL, false}, {0, 0}
 };
 
 SFContext g_sf_context = {
@@ -131,11 +131,69 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     return 0;
 }
 
+void sf_set_log_rotate_size(LogContext *log_ctx, const int64_t rotate_on_size)
+{
+    if (rotate_on_size > 0) {
+        log_ctx->rotate_size = rotate_on_size;
+        log_set_rotate_time_format(log_ctx, "%Y%m%d_%H%M%S");
+    } else {
+        log_ctx->rotate_size = 0;
+        log_set_rotate_time_format(log_ctx, "%Y%m%d");
+    }
+}
+
+int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
+        SFLogConfig *log_cfg)
+{
+    int result;
+
+    log_cfg->sync_log_buff_interval = iniGetIntValueEx(
+            ini_ctx->section_name, "sync_log_buff_interval",
+            ini_ctx->context, SYNC_LOG_BUFF_DEF_INTERVAL, true);
+    if (log_cfg->sync_log_buff_interval <= 0) {
+        log_cfg->sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
+    }
+
+    log_cfg->rotate_everyday = iniGetBoolValueEx(ini_ctx->section_name,
+            "log_file_rotate_everyday", ini_ctx->context, false, true);
+    log_cfg->keep_days = iniGetIntValueEx(ini_ctx->section_name,
+            "log_file_keep_days", ini_ctx->context, 0, true);
+    log_cfg->compress_old = iniGetBoolValueEx(ini_ctx->section_name,
+            "log_file_compress_old", ini_ctx->context, false, true);
+    log_cfg->compress_days_before = iniGetIntValueEx(ini_ctx->section_name,
+            "log_file_compress_days_before", ini_ctx->context, 1, true);
+    if (log_cfg->compress_old) {
+        log_set_compress_log_flags_ex(log_ctx, LOG_COMPRESS_FLAGS_ENABLED |
+                LOG_COMPRESS_FLAGS_NEW_THREAD);
+        log_set_compress_log_days_before_ex(log_ctx,
+                log_cfg->compress_days_before);
+    }
+
+    if ((result=get_time_item_from_conf_ex(ini_ctx, "log_file_rotate_time",
+                    &log_cfg->rotate_time, 0, 0, true)) != 0)
+    {
+        return result;
+    }
+
+    if ((result=get_time_item_from_conf_ex(ini_ctx, "log_file_delete_old_time",
+                    &log_cfg->delete_old_time, 1, 30, true)) != 0)
+    {
+        return result;
+    }
+
+    log_cfg->rotate_on_size = iniGetByteCorrectValueEx(ini_ctx,
+            "log_file_rotate_on_size", 0, 1, 0,
+            64 * 1024 * 1024 * 1024LL, true);
+    sf_set_log_rotate_size(log_ctx, log_cfg->rotate_on_size);
+    return 0;
+}
+
 int sf_load_global_config_ex(const char *server_name,
         IniFullContext *ini_ctx, const bool load_network_params,
         const int task_buffer_extra_size)
 {
     int result;
+    const char *old_section_name;
     char *pBasePath;
     char *pRunByGroup;
     char *pRunByUser;
@@ -238,21 +296,18 @@ int sf_load_global_config_ex(const char *server_name,
         return result;
     }
 
-    g_sf_global_vars.sync_log_buff_interval = iniGetIntValue(NULL,
-            "sync_log_buff_interval", ini_ctx->context,
-            SYNC_LOG_BUFF_DEF_INTERVAL);
-    if (g_sf_global_vars.sync_log_buff_interval <= 0) {
-        g_sf_global_vars.sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
-    }
-
     g_sf_global_vars.thread_stack_size = iniGetByteCorrectValueEx(ini_ctx,
             "thread_stack_size", SF_DEF_THREAD_STACK_SIZE, 1,
             SF_MIN_THREAD_STACK_SIZE, SF_MAX_THREAD_STACK_SIZE, true);
 
-    g_sf_global_vars.rotate_error_log = iniGetBoolValue(NULL,
-            "rotate_error_log", ini_ctx->context, false);
-    g_sf_global_vars.log_file_keep_days = iniGetIntValue(NULL,
-            "log_file_keep_days", ini_ctx->context, 0);
+    old_section_name = ini_ctx->section_name;
+    ini_ctx->section_name = "error_log";
+    if ((result=sf_load_log_config(ini_ctx, &g_log_context,
+                    &g_sf_global_vars.error_log)) != 0)
+    {
+        return result;
+    }
+    ini_ctx->section_name = old_section_name;
 
     load_log_level(ini_ctx->context);
     if ((result=log_set_prefix(g_sf_global_vars.base_path, server_name)) != 0) {
@@ -382,20 +437,35 @@ void sf_context_config_to_string(const SFContext *sf_context,
             sf_context->accept_threads, sf_context->work_threads);
 }
 
+void sf_log_config_to_string(SFLogConfig *log_cfg,
+        const char *caption, char *output, const int size)
+{
+    snprintf(output, size,
+            "%s: {sync_log_buff_interval=%d, rotate_everyday=%d, "
+            "rotate_time=%02d:%02d, rotate_on_size=%"PRId64", "
+            "compress_old=%d, compress_days_before=%d, keep_days=%d, "
+            "delete_old_time=%02d:%02d}", caption,
+            log_cfg->sync_log_buff_interval, log_cfg->rotate_everyday,
+            log_cfg->rotate_time.hour, log_cfg->rotate_time.minute,
+            log_cfg->rotate_on_size, log_cfg->compress_old,
+            log_cfg->compress_days_before, log_cfg->keep_days,
+            log_cfg->delete_old_time.hour, log_cfg->delete_old_time.minute);
+}
+
 void sf_global_config_to_string(char *output, const int size)
 {
+    int len;
     char sz_thread_stack_size[32];
     char sz_max_pkg_size[32];
     char sz_min_buff_size[32];
     char sz_max_buff_size[32];
 
-    snprintf(output, size,
+    len = snprintf(output, size,
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%s, max_pkg_size=%s, "
             "min_buff_size=%s, max_buff_size=%s, task_buffer_extra_size=%d, "
-            "tcp_quick_ack=%d, log_level=%s, sync_log_buff_interval=%d, "
-            "rotate_error_log=%d, log_file_keep_days=%d, "
-            "run_by_group=%s, run_by_user=%s",
+            "tcp_quick_ack=%d, log_level=%s, "
+            "run_by_group=%s, run_by_user=%s, ",
             g_sf_global_vars.base_path,
             g_sf_global_vars.max_connections,
             g_sf_global_vars.connect_timeout,
@@ -408,12 +478,12 @@ void sf_global_config_to_string(char *output, const int size)
             g_sf_global_vars.task_buffer_extra_size,
             g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
-            g_sf_global_vars.sync_log_buff_interval,
-            g_sf_global_vars.rotate_error_log,
-            g_sf_global_vars.log_file_keep_days,
             g_sf_global_vars.run_by_group,
             g_sf_global_vars.run_by_user
                 );
+
+    sf_log_config_to_string(&g_sf_global_vars.error_log,
+            "error_log_file", output + len, size - len);
 }
 
 void sf_log_config_ex(const char *other_config)

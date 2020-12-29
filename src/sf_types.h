@@ -107,4 +107,15 @@ typedef struct sf_version_range {
     int64_t last;  //including
 } SFVersionRange;
 
+typedef struct sf_log_config {
+    int sync_log_buff_interval; //sync log buff to disk every interval seconds
+    bool rotate_everyday;
+    bool compress_old;
+    int compress_days_before;
+    TimeInfo rotate_time;
+    TimeInfo delete_old_time;
+    int keep_days;
+    int64_t rotate_on_size;
+} SFLogConfig;
+
 #endif

@@ -42,7 +42,6 @@ typedef struct sf_global_variables {
     int max_buff_size;
     int task_buffer_extra_size;
     int thread_stack_size;
-    int sync_log_buff_interval; //sync log buff to disk every interval seconds
 
     time_t up_time;
     gid_t run_by_gid;
@@ -50,9 +49,7 @@ typedef struct sf_global_variables {
     char run_by_group[32];
     char run_by_user[32];
 
-    bool rotate_error_log;
-    int log_file_keep_days;
-
+    SFLogConfig error_log;
     SFConnectionStat connection_stat;
 } SFGlobalVariables;
 
@@ -159,6 +156,11 @@ static inline int sf_load_context_from_config(SFContext *sf_context,
             DEFAULT_WORK_THREADS);
     return sf_load_context_from_config_ex(sf_context, &config);
 }
+
+void sf_set_log_rotate_size(LogContext *context, const int64_t log_rotate_size);
+
+void sf_log_config_to_string(SFLogConfig *log_cfg,
+        const char *caption, char *output, const int size);
 
 void sf_global_config_to_string(char *output, const int size);
 
