@@ -69,8 +69,7 @@ int sf_service_destroy_ex(SFContext *sf_context);
 int sf_setup_signal_handler();
 
 int sf_startup_schedule(pthread_t *schedule_tid);
-int sf_add_slow_log_schedule(LogContext *pContext,
-        SFSlowLogConfig *slow_log_cfg);
+int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx);
 
 void sf_set_current_time();
 

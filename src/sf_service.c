@@ -615,25 +615,25 @@ int sf_startup_schedule(pthread_t *schedule_tid)
             &g_sf_global_vars.continue_flag);
 }
 
-int sf_add_slow_log_schedule(LogContext *pContext,
-        SFSlowLogConfig *slow_log_cfg)
+int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx)
 {
     int result;
     ScheduleArray scheduleArray;
     ScheduleEntry scheduleEntries[LOG_SCHEDULE_ENTRIES_COUNT];
 
-    if (!slow_log_cfg->enabled) {
+    if (!slowlog_ctx->cfg.enabled) {
         return 0;
     }
 
-    if ((result=sf_logger_init(pContext, slow_log_cfg->
+    if ((result=sf_logger_init(&slowlog_ctx->ctx, slowlog_ctx->cfg.
                     filename_prefix)) != 0)
     {
         return result;
     }
 
     scheduleArray.entries = scheduleEntries;
-    sf_setup_schedule(pContext, &slow_log_cfg->log_cfg, &scheduleArray);
+    sf_setup_schedule(&slowlog_ctx->ctx, &slowlog_ctx->cfg.log_cfg,
+            &scheduleArray);
     return sched_add_entries(&scheduleArray);
 }
 
