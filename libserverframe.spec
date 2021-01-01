@@ -1,10 +1,11 @@
 %define LibserverframeDevel libserverframe-devel
+%define LibserverframeDebuginfo  libserverframe-debuginfo
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe
 Version: 1.1.2
 Release: 1%{?dist}
-Summary: mc common framework library
+Summary: network framework library
 License: AGPL v3.0
 Group: Arch/Tech
 URL:  http://github.com/happyfish100/libfastcommon/
@@ -15,6 +16,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires: libfastcommon-devel >= 1.0.46
 Requires: %__cp %__mv %__chmod %__grep %__mkdir %__install %__id
 Requires: libfastcommon >= 1.0.46
+
 %description
 common framework library 
 commit version: %{CommitVersion}
@@ -32,7 +34,7 @@ commit version: %{CommitVersion}
 %setup -q
 
 %build
-./make.sh
+./make.sh clean && ./make.sh
 
 %install
 rm -rf %{buildroot}
