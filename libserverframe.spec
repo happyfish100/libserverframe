@@ -2,19 +2,19 @@
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe
-Version: 1.1.1
+Version: 1.1.2
 Release: 1%{?dist}
 Summary: mc common framework library
-License: GPL
+License: AGPL v3.0
 Group: Arch/Tech
 URL:  http://github.com/happyfish100/libfastcommon/
 Source: http://github.com/happyfish100/libfastcommon/%{name}-%{version}.tar.gz
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n) 
 
-BuildRequires: libfastcommon-devel >= 1.0.45
+BuildRequires: libfastcommon-devel >= 1.0.46
 Requires: %__cp %__mv %__chmod %__grep %__mkdir %__install %__id
-Requires: libfastcommon >= 1.0.45
+Requires: libfastcommon >= 1.0.46
 %description
 common framework library 
 commit version: %{CommitVersion}
