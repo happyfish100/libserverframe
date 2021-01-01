@@ -8,8 +8,8 @@ Release: 1%{?dist}
 Summary: network framework library
 License: AGPL v3.0
 Group: Arch/Tech
-URL:  http://github.com/happyfish100/libfastcommon/
-Source: http://github.com/happyfish100/libfastcommon/%{name}-%{version}.tar.gz
+URL:  http://github.com/happyfish100/libserverframe/
+Source: http://github.com/happyfish100/libserverframe/%{name}-%{version}.tar.gz
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n) 
 
@@ -58,5 +58,5 @@ rm -rf %{buildroot}
 /usr/include/sf/*
 
 %changelog
-* Mon Jun 23 2014  Zaixue Liao <liaozaixue@yongche.com>
+* Mon Jun 23 2014  Zaixue Liao
 - first RPM release (1.0)
