@@ -272,8 +272,7 @@ static inline int deal_binlog_one_record(SFBinlogWriterBuffer *wb)
             }
         }
 
-        return check_write_to_file(wb->writer,
-                wb->bf.buff, wb->bf.length);
+        return check_write_to_file(wb->writer, wb->bf.buff, wb->bf.length);
     }
 
     if (wb->writer->file.size + SF_BINLOG_BUFFER_LENGTH(wb->writer->
@@ -370,6 +369,7 @@ static int deal_record_by_version(SFBinlogWriterBuffer *wb)
                 "less than %"PRId64, __LINE__,
                 writer->cfg.subdir_name, wb->version.first,
                 writer->version_ctx.next);
+        fast_mblock_free_object(&writer->thread->mblock, wb);
         return EINVAL;
     }
 
