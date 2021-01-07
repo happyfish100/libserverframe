@@ -46,6 +46,7 @@ struct sf_binlog_writer_info;
 typedef struct sf_binlog_writer_buffer {
     SFVersionRange version;
     BufferInfo bf;
+    int tag;
     int type;    //for versioned writer
     struct sf_binlog_writer_info *writer;
     struct sf_binlog_writer_buffer *next;

@@ -366,9 +366,10 @@ static int deal_record_by_version(SFBinlogWriterBuffer *wb)
     } else if (distance < 0) {
         logError("file: "__FILE__", line: %d, subdir_name: %s, "
                 "current version: %"PRId64" is too small which "
-                "less than %"PRId64, __LINE__,
+                "less than %"PRId64", tag: %d, buffer(%d): %.*s", __LINE__,
                 writer->cfg.subdir_name, wb->version.first,
-                writer->version_ctx.next);
+                writer->version_ctx.next, wb->tag, wb->bf.length,
+                wb->bf.length, wb->bf.buff);
         fast_mblock_free_object(&writer->thread->mblock, wb);
         return EINVAL;
     }
