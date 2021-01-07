@@ -104,6 +104,20 @@ static inline int sf_unify_errno(const int errnum)
     }
 }
 
+static inline int sf_localize_errno(const int errnum)
+{
+    switch (errnum) {
+        case SF_ERROR_EINVAL:
+            return EINVAL;
+        case SF_ERROR_EAGAIN:
+            return EAGAIN;
+        case SF_ERROR_EOVERFLOW:
+            return EOVERFLOW;
+        default:
+            return errnum;
+    }
+}
+
 const char *sf_strerror(const int errnum);
 
 #ifdef __cplusplus

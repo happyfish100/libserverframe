@@ -243,7 +243,6 @@ static inline int sf_send_and_check_response_header(ConnectionInfo *conn,
         return result;
     }
 
-
     if ((result=sf_check_response(conn, response, network_timeout,
                     expect_cmd)) != 0)
     {
@@ -291,6 +290,9 @@ static inline void sf_proto_extract_header(SFCommonProtoHeader *header_proto,
     header_info->body_len = buff2int(header_proto->body_len);
     header_info->flags = buff2short(header_proto->flags);
     header_info->status = buff2short(header_proto->status);
+    if (header_info->status > 255) {
+        header_info->status = sf_localize_errno(header_info->status);
+    }
 }
 
 static inline int sf_active_test(ConnectionInfo *conn,
