@@ -25,6 +25,7 @@
 #include "fastcommon/sockopt.h"
 #include "sf_define.h"
 #include "sf_types.h"
+#include "sf_util.h"
 
 #define SF_PROTO_ACK                    116
 
