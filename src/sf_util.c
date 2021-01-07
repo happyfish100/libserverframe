@@ -183,6 +183,12 @@ const char *sf_strerror(const int errnum)
             return "idempotency channel not exist";
         case SF_RETRIABLE_ERROR_CHANNEL_INVALID:
             return "idempotency channel is invalid";
+        case SF_ERROR_EINVAL:
+            return STRERROR(EINVAL);
+        case SF_ERROR_EAGAIN:
+            return STRERROR(EAGAIN);
+        case SF_ERROR_EOVERFLOW:
+            return STRERROR(EOVERFLOW);
         default:
             return STRERROR(errnum);
     }

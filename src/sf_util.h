@@ -20,6 +20,7 @@
 
 #include "fastcommon/logger.h"
 #include "fastcommon/sched_thread.h"
+#include "sf_define.h"
 #include "sf_types.h"
 
 #ifdef DEBUG_FLAG  /*only for format check*/
@@ -87,6 +88,20 @@ static inline void sf_setup_schedule(struct log_context *pContext,
     scheduleEntry = sf_logger_set_schedule_entry(pContext,
             log_cfg, scheduleArray->entries);
     scheduleArray->count = scheduleEntry - scheduleArray->entries;
+}
+
+static inline int sf_unify_errno(const int errnum)
+{
+    switch (errnum) {
+        case EINVAL:
+            return SF_ERROR_EINVAL;
+        case EAGAIN:
+            return SF_ERROR_EAGAIN;
+        case EOVERFLOW:
+            return SF_ERROR_EOVERFLOW;
+        default:
+            return errnum;
+    }
 }
 
 const char *sf_strerror(const int errnum);

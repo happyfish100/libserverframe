@@ -53,17 +53,23 @@
 #define SF_RETRIABLE_ERROR_NO_CHANNEL      9914
 #define SF_RETRIABLE_ERROR_CHANNEL_INVALID 9915  //client should re-setup channel
 
+//std errno wrapper for crossing platform
+#define SF_ERROR_EINVAL       8811
+#define SF_ERROR_EAGAIN       8835
+#define SF_ERROR_EOVERFLOW    8884
+
 #define SF_FORCE_CLOSE_CONNECTION_ERROR_MIN  SF_RETRIABLE_ERROR_NOT_MASTER
 #define SF_FORCE_CLOSE_CONNECTION_ERROR_MAX  SF_RETRIABLE_ERROR_MAX
 
 #define SF_IS_RETRIABLE_ERROR(code) \
     ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
-     (code == EAGAIN) || is_network_error(code))
+     (code == SF_ERROR_EAGAIN) || is_network_error(code))
 
 #define SF_FORCE_CLOSE_CONNECTION_ERROR(code) \
     ((code >= SF_FORCE_CLOSE_CONNECTION_ERROR_MIN &&  \
       code <= SF_FORCE_CLOSE_CONNECTION_ERROR_MAX) || \
-      (result == EINVAL) || (result == EOVERFLOW)  || \
+      (result == SF_ERROR_EINVAL) ||     \
+      (result == SF_ERROR_EOVERFLOW)  || \
       (result != 0 && is_network_error(code)))
 
 
