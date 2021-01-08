@@ -63,15 +63,13 @@
 
 #define SF_IS_RETRIABLE_ERROR(code) \
     ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
-     (code == SF_ERROR_EAGAIN) || is_network_error(code))
+     (code == EAGAIN) || is_network_error(code))
 
 #define SF_FORCE_CLOSE_CONNECTION_ERROR(code) \
     ((code >= SF_FORCE_CLOSE_CONNECTION_ERROR_MIN &&  \
       code <= SF_FORCE_CLOSE_CONNECTION_ERROR_MAX) || \
-      (result == SF_ERROR_EINVAL) ||     \
-      (result == SF_ERROR_EOVERFLOW)  || \
+      (result == EINVAL) || (result == EOVERFLOW)  || \
       (result != 0 && is_network_error(code)))
-
 
 #define SF_UNIX_ERRNO(code, errno_for_overflow) \
     (code < 256 ? code : errno_for_overflow)
