@@ -93,6 +93,8 @@ static inline void sf_setup_schedule(struct log_context *pContext,
 static inline int sf_unify_errno(const int errnum)
 {
     switch (errnum) {
+        case EBUSY:
+            return SF_ERROR_EBUSY;
         case EINVAL:
             return SF_ERROR_EINVAL;
         case EAGAIN:
@@ -107,6 +109,8 @@ static inline int sf_unify_errno(const int errnum)
 static inline int sf_localize_errno(const int errnum)
 {
     switch (errnum) {
+        case SF_ERROR_EBUSY:
+            return EBUSY;
         case SF_ERROR_EINVAL:
             return EINVAL;
         case SF_ERROR_EAGAIN:

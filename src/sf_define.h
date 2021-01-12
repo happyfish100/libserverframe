@@ -54,7 +54,8 @@
 #define SF_RETRIABLE_ERROR_CHANNEL_INVALID 9915  //client should re-setup channel
 
 //std errno wrapper for crossing platform
-#define SF_ERROR_EINVAL       8811
+#define SF_ERROR_EBUSY        8816
+#define SF_ERROR_EINVAL       8822
 #define SF_ERROR_EAGAIN       8835
 #define SF_ERROR_EOVERFLOW    8884
 
