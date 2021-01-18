@@ -131,7 +131,7 @@ int sf_service_init_ex2(SFContext *sf_context,
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
     struct nio_thread_data *thread_data;
-    struct nio_thread_data *pDataEnd;
+    struct nio_thread_data *data_end;
     pthread_t tid;
     pthread_attr_t thread_attr;
 
@@ -167,9 +167,9 @@ int sf_service_init_ex2(SFContext *sf_context,
     }
 
     sf_context->thread_count = 0;
-    pDataEnd = sf_context->thread_data + sf_context->work_threads;
+    data_end = sf_context->thread_data + sf_context->work_threads;
     for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
-            thread_data<pDataEnd; thread_data++,thread_ctx++)
+            thread_data<data_end; thread_data++,thread_ctx++)
     {
         thread_data->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
@@ -251,11 +251,11 @@ int sf_service_init_ex2(SFContext *sf_context,
 
 int sf_service_destroy_ex(SFContext *sf_context)
 {
-    struct nio_thread_data *pDataEnd, *thread_data;
+    struct nio_thread_data *data_end, *thread_data;
 
     free_queue_destroy();
-    pDataEnd = sf_context->thread_data + sf_context->work_threads;
-    for (thread_data=sf_context->thread_data; thread_data<pDataEnd;
+    data_end = sf_context->thread_data + sf_context->work_threads;
+    for (thread_data=sf_context->thread_data; thread_data<data_end;
             thread_data++)
     {
         fast_timer_destroy(&thread_data->timer);
@@ -263,6 +263,19 @@ int sf_service_destroy_ex(SFContext *sf_context)
     free(sf_context->thread_data);
     sf_context->thread_data = NULL;
     return 0;
+}
+
+void sf_service_set_thread_loop_callback_ex(SFContext *sf_context,
+        ThreadLoopCallback thread_loop_callback)
+{
+    struct nio_thread_data *data_end, *thread_data;
+
+    data_end = sf_context->thread_data + sf_context->work_threads;
+    for (thread_data=sf_context->thread_data; thread_data<data_end;
+            thread_data++)
+    {
+        thread_data->thread_loop_callback = thread_loop_callback;
+    }
 }
 
 static void *worker_thread_entrance(void *arg)

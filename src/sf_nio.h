@@ -40,6 +40,15 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
             set_body_length_func, deal_func, \
             cleanup_func, timeout_callback)
 
+static inline void sf_set_deal_task_func_ex(SFContext *sf_context,
+        sf_deal_task_func deal_func)
+{
+    sf_context->deal_task = deal_func;
+}
+
+#define sf_set_deal_task_func(deal_func) \
+    sf_set_deal_task_func_ex(&g_sf_context, deal_func)
+
 static inline void sf_set_remove_from_ready_list_ex(SFContext *sf_context,
         const bool enabled)
 {

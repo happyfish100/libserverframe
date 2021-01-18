@@ -66,6 +66,12 @@ int sf_service_destroy_ex(SFContext *sf_context);
 
 #define sf_service_destroy() sf_service_destroy_ex(&g_sf_context)
 
+void sf_service_set_thread_loop_callback_ex(SFContext *sf_context,
+        ThreadLoopCallback thread_loop_callback);
+
+#define sf_service_set_thread_loop_callback(thread_loop_callback) \
+    sf_service_set_thread_loop_callback_ex(&g_sf_context, thread_loop_callback)
+
 int sf_setup_signal_handler();
 
 int sf_startup_schedule(pthread_t *schedule_tid);
