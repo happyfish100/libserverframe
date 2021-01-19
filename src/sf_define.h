@@ -63,6 +63,10 @@
 #define SF_FORCE_CLOSE_CONNECTION_ERROR_MIN  SF_RETRIABLE_ERROR_NOT_MASTER
 #define SF_FORCE_CLOSE_CONNECTION_ERROR_MAX  SF_RETRIABLE_ERROR_MAX
 
+#define SF_IS_SERVER_RETRIABLE_ERROR(code) \
+    ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
+     (code == EAGAIN))
+
 #define SF_IS_RETRIABLE_ERROR(code) \
     ((code >= SF_RETRIABLE_ERROR_MIN && code <= SF_RETRIABLE_ERROR_MAX) || \
      (code == EAGAIN) || is_network_error(code))

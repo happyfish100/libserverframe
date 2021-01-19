@@ -117,7 +117,7 @@
             continue; \
         } \
     \
-        if (idempotency_enabled) { \
+        if (idempotency_enabled && !SF_IS_SERVER_RETRIABLE_ERROR(result)) { \
             idempotency_client_channel_push( \
                     connection_params->channel, req_id); \
         } \
