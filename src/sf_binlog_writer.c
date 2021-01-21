@@ -451,9 +451,10 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                         thread->mblock, current);
             } else {
                 current->writer->total_count++;
-                if ((result=deal_record_by_version(current)) == 0) {
-                    add_to_flush_writer_queue(thread, current->writer);
-                } else {
+                add_to_flush_writer_queue(thread, current->writer);
+
+                /* NOTE: current maybe be released in the deal function */
+                if ((result=deal_record_by_version(current)) != 0) {
                     return result;
                 }
             }
