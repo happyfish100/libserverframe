@@ -46,18 +46,20 @@ struct sf_binlog_writer_info;
 typedef struct sf_binlog_writer_buffer {
     SFVersionRange version;
     BufferInfo bf;
-    int tag;
+    int64_t tag;
     int type;    //for versioned writer
     struct sf_binlog_writer_info *writer;
     struct sf_binlog_writer_buffer *next;
 } SFBinlogWriterBuffer;
 
+typedef struct sf_binlog_writer_slot {
+    SFBinlogWriterBuffer head;
+} SFBinlogWriterSlot;
+
 typedef struct sf_binlog_writer_buffer_ring {
-    SFBinlogWriterBuffer **entries;
-    SFBinlogWriterBuffer **start; //for consumer
-    SFBinlogWriterBuffer **end;   //for producer
-    int count;
-    int max_count;
+    SFBinlogWriterSlot *slots;
+    int waiting_count;
+    int max_waitings;
     int size;
 } SFBinlogWriterBufferRing;
 
@@ -91,6 +93,7 @@ typedef struct sf_binlog_writer_info {
         char *name;
     } file;
 
+    int64_t total_count;
     struct {
         SFBinlogWriterBufferRing ring;
         int64_t next;
