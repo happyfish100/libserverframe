@@ -170,9 +170,9 @@ void client_channel_destroy()
 {
 }
 
-struct fast_task_info *alloc_channel_task(IdempotencyClientChannel *channel,
-        const uint32_t hash_code, const char *server_ip, const uint16_t port,
-        int *err_no)
+static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
+        *channel, const uint32_t hash_code, const char *server_ip,
+        const uint16_t port, int *err_no)
 {
     struct fast_task_info *task;
 

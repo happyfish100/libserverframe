@@ -201,6 +201,9 @@ IdempotencyRequest *sf_server_update_prepare_and_check(
     *result = idempotency_channel_add_request(channel, request);
     if (*result == EEXIST) {
         if (!request->finished) {
+            response->error.length = sprintf(response->error.message,
+                    "idempotency req id: %"PRId64" exists but NOT "
+                    "finished", request->req_id);
             *result = EAGAIN;
         }
     }
