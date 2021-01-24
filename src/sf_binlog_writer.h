@@ -29,6 +29,7 @@
 
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
+#define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
 
 #define SF_BINLOG_SUBDIR_NAME_SIZE 128
 #define SF_BINLOG_FILE_MAX_SIZE   (1024 * 1024 * 1024)  //for binlog rotating by size
@@ -97,6 +98,7 @@ typedef struct sf_binlog_writer_info {
     struct {
         SFBinlogWriterBufferRing ring;
         int64_t next;
+        int64_t change_count;  //version change count
     } version_ctx;
     SFBinlogBuffer binlog_buffer;
     SFBinlogWriterThread *thread;
@@ -150,7 +152,7 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
             SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE, max_record_size);
 }
 
-int sf_binlog_writer_change_order_by(SFBinlogWriterThread *thread,
+int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         const short order_by);
 
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
