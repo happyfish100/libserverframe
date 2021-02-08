@@ -718,14 +718,6 @@ int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
 {
     SFBinlogWriterBuffer *buffer;
 
-    if (writer->thread->order_by != SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
-        logError("file: "__FILE__", line: %d, "
-                "unexpected order by type: %d, can't set "
-                "next version to %"PRId64"!", __LINE__,
-                writer->thread->order_by, next_version);
-        return EINVAL;
-    }
-
     if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, next_version,
                     next_version, SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION)) == NULL)
     {
