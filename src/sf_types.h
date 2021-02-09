@@ -65,7 +65,7 @@ typedef struct sf_context {
 typedef struct {
     int body_len;      //body length
     short flags;
-    short status;
+    volatile short status;
     unsigned char cmd; //command
 } SFHeaderInfo;
 

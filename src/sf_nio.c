@@ -312,6 +312,9 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
             if (task->continue_callback != NULL) {
                 return task->continue_callback(task);
             } else {
+                logWarning("file: "__FILE__", line: %d, "
+                        "task %p, continue_callback is NULL",
+                        __LINE__, task);
                 return 0;
             }
         } else {
@@ -398,10 +401,14 @@ void sf_recv_notify_read(int sock, short event, void *arg)
         } else {
             stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
             if (stage != SF_NIO_STAGE_NONE) {
-                if (stage == SF_NIO_STAGE_CONTINUE &&
-                        task->continue_callback != NULL)
-                {
-                    task->continue_callback(task);
+                if (stage == SF_NIO_STAGE_CONTINUE) {
+                    if (task->continue_callback != NULL) {
+                        task->continue_callback(task);
+                    } else {
+                        logWarning("file: "__FILE__", line: %d, "
+                                "task %p, continue_callback is NULL",
+                                __LINE__, task);
+                    }
                 }
                 __sync_bool_compare_and_swap(&task->nio_stages.notify,
                         stage, SF_NIO_STAGE_NONE);
