@@ -39,10 +39,11 @@ typedef struct idempotency_request_result {
 typedef struct idempotency_request {
     uint64_t req_id;
     volatile int ref_count;
-    bool finished;
+    volatile bool finished;
     IdempotencyRequestResult output;
     struct fast_mblock_man *allocator;  //for free
     struct idempotency_request *next;
+    struct fast_task_info *task;  //for debug
 } IdempotencyRequest;
 
 typedef struct idempotency_request_htable {

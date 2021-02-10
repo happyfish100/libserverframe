@@ -102,6 +102,13 @@ typedef struct sf_space_stat {
     int64_t used;
 } SFSpaceStat;
 
+typedef struct sf_binlog_writer_stat {
+    int64_t total_count;
+    int64_t next_version;
+    int waiting_count;
+    int max_waitings;
+} SFBinlogWriterStat;
+
 typedef struct sf_version_range {
     int64_t first; //including
     int64_t last;  //including
