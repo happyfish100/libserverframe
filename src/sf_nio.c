@@ -245,12 +245,10 @@ static int sf_connect_server(struct fast_task_info *task)
     }
 }
 
-static int sf_nio_deal_task(struct fast_task_info *task)
+static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
 {
     int result;
-    int stage;
 
-    stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
     switch (stage) {
         case SF_NIO_STAGE_INIT:
             task->nio_stages.current = SF_NIO_STAGE_RECV;
@@ -295,8 +293,6 @@ static int sf_nio_deal_task(struct fast_task_info *task)
         ioevent_add_to_deleted_list(task);
     }
 
-    __sync_bool_compare_and_swap(&task->nio_stages.notify,
-            stage, SF_NIO_STAGE_NONE);
     return result;
 }
 
@@ -396,10 +392,19 @@ void sf_recv_notify_read(int sock, short event, void *arg)
         task = current;
         current = current->next;
 
+        stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
         if (!task->canceled) {
-            sf_nio_deal_task(task);
+            if (stage == SF_NIO_STAGE_CONTINUE) {
+                /* MUST set to SF_NIO_STAGE_NONE first for re-entry */
+                __sync_bool_compare_and_swap(&task->nio_stages.notify,
+                        stage, SF_NIO_STAGE_NONE);
+                sf_nio_deal_task(task, stage);
+            } else {
+                sf_nio_deal_task(task, stage);
+                __sync_bool_compare_and_swap(&task->nio_stages.notify,
+                        stage, SF_NIO_STAGE_NONE);
+            }
         } else {
-            stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
             if (stage != SF_NIO_STAGE_NONE) {
                 if (stage == SF_NIO_STAGE_CONTINUE) {
                     if (task->continue_callback != NULL) {

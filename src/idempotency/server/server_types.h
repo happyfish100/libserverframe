@@ -32,18 +32,17 @@
 typedef struct idempotency_request_result {
     short rsize;  //response size defined by application
     short flags;  //for application
-    int result;
-    void *response;
+    volatile int result;
+    void * volatile response;
 } IdempotencyRequestResult;
 
 typedef struct idempotency_request {
     uint64_t req_id;
     volatile int ref_count;
-    volatile bool finished;
+    volatile char finished;
     IdempotencyRequestResult output;
     struct fast_mblock_man *allocator;  //for free
     struct idempotency_request *next;
-    struct fast_task_info *task;  //for debug
 } IdempotencyRequest;
 
 typedef struct idempotency_request_htable {
