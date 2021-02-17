@@ -27,6 +27,10 @@
 #include "sf_types.h"
 #include "sf_util.h"
 
+//for connection manager
+#define SF_SERVICE_PROTO_GET_GROUP_SERVERS_REQ    111
+#define SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP   112
+
 #define SF_PROTO_ACK                    116
 
 #define SF_PROTO_ACTIVE_TEST_REQ        117
@@ -88,6 +92,20 @@ typedef struct sf_common_proto_header {
     unsigned char cmd;      //the command code
     char padding[3];
 } SFCommonProtoHeader;
+
+typedef struct sf_proto_get_group_servers_req {
+    char group_id[4];
+} SFProtoGetGroupServersReq;
+
+typedef struct sf_proto_get_group_servers_resp_body_header {
+    char count[2];
+} SFProtoGetGroupServersRespBodyHeader;
+
+typedef struct sf_proto_get_group_servers_resp_body_part {
+    char is_master;
+    char is_active;
+    char server_id[4];
+} SFProtoGetGroupServersRespBodyPart;
 
 typedef struct sf_proto_idempotency_additional_header {
     char req_id[8];

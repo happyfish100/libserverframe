@@ -296,6 +296,10 @@ const char *sf_get_cmd_caption(const int cmd)
             return "REPORT_REQ_RECEIPT_REQ";
         case SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP:
             return "REPORT_REQ_RECEIPT_RESP";
+        case SF_SERVICE_PROTO_GET_GROUP_SERVERS_REQ:
+            return "GET_GROUP_SERVERS_REQ";
+        case SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP:
+            return "GET_GROUP_SERVERS_RESP";
         default:
             return "UNKOWN";
     }
