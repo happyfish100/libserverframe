@@ -40,6 +40,7 @@ typedef struct sf_cm_server_ptr_array {
 
 typedef struct sf_cm_conn_group_entry {
     SFCMServerEntry *master;
+    SFCMServerArray all;
     SFCMServerPtrArray alives;
     pthread_mutex_t lock;
 } SFCMConnGroupEntry;
@@ -47,7 +48,8 @@ typedef struct sf_cm_conn_group_entry {
 typedef struct sf_cm_conn_group_array {
     SFCMConnGroupEntry *entries;
     int count;
-    int base_id;
+    int min_group_id;
+    int max_group_id;
 } SFCMConnGroupArray;
 
 typedef struct sf_connection_manager {
@@ -57,10 +59,13 @@ typedef struct sf_connection_manager {
 } SFConnectionManager;
 
 int sf_connection_manager_init(SFConnectionManager *cm, const int group_count,
-        const int server_group_index);
+        const int min_group_id, const int server_group_index,
+        const SFDataReadRule read_rule);
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
         FCServerInfo **servers, const int count);
+
+int sf_connection_manager_start(SFConnectionManager *cm);
 
 ConnectionInfo *sf_connection_manager_get_master(SFConnectionManager *cm,
         const int group_index, int *err_no);
