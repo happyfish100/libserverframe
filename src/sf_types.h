@@ -137,4 +137,44 @@ typedef struct sf_slow_log_context {
     LogContext ctx;
 } SFSlowLogContext;
 
+typedef enum sf_data_read_rule {
+    sf_data_read_rule_any_available,
+    sf_data_read_rule_slave_first,
+    sf_data_read_rule_master_only,
+} SFDataReadRule;
+
+typedef enum sf_net_retry_interval_mode {
+    sf_net_retry_interval_mode_fixed,
+    sf_net_retry_interval_mode_multiple
+} SFNetRetryIntervalMode;
+
+typedef struct sf_net_retry_interval_mode_max_pair {
+    SFNetRetryIntervalMode mode;
+    int max_interval_ms;
+} SFNetRetryIntervalModeMaxPair;
+
+typedef struct sf_net_retry_times_interval_pair {
+    int times;
+    int interval_ms;
+} SFNetRetryTimesIntervalPair;
+
+typedef struct sf_net_retry_config {
+    SFNetRetryIntervalModeMaxPair interval_mm;
+    SFNetRetryTimesIntervalPair connect;
+    SFNetRetryTimesIntervalPair network;
+} SFNetRetryConfig;
+
+typedef struct sf_client_common_config {
+    SFDataReadRule read_rule;  //the rule for read
+    int connect_timeout;
+    int network_timeout;
+    SFNetRetryConfig net_retry_cfg;
+} SFClientCommonConfig;
+
+typedef struct sf_connection_parameters {
+    int buffer_size;
+    int group_id;
+    struct idempotency_client_channel *channel;
+} SFConnectionParameters;
+
 #endif

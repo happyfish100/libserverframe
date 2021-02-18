@@ -23,38 +23,11 @@
 #include "sf_define.h"
 #include "sf_types.h"
 
-typedef enum sf_net_retry_interval_mode {
-    sf_net_retry_interval_mode_fixed,
-    sf_net_retry_interval_mode_multiple
-} SFNetRetryIntervalMode;
-
-typedef struct sf_net_retry_interval_mode_max_pair {
-    SFNetRetryIntervalMode mode;
-    int max_interval_ms;
-} SFNetRetryIntervalModeMaxPair;
-
-typedef struct sf_net_retry_times_interval_pair {
-    int times;
-    int interval_ms;
-} SFNetRetryTimesIntervalPair;
-
-typedef struct sf_net_retry_config {
-    SFNetRetryIntervalModeMaxPair interval_mm;
-    SFNetRetryTimesIntervalPair connect;
-    SFNetRetryTimesIntervalPair network;
-} SFNetRetryConfig;
-
 typedef struct sf_net_retry_interval_context {
     SFNetRetryIntervalModeMaxPair *mm;
     SFNetRetryTimesIntervalPair *ti;
     int interval_ms;
 } SFNetRetryIntervalContext;
-
-typedef enum sf_data_read_rule {
-    sf_data_read_rule_any_available,
-    sf_data_read_rule_slave_first,
-    sf_data_read_rule_master_only,
-} SFDataReadRule;
 
 #ifdef __cplusplus
 extern "C" {

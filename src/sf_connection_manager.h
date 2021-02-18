@@ -19,11 +19,11 @@
 #define _SF_CONNECTION_MANAGER_H
 
 #include "fastcommon/server_id_func.h"
+#include "fastcommon/connection_pool.h"
 #include "sf_types.h"
-#include "sf_configs.h"
 
 typedef struct sf_cm_server_entry {
-    int server_id;
+    int id;
     ConnectionInfo *conn;
     FCAddressPtrArray *addr_array;
 } SFCMServerEntry;
@@ -39,9 +39,10 @@ typedef struct sf_cm_server_ptr_array {
 } SFCMServerPtrArray;
 
 typedef struct sf_cm_conn_group_entry {
-    SFCMServerEntry *master;
+    int id;
     SFCMServerArray all;
-    SFCMServerPtrArray alives;
+    volatile SFCMServerEntry *master;
+    volatile SFCMServerPtrArray *alives;
     pthread_mutex_t lock;
 } SFCMConnGroupEntry;
 
@@ -54,13 +55,19 @@ typedef struct sf_cm_conn_group_array {
 
 typedef struct sf_connection_manager {
     int server_group_index;
-    SFDataReadRule read_rule;  //the rule for read
+    int max_servers_per_group;
+    const SFClientCommonConfig *common_cfg;
     SFCMConnGroupArray groups;
+    ConnectionPool cpool;
+    struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
 } SFConnectionManager;
 
-int sf_connection_manager_init(SFConnectionManager *cm, const int group_count,
+int sf_connection_manager_init(SFConnectionManager *cm,
+        const SFClientCommonConfig *common_cfg, const int group_count,
         const int min_group_id, const int server_group_index,
-        const SFDataReadRule read_rule);
+        const int server_count, const int max_count_per_entry,
+        const int max_idle_time, fc_connection_callback_func
+        connect_done_callback, void *args);
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
         FCServerInfo **servers, const int count);

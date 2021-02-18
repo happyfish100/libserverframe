@@ -137,6 +137,19 @@ typedef struct sf_proto_report_req_receipt_body {
     char req_id[8];
 } SFProtoReportReqReceiptBody;
 
+typedef struct sf_group_server_info {
+    int id;
+    bool is_master;
+    bool is_active;
+    char padding[2];
+} SFGroupServerInfo;
+
+typedef struct sf_group_server_array {
+    SFGroupServerInfo *servers;
+    int alloc;
+    int count;
+} SFGroupServerArray;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -337,6 +350,10 @@ int sf_proto_deal_ack(struct fast_task_info *task,
 
 int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
         const uint32_t channel_id, const int key, const int network_timeout);
+
+int sf_proto_get_group_servers(ConnectionInfo *conn,
+        const int network_timeout, const int group_id,
+        SFGroupServerArray *sarray);
 
 #define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
     do {  \

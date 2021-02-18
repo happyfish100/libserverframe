@@ -368,3 +368,72 @@ int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
 
     return result;
 }
+
+int sf_proto_get_group_servers(ConnectionInfo *conn,
+        const int network_timeout, const int group_id,
+        SFGroupServerArray *sarray)
+{
+    char out_buff[sizeof(SFCommonProtoHeader) +
+        sizeof(SFProtoGetGroupServersReq)];
+    char in_buff[1024];
+    SFCommonProtoHeader *header;
+    SFProtoGetGroupServersReq *req;
+    SFProtoGetGroupServersRespBodyHeader *body_header;
+    SFProtoGetGroupServersRespBodyPart *body_part;
+    SFGroupServerInfo *server;
+    SFGroupServerInfo *end;
+    SFResponseInfo response;
+    int result;
+    int body_len;
+    int count;
+
+    header = (SFCommonProtoHeader *)out_buff;
+    req = (SFProtoGetGroupServersReq *)(header + 1);
+    int2buff(group_id, req->group_id);
+    SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_GET_GROUP_SERVERS_REQ,
+            sizeof(SFProtoGetGroupServersReq));
+    response.error.length = 0;
+    if ((result=sf_send_and_recv_response_ex1(conn, out_buff,
+                    sizeof(out_buff), &response, network_timeout,
+                    SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP, in_buff,
+                    sizeof(in_buff), &body_len)) != 0)
+    {
+        sf_log_network_error(&response, conn, result);
+        return result;
+    }
+
+    if (body_len < sizeof(SFProtoGetGroupServersRespBodyHeader)) {
+        logError("file: "__FILE__", line: %d, "
+                "server %s:%d response body length: %d < %d",
+                __LINE__, conn->ip_addr, conn->port, body_len,
+                (int)sizeof(SFProtoGetGroupServersRespBodyHeader));
+        return EINVAL;
+    }
+
+    body_header = (SFProtoGetGroupServersRespBodyHeader *)in_buff;
+    count = buff2short(body_header->count);
+    if (count <= 0) {
+        logError("file: "__FILE__", line: %d, "
+                "server %s:%d response server count: %d <= 0",
+                __LINE__, conn->ip_addr, conn->port, count);
+        return EINVAL;
+    }
+    if (count > sarray->alloc) {
+        logError("file: "__FILE__", line: %d, "
+                "server %s:%d response server count: %d is too large, "
+                "exceeds %d", __LINE__, conn->ip_addr, conn->port,
+                count, sarray->alloc);
+        return EOVERFLOW;
+    }
+    sarray->count = count;
+
+    body_part = (SFProtoGetGroupServersRespBodyPart *)(body_header + 1);
+    end = sarray->servers + sarray->count;
+    for (server=sarray->servers; server<end; server++, body_part++) {
+        server->id = buff2int(body_part->server_id);
+        server->is_master = body_part->is_master;
+        server->is_active = body_part->is_active;
+    }
+
+    return 0;
+}
