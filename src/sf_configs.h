@@ -24,8 +24,8 @@
 #include "sf_types.h"
 
 typedef struct sf_net_retry_interval_context {
-    SFNetRetryIntervalModeMaxPair *mm;
-    SFNetRetryTimesIntervalPair *ti;
+    const SFNetRetryIntervalModeMaxPair *mm;
+    const SFNetRetryTimesIntervalPair *ti;
     int interval_ms;
 } SFNetRetryIntervalContext;
 
@@ -45,8 +45,8 @@ static inline void sf_reset_net_retry_interval(SFNetRetryIntervalContext *ctx)
 }
 
 static inline void sf_init_net_retry_interval_context(
-        SFNetRetryIntervalContext *ctx, SFNetRetryIntervalModeMaxPair *mm,
-        SFNetRetryTimesIntervalPair *ti)
+        SFNetRetryIntervalContext *ctx, const SFNetRetryIntervalModeMaxPair *mm,
+        const SFNetRetryTimesIntervalPair *ti)
 {
     ctx->mm = mm;
     ctx->ti = ti;

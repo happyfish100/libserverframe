@@ -95,16 +95,19 @@ typedef struct sf_common_proto_header {
 
 typedef struct sf_proto_get_group_servers_req {
     char group_id[4];
+    char padding[4];
 } SFProtoGetGroupServersReq;
 
 typedef struct sf_proto_get_group_servers_resp_body_header {
-    char count[2];
+    char count[4];
+    char padding[4];
 } SFProtoGetGroupServersRespBodyHeader;
 
 typedef struct sf_proto_get_group_servers_resp_body_part {
+    char server_id[4];
     char is_master;
     char is_active;
-    char server_id[4];
+    char padding[2];
 } SFProtoGetGroupServersRespBodyPart;
 
 typedef struct sf_proto_idempotency_additional_header {
@@ -139,9 +142,10 @@ typedef struct sf_proto_report_req_receipt_body {
 
 typedef struct sf_group_server_info {
     int id;
+    bool is_leader;
     bool is_master;
     bool is_active;
-    char padding[2];
+    char padding[1];
 } SFGroupServerInfo;
 
 typedef struct sf_group_server_array {
@@ -149,6 +153,11 @@ typedef struct sf_group_server_array {
     int alloc;
     int count;
 } SFGroupServerArray;
+
+typedef struct sf_client_server_entry {
+    int server_id;
+    ConnectionInfo conn;
+} SFClientServerEntry;
 
 #ifdef __cplusplus
 extern "C" {

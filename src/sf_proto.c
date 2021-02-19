@@ -411,7 +411,7 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     }
 
     body_header = (SFProtoGetGroupServersRespBodyHeader *)in_buff;
-    count = buff2short(body_header->count);
+    count = buff2int(body_header->count);
     if (count <= 0) {
         logError("file: "__FILE__", line: %d, "
                 "server %s:%d response server count: %d <= 0",

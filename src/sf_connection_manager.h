@@ -22,9 +22,31 @@
 #include "fastcommon/connection_pool.h"
 #include "sf_types.h"
 
+struct sf_connection_manager;
+
+typedef ConnectionInfo *(*sf_get_connection_func)(
+        struct sf_connection_manager *cm,
+        const int group_index, int *err_no);
+
+typedef ConnectionInfo *(*sf_get_server_connection_func)(
+        struct sf_connection_manager *cm,
+        FCServerInfo *server, int *err_no);
+
+typedef ConnectionInfo *(*sf_get_spec_connection_func)(
+        struct sf_connection_manager *cm,
+        const ConnectionInfo *target, int *err_no);
+
+typedef void (*sf_release_connection_func)(
+        struct sf_connection_manager *cm, ConnectionInfo *conn);
+typedef void (*sf_close_connection_func)(
+        struct sf_connection_manager *cm, ConnectionInfo *conn);
+
+typedef const struct sf_connection_parameters * (*sf_get_connection_parameters)(
+        struct sf_connection_manager *cm, ConnectionInfo *conn);
+
 typedef struct sf_cm_server_entry {
     int id;
-    ConnectionInfo *conn;
+    int group_index;
     FCAddressPtrArray *addr_array;
 } SFCMServerEntry;
 
@@ -43,6 +65,7 @@ typedef struct sf_cm_conn_group_entry {
     SFCMServerArray all;
     volatile SFCMServerEntry *master;
     volatile SFCMServerPtrArray *alives;
+    struct sf_connection_manager *cm;
     pthread_mutex_t lock;
 } SFCMConnGroupEntry;
 
@@ -53,6 +76,34 @@ typedef struct sf_cm_conn_group_array {
     int max_group_id;
 } SFCMConnGroupArray;
 
+typedef struct sf_cm_operations {
+    /* get the specify connection by ip and port */
+    sf_get_spec_connection_func get_spec_connection;
+
+    /* get one connection of the configured servers by data group */
+    sf_get_connection_func get_connection;
+
+    /* get one connection of the server */
+    sf_get_server_connection_func get_server_connection;
+
+    /* get the master connection from the server */
+    sf_get_connection_func get_master_connection;
+
+    /* get one readable connection from the server */
+    sf_get_connection_func get_readable_connection;
+
+    /* get the leader connection from the server */
+    sf_get_server_connection_func get_leader_connection;
+
+    /* push back to connection pool when use connection pool */
+    sf_release_connection_func release_connection;
+
+     /* disconnect the connecton on network error */
+    sf_close_connection_func close_connection;
+
+    sf_get_connection_parameters get_connection_params;
+} SFCMOperations;
+
 typedef struct sf_connection_manager {
     int server_group_index;
     int max_servers_per_group;
@@ -60,6 +111,7 @@ typedef struct sf_connection_manager {
     SFCMConnGroupArray groups;
     ConnectionPool cpool;
     struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
+    SFCMOperations ops;
 } SFConnectionManager;
 
 int sf_connection_manager_init(SFConnectionManager *cm,
