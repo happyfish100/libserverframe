@@ -300,6 +300,10 @@ const char *sf_get_cmd_caption(const int cmd)
             return "GET_GROUP_SERVERS_REQ";
         case SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP:
             return "GET_GROUP_SERVERS_RESP";
+        case SF_SERVICE_PROTO_GET_LEADER_REQ:
+            return "GET_LEADER_REQ";
+        case SF_SERVICE_PROTO_GET_LEADER_RESP:
+            return "GET_LEADER_RESP";
         default:
             return "UNKOWN";
     }
@@ -436,4 +440,33 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     }
 
     return 0;
+}
+
+int sf_proto_get_leader(ConnectionInfo *conn,
+        const int network_timeout,
+        SFClientServerEntry *leader)
+{
+    int result;
+    SFCommonProtoHeader *header;
+    SFResponseInfo response;
+    SFProtoGetServerResp server_resp;
+    char out_buff[sizeof(SFCommonProtoHeader)];
+
+    header = (SFCommonProtoHeader *)out_buff;
+    SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_GET_LEADER_REQ,
+            sizeof(out_buff) - sizeof(SFCommonProtoHeader));
+    if ((result=sf_send_and_recv_response(conn, out_buff,
+                    sizeof(out_buff), &response, network_timeout,
+                    SF_SERVICE_PROTO_GET_LEADER_RESP, (char *)&server_resp,
+                    sizeof(SFProtoGetServerResp))) != 0)
+    {
+        sf_log_network_error(&response, conn, result);
+    } else {
+        leader->server_id = buff2int(server_resp.server_id);
+        memcpy(leader->conn.ip_addr, server_resp.ip_addr, IP_ADDRESS_SIZE);
+        *(leader->conn.ip_addr + IP_ADDRESS_SIZE - 1) = '\0';
+        leader->conn.port = buff2short(server_resp.port);
+    }
+
+    return result;
 }

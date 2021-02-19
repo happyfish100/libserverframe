@@ -171,9 +171,14 @@ typedef struct sf_client_common_config {
     SFNetRetryConfig net_retry_cfg;
 } SFClientCommonConfig;
 
+struct sf_cm_server_entry;
+struct sf_cm_server_ptr_array;
 typedef struct sf_connection_parameters {
     int buffer_size;
-    int group_id;
+    struct {
+        struct sf_cm_server_entry *sentry;
+        struct sf_cm_server_ptr_array *old_alives;
+    } cm;  //for connection manager
     struct idempotency_client_channel *channel;
 } SFConnectionParameters;
 

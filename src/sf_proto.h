@@ -30,6 +30,8 @@
 //for connection manager
 #define SF_SERVICE_PROTO_GET_GROUP_SERVERS_REQ    111
 #define SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP   112
+#define SF_SERVICE_PROTO_GET_LEADER_REQ           113
+#define SF_SERVICE_PROTO_GET_LEADER_RESP          114
 
 #define SF_PROTO_ACK                    116
 
@@ -109,6 +111,13 @@ typedef struct sf_proto_get_group_servers_resp_body_part {
     char is_active;
     char padding[2];
 } SFProtoGetGroupServersRespBodyPart;
+
+typedef struct sf_proto_get_server_resp {
+    char ip_addr[IP_ADDRESS_SIZE];
+    char server_id[4];
+    char port[2];
+    char padding[2];
+} SFProtoGetServerResp;
 
 typedef struct sf_proto_idempotency_additional_header {
     char req_id[8];
@@ -363,6 +372,10 @@ int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
 int sf_proto_get_group_servers(ConnectionInfo *conn,
         const int network_timeout, const int group_id,
         SFGroupServerArray *sarray);
+
+int sf_proto_get_leader(ConnectionInfo *conn,
+        const int network_timeout,
+        SFClientServerEntry *leader);
 
 #define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
     do {  \

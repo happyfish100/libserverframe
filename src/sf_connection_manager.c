@@ -135,6 +135,15 @@ static ConnectionInfo *get_connection(SFConnectionManager *cm,
     return NULL;
 }
 
+static inline void set_connection_params(ConnectionInfo *conn,
+        SFCMServerEntry *server, SFCMServerPtrArray *old_alives)
+{
+    SFConnectionParameters *cparam;
+    cparam = (SFConnectionParameters *)conn->args;
+    cparam->cm.sentry = server;
+    cparam->cm.old_alives = old_alives;
+}
+
 static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
         SFCMConnGroupEntry *group, int *err_no)
 {
@@ -146,6 +155,13 @@ static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
         if ((conn=make_connection(cm, master->addr_array,
                         err_no)) != NULL)
         {
+            if (cm->common_cfg->read_rule == sf_data_read_rule_master_only) {
+                set_connection_params(conn, master, NULL);
+            } else {
+                SFCMServerPtrArray *alives;
+                alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
+                set_connection_params(conn, master, alives);
+            }
             return conn;
         }
 
@@ -222,6 +238,8 @@ static inline ConnectionInfo *make_readable_connection(SFConnectionManager *cm,
                     addr_array, err_no)) == NULL)
     {
         remove_from_alives(cm, group, alives, alives->servers[index]);
+    } else {
+        set_connection_params(conn, alives->servers[index], alives);
     }
 
     return conn;
@@ -316,9 +334,11 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
 static void release_connection(SFConnectionManager *cm,
         ConnectionInfo *conn)
 {
-    //TODO
-    if (((SFConnectionParameters *)conn->args)->group_id > 0) {
-        ((SFConnectionParameters *)conn->args)->group_id = 0;
+    SFConnectionParameters *cparam;
+    cparam = (SFConnectionParameters *)conn->args;
+    if (cparam->cm.sentry != NULL) {
+        cparam->cm.sentry = NULL;
+        cparam->cm.old_alives = NULL;
     }
 
     conn_pool_close_connection_ex(&cm->cpool, conn, false);
@@ -326,12 +346,21 @@ static void release_connection(SFConnectionManager *cm,
 
 static void close_connection(SFConnectionManager *cm, ConnectionInfo *conn)
 {
-    //TODO
-    if (((SFConnectionParameters *)conn->args)->group_id > 0) {
-        int group_index;
-        group_index = ((SFConnectionParameters *)conn->args)->
-            group_id - 1;
-        ((SFConnectionParameters *)conn->args)->group_id = 0;
+    SFConnectionParameters *cparam;
+    SFCMServerEntry *server;
+    SFCMConnGroupEntry *group;
+
+    cparam = (SFConnectionParameters *)conn->args;
+    if (cparam->cm.sentry != NULL) {
+        server = cparam->cm.sentry;
+        group = cm->groups.entries + server->group_index;
+        if (cm->common_cfg->read_rule == sf_data_read_rule_master_only) {
+            __sync_bool_compare_and_swap(&group->master, server, NULL);
+        } else {
+            remove_from_alives(cm, group, cparam->cm.old_alives, server);
+        }
+        cparam->cm.sentry = NULL;
+        cparam->cm.old_alives = NULL;
     }
 
     conn_pool_close_connection_ex(&cm->cpool, conn, true);
@@ -359,20 +388,20 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                 break;
             }
 
-            /*
-               if ((*err_no=fs_client_proto_get_leader(client_ctx,
-               conn, &leader)) != 0)
-               {
-               close_connection(cm, conn);
-               break;
-               }
-             */
+            if ((*err_no=sf_proto_get_leader(conn, cm->common_cfg->
+                    network_timeout, &leader)) != 0)
+            {
+                close_connection(cm, conn);
+                break;
+            }
 
             if (FC_CONNECTION_SERVER_EQUAL1(*conn, leader.conn)) {
                 return conn;
             }
             release_connection(cm, conn);
-            if ((conn=get_spec_connection(cm, &leader.conn, err_no)) == NULL) {
+            if ((conn=get_spec_connection(cm,&leader.conn,
+                            err_no)) == NULL)
+            {
                 break;
             }
 
