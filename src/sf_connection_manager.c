@@ -354,13 +354,13 @@ static void close_connection(SFConnectionManager *cm, ConnectionInfo *conn)
     if (cparam->cm.sentry != NULL) {
         server = cparam->cm.sentry;
         group = cm->groups.entries + server->group_index;
-        if (cm->common_cfg->read_rule == sf_data_read_rule_master_only) {
+        if (cparam->cm.old_alives == NULL) {
             __sync_bool_compare_and_swap(&group->master, server, NULL);
         } else {
             remove_from_alives(cm, group, cparam->cm.old_alives, server);
+            cparam->cm.old_alives = NULL;
         }
         cparam->cm.sentry = NULL;
-        cparam->cm.old_alives = NULL;
     }
 
     conn_pool_close_connection_ex(&cm->cpool, conn, true);
@@ -448,8 +448,7 @@ static int validate_connection_callback(ConnectionInfo *conn, void *args)
 }
 
 static int init_group_array(SFConnectionManager *cm,
-        SFCMConnGroupArray *garray, const int group_count,
-        const int min_group_id)
+        SFCMConnGroupArray *garray, const int group_count)
 {
     int result;
     int bytes;
@@ -465,24 +464,20 @@ static int init_group_array(SFConnectionManager *cm,
 
     end = garray->entries + group_count;
     for (group=garray->entries; group<end; group++) {
-        group->cm = cm;
         if ((result=init_pthread_lock(&group->lock)) != 0) {
             return result;
         }
     }
 
     garray->count = group_count;
-    garray->min_group_id = min_group_id;
-    garray->max_group_id = min_group_id + group_count - 1;
     return 0;
 }
 
 int sf_connection_manager_init(SFConnectionManager *cm,
         const SFClientCommonConfig *common_cfg, const int group_count,
-        const int min_group_id, const int server_group_index,
-        const int server_count, const int max_count_per_entry,
-        const int max_idle_time, fc_connection_callback_func
-        connect_done_callback, void *args)
+        const int server_group_index, const int server_count,
+        const int max_count_per_entry, const int max_idle_time,
+        fc_connection_callback_func connect_done_callback, void *args)
 {
     const int socket_domain = AF_INET;
     int htable_init_capacity;
@@ -501,9 +496,7 @@ int sf_connection_manager_init(SFConnectionManager *cm,
         return result;
     }
 
-    if ((result=init_group_array(cm, &cm->groups,
-                    group_count, min_group_id)) != 0)
-    {
+    if ((result=init_group_array(cm, &cm->groups, group_count)) != 0) {
         return result;
     }
 
@@ -532,20 +525,20 @@ int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
     SFCMServerEntry *entry;
     int group_index;
 
-    if (group_id < cm->groups.min_group_id) {
+    if (group_id < 1) {
         logError("file: "__FILE__", line: %d, "
-                "invalid group id: %d which < min group id: %d",
-                __LINE__, group_id, cm->groups.min_group_id);
+                "invalid group id: %d < 1",
+                __LINE__, group_id);
         return EINVAL;
     }
-    if (group_id > cm->groups.max_group_id) {
+    if (group_id > cm->groups.count) {
         logError("file: "__FILE__", line: %d, "
-                "invalid group id: %d which > max group id: %d",
-                __LINE__, group_id, cm->groups.max_group_id);
+                "invalid group id: %d > group count: %d",
+                __LINE__, group_id, cm->groups.count);
         return EINVAL;
     }
 
-    group_index = group_id - cm->groups.min_group_id;
+    group_index = group_id - 1;
     group = cm->groups.entries + group_index;
     group->id = group_id;
     group->all.servers = (SFCMServerEntry *)fc_malloc(

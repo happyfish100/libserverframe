@@ -377,12 +377,12 @@ int sf_proto_get_leader(ConnectionInfo *conn,
         const int network_timeout,
         SFClientServerEntry *leader);
 
-#define SF_CLIENT_RELEASE_CONNECTION(client_ctx, conn, result) \
-    do {  \
+#define SF_CLIENT_RELEASE_CONNECTION(cm, conn, result) \
+    do { \
         if (SF_FORCE_CLOSE_CONNECTION_ERROR(result)) {  \
-            client_ctx->conn_manager.close_connection(client_ctx, conn);   \
-        } else if (client_ctx->conn_manager.release_connection != NULL) {  \
-            client_ctx->conn_manager.release_connection(client_ctx, conn); \
+            (cm)->ops.close_connection(cm, conn);   \
+        } else if ((cm)->ops.release_connection != NULL) {  \
+            (cm)->ops.release_connection(cm, conn); \
         } \
     } while (0)
 

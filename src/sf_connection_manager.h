@@ -65,15 +65,12 @@ typedef struct sf_cm_conn_group_entry {
     SFCMServerArray all;
     volatile SFCMServerEntry *master;
     volatile SFCMServerPtrArray *alives;
-    struct sf_connection_manager *cm;
     pthread_mutex_t lock;
 } SFCMConnGroupEntry;
 
 typedef struct sf_cm_conn_group_array {
     SFCMConnGroupEntry *entries;
     int count;
-    int min_group_id;
-    int max_group_id;
 } SFCMConnGroupArray;
 
 typedef struct sf_cm_operations {
@@ -116,10 +113,9 @@ typedef struct sf_connection_manager {
 
 int sf_connection_manager_init(SFConnectionManager *cm,
         const SFClientCommonConfig *common_cfg, const int group_count,
-        const int min_group_id, const int server_group_index,
-        const int server_count, const int max_count_per_entry,
-        const int max_idle_time, fc_connection_callback_func
-        connect_done_callback, void *args);
+        const int server_group_index, const int server_count,
+        const int max_count_per_entry, const int max_idle_time,
+        fc_connection_callback_func connect_done_callback, void *args);
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
         FCServerInfo **servers, const int count);
