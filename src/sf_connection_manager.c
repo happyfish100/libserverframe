@@ -473,11 +473,12 @@ static int init_group_array(SFConnectionManager *cm,
     return 0;
 }
 
-int sf_connection_manager_init(SFConnectionManager *cm,
+int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const SFClientCommonConfig *common_cfg, const int group_count,
         const int server_group_index, const int server_count,
         const int max_count_per_entry, const int max_idle_time,
-        fc_connection_callback_func connect_done_callback, void *args)
+        fc_connection_callback_func connect_done_callback, void *args,
+        const bool bg_thread_enabled)
 {
     const int socket_domain = AF_INET;
     int htable_init_capacity;
@@ -502,7 +503,9 @@ int sf_connection_manager_init(SFConnectionManager *cm,
 
     cm->server_group_index = server_group_index;
     cm->common_cfg = common_cfg;
+    cm->bg_thread_enabled = bg_thread_enabled;
     cm->max_servers_per_group = 0;
+    cm->extra = NULL;
 
     cm->ops.get_connection = get_connection;
     cm->ops.get_server_connection = get_server_connection;
@@ -817,6 +820,10 @@ int sf_connection_manager_start(SFConnectionManager *cm)
         __sync_bool_compare_and_swap(&group->alives, NULL, sptr_array);
     }
 
-    return fc_create_thread(&tid, connection_manager_thread_func,
-            cm, SF_G_THREAD_STACK_SIZE);
+    if (cm->bg_thread_enabled) {
+        return fc_create_thread(&tid, connection_manager_thread_func,
+                cm, SF_G_THREAD_STACK_SIZE);
+    } else {
+        return 0;
+    }
 }

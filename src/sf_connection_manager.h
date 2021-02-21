@@ -101,32 +101,50 @@ typedef struct sf_cm_operations {
     sf_get_connection_parameters get_connection_params;
 } SFCMOperations;
 
+typedef struct sf_cm_simple_extra {
+    /* master connection cache */
+    struct {
+        ConnectionInfo *conn;
+        ConnectionInfo holder;
+    } master_cache;
+    void *args[2];
+} SFCMSimpleExtra;
+
 typedef struct sf_connection_manager {
-    int server_group_index;
-    int max_servers_per_group;
+    short server_group_index;
+    short max_servers_per_group;
+    bool bg_thread_enabled;
     const SFClientCommonConfig *common_cfg;
     SFCMConnGroupArray groups;
     ConnectionPool cpool;
     struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
     SFCMOperations ops;
+    SFCMSimpleExtra *extra;   //for simple
 } SFConnectionManager;
 
-int sf_connection_manager_init(SFConnectionManager *cm,
+int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const SFClientCommonConfig *common_cfg, const int group_count,
         const int server_group_index, const int server_count,
         const int max_count_per_entry, const int max_idle_time,
-        fc_connection_callback_func connect_done_callback, void *args);
+        fc_connection_callback_func connect_done_callback, void *args,
+        const bool bg_thread_enabled);
+
+static inline int sf_connection_manager_init(SFConnectionManager *cm,
+        const SFClientCommonConfig *common_cfg, const int group_count,
+        const int server_group_index, const int server_count,
+        const int max_count_per_entry, const int max_idle_time,
+        fc_connection_callback_func connect_done_callback, void *args)
+{
+    const bool bg_thread_enabled = true;
+    return sf_connection_manager_init_ex(cm, common_cfg, group_count,
+            server_group_index, server_count, max_count_per_entry,
+            max_idle_time, connect_done_callback, args, bg_thread_enabled);
+}
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
         FCServerInfo **servers, const int count);
 
 int sf_connection_manager_start(SFConnectionManager *cm);
-
-ConnectionInfo *sf_connection_manager_get_master(SFConnectionManager *cm,
-        const int group_index, int *err_no);
-
-ConnectionInfo *sf_connection_manager_get_readable(SFConnectionManager *cm,
-        const int group_index, int *err_no);
 
 #ifdef __cplusplus
 extern "C" {
