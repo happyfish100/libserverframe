@@ -194,15 +194,15 @@ static inline bool alive_array_cas(SFConnectionManager *cm,
     if (__sync_bool_compare_and_swap(&group->alives,
                 old_alives, new_alives))
     {
-        logInfo("file: "__FILE__", line: %d, "
+        logDebug("file: "__FILE__", line: %d, "
                 "[%s] group_id: %d, old alive server count: %d, "
                 "new alive server count: %d", __LINE__, cm->module_name,
                 group->id, old_alives->count, new_alives->count);
 
+        push_to_detect_queue(cm, group, new_alives);
         fast_mblock_delay_free_object(&cm->sptr_array_allocator, old_alives,
                 (cm->common_cfg->connect_timeout + cm->common_cfg->
                  network_timeout) * group->all.count);
-        push_to_detect_queue(cm, group, new_alives);
         return true;
     } else {
         fast_mblock_free_object(&cm->sptr_array_allocator, new_alives);
@@ -701,6 +701,7 @@ static int do_get_group_servers(SFConnectionManager *cm,
 
     old_alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
     if (sptr_array_compare(old_alives, new_alives) == 0) {
+        push_to_detect_queue(cm, group, new_alives);
         fast_mblock_free_object(&cm->sptr_array_allocator, new_alives);
         return 0;
     }
@@ -796,6 +797,11 @@ static void deal_nodes(SFConnectionManager *cm,
         __sync_bool_compare_and_swap(&group->in_queue, 1, 0);
         alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
         if (alives->count < group->all.count) {
+            logDebug("file: "__FILE__", line: %d, "
+                    "[%s] group_id: %d, alive server count: %d, "
+                    "all server count: %d", __LINE__, cm->module_name,
+                    group->id, alives->count, group->all.count);
+
             if (get_group_servers(cm, group) != 0) {
                 push_to_detect_queue(cm, group, (SFCMServerPtrArray *)
                         FC_ATOMIC_GET(group->alives));
@@ -812,6 +818,10 @@ static void *connection_manager_thread_func(void *arg)
     struct common_blocked_node *head;
 
     cm = (SFConnectionManager *)arg;
+    logInfo("file: "__FILE__", line: %d, "
+            "[%s] connection manager thread start",
+            __LINE__, cm->module_name);
+
     while (1) {
         sleep(1);
         if ((head=common_blocked_queue_pop_all_nodes(&cm->
