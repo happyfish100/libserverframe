@@ -18,6 +18,7 @@
 #ifndef _SF_CONNECTION_MANAGER_H
 #define _SF_CONNECTION_MANAGER_H
 
+#include "fastcommon/common_blocked_queue.h"
 #include "fastcommon/server_id_func.h"
 #include "fastcommon/connection_pool.h"
 #include "sf_types.h"
@@ -62,10 +63,10 @@ typedef struct sf_cm_server_ptr_array {
 
 typedef struct sf_cm_conn_group_entry {
     int id;
+    volatile char in_queue;  //if in active detect queue
     SFCMServerArray all;
     volatile SFCMServerEntry *master;
     volatile SFCMServerPtrArray *alives;
-    pthread_mutex_t lock;
 } SFCMConnGroupEntry;
 
 typedef struct sf_cm_conn_group_array {
@@ -113,32 +114,38 @@ typedef struct sf_cm_simple_extra {
 typedef struct sf_connection_manager {
     short server_group_index;
     short max_servers_per_group;
-    bool bg_thread_enabled;
+    struct {
+        bool bg_thread_enabled;
+        struct common_blocked_queue queue;
+    } alive_detect;
+    const char *module_name;
     const SFClientCommonConfig *common_cfg;
     SFCMConnGroupArray groups;
     ConnectionPool cpool;
     struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
     SFCMOperations ops;
-    SFCMSimpleExtra *extra;   //for simple
+    SFCMSimpleExtra *extra;   //for simple connection manager
 } SFConnectionManager;
 
 int sf_connection_manager_init_ex(SFConnectionManager *cm,
-        const SFClientCommonConfig *common_cfg, const int group_count,
-        const int server_group_index, const int server_count,
-        const int max_count_per_entry, const int max_idle_time,
-        fc_connection_callback_func connect_done_callback, void *args,
-        const bool bg_thread_enabled);
+        const char *module_name, const SFClientCommonConfig *common_cfg,
+        const int group_count, const int server_group_index,
+        const int server_count, const int max_count_per_entry,
+        const int max_idle_time, fc_connection_callback_func
+        connect_done_callback, void *args, const bool bg_thread_enabled);
 
 static inline int sf_connection_manager_init(SFConnectionManager *cm,
-        const SFClientCommonConfig *common_cfg, const int group_count,
-        const int server_group_index, const int server_count,
-        const int max_count_per_entry, const int max_idle_time,
-        fc_connection_callback_func connect_done_callback, void *args)
+        const char *module_name, const SFClientCommonConfig *common_cfg,
+        const int group_count, const int server_group_index,
+        const int server_count, const int max_count_per_entry,
+        const int max_idle_time, fc_connection_callback_func
+        connect_done_callback, void *args)
 {
     const bool bg_thread_enabled = true;
-    return sf_connection_manager_init_ex(cm, common_cfg, group_count,
-            server_group_index, server_count, max_count_per_entry,
-            max_idle_time, connect_done_callback, args, bg_thread_enabled);
+    return sf_connection_manager_init_ex(cm, module_name,
+            common_cfg, group_count, server_group_index,
+            server_count, max_count_per_entry, max_idle_time,
+            connect_done_callback, args, bg_thread_enabled);
 }
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
