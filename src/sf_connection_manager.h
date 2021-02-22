@@ -151,6 +151,9 @@ static inline int sf_connection_manager_init(SFConnectionManager *cm,
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
         FCServerInfo **servers, const int count);
 
+int sf_connection_manager_prepare(SFConnectionManager *cm);
+
+//start thread
 int sf_connection_manager_start(SFConnectionManager *cm);
 
 #ifdef __cplusplus

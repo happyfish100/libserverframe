@@ -836,9 +836,8 @@ static int sptr_array_alloc_init(void *element, void *args)
     return 0;
 }
 
-int sf_connection_manager_start(SFConnectionManager *cm)
+int sf_connection_manager_prepare(SFConnectionManager *cm)
 {
-    pthread_t tid;
     int result;
     int element_size;
     SFCMConnGroupEntry *group;
@@ -870,6 +869,13 @@ int sf_connection_manager_start(SFConnectionManager *cm)
         }
         __sync_bool_compare_and_swap(&group->alives, NULL, sptr_array);
     }
+
+    return 0;
+}
+
+int sf_connection_manager_start(SFConnectionManager *cm)
+{
+    pthread_t tid;
 
     if (cm->alive_detect.bg_thread_enabled) {
         return fc_create_thread(&tid, connection_manager_thread_func,
