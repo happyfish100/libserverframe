@@ -3,7 +3,7 @@
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe
-Version: 1.1.4
+Version: 1.1.5
 Release: 1%{?dist}
 Summary: network framework library
 License: AGPL v3.0
