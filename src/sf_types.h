@@ -182,4 +182,10 @@ typedef struct sf_connection_parameters {
     struct idempotency_client_channel *channel;
 } SFConnectionParameters;
 
+typedef struct sf_key_value_array {
+    key_value_pair_t *elts;
+    int count;
+    int alloc;
+} SFKeyValueArray;
+
 #endif
