@@ -189,6 +189,8 @@ const char *sf_strerror(const int errnum)
             return STRERROR(EAGAIN);
         case SF_ERROR_EOVERFLOW:
             return STRERROR(EOVERFLOW);
+        case SF_ERROR_ENODATA:
+            return STRERROR(ENODATA);
         default:
             return STRERROR(errnum);
     }
