@@ -17,7 +17,14 @@
 #include <errno.h>
 #include "fastcommon/shared_func.h"
 #include "sf_util.h"
+#include "sf_nio.h"
 #include "sf_proto.h"
+
+static SFHandlerContext sf_handler_ctx = {NULL, {NULL, NULL}};
+static int64_t log_slower_than_us = 0;
+
+#define GET_CMD_CAPTION(cmd)    sf_handler_ctx.callbacks.get_cmd_caption(cmd)
+#define GET_CMD_LOG_LEVEL(cmd)  sf_handler_ctx.callbacks.get_cmd_log_level(cmd)
 
 int sf_proto_set_body_length(struct fast_task_info *task)
 {
@@ -469,4 +476,103 @@ int sf_proto_get_leader(ConnectionInfo *conn,
     }
 
     return result;
+}
+
+void sf_proto_set_handler_context(const SFHandlerContext *ctx)
+{
+    sf_handler_ctx = *ctx;
+    log_slower_than_us = ctx->slow_log->cfg.log_slower_than_ms * 1000;
+}
+
+int sf_proto_deal_task_done(struct fast_task_info *task,
+        SFCommonTaskContext *ctx)
+{
+    SFCommonProtoHeader *proto_header;
+    int status;
+    int r;
+    int64_t time_used;
+    int log_level;
+    char time_buff[32];
+
+    if (ctx->log_level != LOG_NOTHING && ctx->response.error.length > 0) {
+        log_it_ex(&g_log_context, ctx->log_level,
+                "file: "__FILE__", line: %d, "
+                "peer %s:%u, cmd: %d (%s), req body length: %d, "
+                "resp status: %d, %s", __LINE__, task->client_ip,
+                task->port, ctx->request.header.cmd,
+                GET_CMD_CAPTION(ctx->request.header.cmd),
+                ctx->request.header.body_len, ctx->response.header.status,
+                ctx->response.error.message);
+    }
+
+    if (!ctx->need_response) {
+        if (sf_handler_ctx.callbacks.get_cmd_log_level != NULL) {
+            time_used = get_current_time_us() - ctx->req_start_time;
+            log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
+            log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
+                    "client %s:%u, req cmd: %d (%s), req body_len: %d, "
+                    "resp status: %d, time used: %s us", __LINE__,
+                    task->client_ip, task->port, ctx->request.header.cmd,
+                    GET_CMD_CAPTION(ctx->request.header.cmd),
+                    ctx->request.header.body_len, ctx->response.header.status,
+                    long_to_comma_str(time_used, time_buff));
+        }
+
+        if (ctx->response.header.status == 0) {
+            task->offset = task->length = 0;
+            return sf_set_read_event(task);
+        } else {
+            return FC_NEGATIVE(ctx->response.header.status);
+        }
+    }
+
+    proto_header = (SFCommonProtoHeader *)task->data;
+    if (!ctx->response_done) {
+        ctx->response.header.body_len = ctx->response.error.length;
+        if (ctx->response.error.length > 0) {
+            memcpy(task->data + sizeof(SFCommonProtoHeader),
+                    ctx->response.error.message, ctx->response.error.length);
+        }
+    }
+
+    status = sf_unify_errno(FC_ABS(ctx->response.header.status));
+    short2buff(status, proto_header->status);
+    proto_header->cmd = ctx->response.header.cmd;
+    int2buff(ctx->response.header.body_len, proto_header->body_len);
+    task->length = sizeof(SFCommonProtoHeader) + ctx->response.header.body_len;
+
+    r = sf_send_add_event(task);
+    time_used = get_current_time_us() - ctx->req_start_time;
+    if ((sf_handler_ctx.slow_log != NULL) && (sf_handler_ctx.slow_log->
+                cfg.enabled && time_used > log_slower_than_us))
+    {
+        char buff[256];
+        int blen;
+
+        blen = sprintf(buff, "timed used: %s us, client %s:%u, "
+                "req cmd: %d (%s), req body len: %d, resp cmd: %d (%s), "
+                "status: %d, resp body len: %d", long_to_comma_str(time_used,
+                    time_buff), task->client_ip, task->port, ctx->request.
+                header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
+                ctx->request.header.body_len, ctx->response.header.cmd,
+                GET_CMD_CAPTION(ctx->response.header.cmd),
+                ctx->response.header.status, ctx->response.header.body_len);
+        log_it_ex2(&sf_handler_ctx.slow_log->ctx, NULL, buff, blen, false, true);
+    }
+
+    if (sf_handler_ctx.callbacks.get_cmd_log_level != NULL) {
+        log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
+        log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
+                "client %s:%u, req cmd: %d (%s), req body_len: %d, "
+                "resp cmd: %d (%s), status: %d, resp body_len: %d, "
+                "time used: %s us", __LINE__,
+                task->client_ip, task->port, ctx->request.header.cmd,
+                GET_CMD_CAPTION(ctx->request.header.cmd),
+                ctx->request.header.body_len, ctx->response.header.cmd,
+                GET_CMD_CAPTION(ctx->response.header.cmd),
+                ctx->response.header.status, ctx->response.header.body_len,
+                long_to_comma_str(time_used, time_buff));
+    }
+
+    return r == 0 ? ctx->response.header.status : r;
 }

@@ -84,6 +84,15 @@ typedef struct {
     SFErrorInfo error;
 } SFResponseInfo;
 
+typedef struct {
+    int64_t req_start_time;  //unit: microsecond (us)
+    SFRequestInfo request;
+    SFResponseInfo response;
+    bool response_done;
+    char log_level;   //level for error log
+    bool need_response;
+} SFCommonTaskContext;
+
 typedef struct sf_binlog_file_position {
     int index;      //current binlog file
     int64_t offset; //current file offset

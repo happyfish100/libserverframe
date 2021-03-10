@@ -168,13 +168,51 @@ typedef struct sf_client_server_entry {
     ConnectionInfo conn;
 } SFClientServerEntry;
 
+typedef const char *(*sf_get_cmd_caption_func)(const int cmd);
+typedef int (*sf_get_cmd_log_level_func)(const int cmd);
+
+typedef struct {
+    sf_get_cmd_caption_func get_cmd_caption;
+    sf_get_cmd_log_level_func get_cmd_log_level;
+} SFCommandCallbacks;
+
+typedef struct {
+    SFSlowLogContext *slow_log;
+    SFCommandCallbacks callbacks;
+} SFHandlerContext;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+void sf_proto_set_handler_context(const SFHandlerContext *ctx);
+
 int sf_proto_set_body_length(struct fast_task_info *task);
 
 const char *sf_get_cmd_caption(const int cmd);
+
+int sf_proto_deal_task_done(struct fast_task_info *task,
+        SFCommonTaskContext *ctx);
+
+static inline void sf_proto_init_task_context(struct fast_task_info *task,
+        SFCommonTaskContext *ctx)
+{
+    ctx->req_start_time = get_current_time_us();
+    ctx->response.header.cmd = SF_PROTO_ACK;
+    ctx->response.header.body_len = 0;
+    ctx->response.header.status = 0;
+    ctx->response.error.length = 0;
+    ctx->response.error.message[0] = '\0';
+    ctx->log_level = LOG_ERR;
+    ctx->response_done = false;
+    ctx->need_response = true;
+
+    ctx->request.header.cmd = ((SFCommonProtoHeader *)task->data)->cmd;
+    ctx->request.header.body_len = task->length - sizeof(SFCommonProtoHeader);
+    ctx->request.header.status = buff2short(((SFCommonProtoHeader *)
+                task->data)->status);
+    ctx->request.body = task->data + sizeof(SFCommonProtoHeader);
+}
 
 static inline void sf_log_network_error_ex1(SFResponseInfo *response,
         const ConnectionInfo *conn, const int result,
