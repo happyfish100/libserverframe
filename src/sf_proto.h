@@ -249,7 +249,7 @@ static inline void sf_log_network_error_ex1(SFResponseInfo *response,
 
 #define sf_log_network_error_for_delete(response, \
         conn, result, enoent_log_level)  \
-        sf_log_network_error_ex(response, conn, result,         \
+        sf_log_network_error_ex(response, conn, result,          \
                 (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
                 LOG_DEBUG : ((result == ENOENT) ? enoent_log_level : LOG_ERR))
 
@@ -308,6 +308,23 @@ static inline int sf_server_check_body_length(
     return sf_server_check_max_body_length(response,
             body_length, max_body_length);
 }
+
+#define server_expect_body_length(task, expect_body_len) \
+    sf_server_expect_body_length(&RESPONSE, REQUEST.header.body_len, \
+            expect_body_len)
+
+#define server_check_min_body_length(task, min_body_length) \
+    sf_server_check_min_body_length(&RESPONSE, REQUEST.header.body_len, \
+            min_body_length)
+
+#define server_check_max_body_length(task, max_body_length) \
+    sf_server_check_max_body_length(&RESPONSE, REQUEST.header.body_len, \
+            max_body_length)
+
+#define server_check_body_length(task, min_body_length, max_body_length) \
+    sf_server_check_body_length(&RESPONSE, REQUEST.header.body_len, \
+            min_body_length, max_body_length)
+
 
 int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd);
@@ -415,6 +432,7 @@ int sf_proto_get_leader(ConnectionInfo *conn,
         const int network_timeout,
         SFClientServerEntry *leader);
 
+
 #define SF_CLIENT_RELEASE_CONNECTION(cm, conn, result) \
     do { \
         if (SF_FORCE_CLOSE_CONNECTION_ERROR(result)) {  \
@@ -423,7 +441,6 @@ int sf_proto_get_leader(ConnectionInfo *conn,
             (cm)->ops.release_connection(cm, conn); \
         } \
     } while (0)
-
 
 #ifdef __cplusplus
 }
