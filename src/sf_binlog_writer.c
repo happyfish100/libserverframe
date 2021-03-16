@@ -596,7 +596,7 @@ int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
         return result;
     }
     if (create) {
-        SF_CHOWN_RETURN_ON_ERROR(filepath, geteuid(), getegid());
+        SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(filepath);
     }
 
     writer->file.fd = -1;

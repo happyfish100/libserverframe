@@ -101,6 +101,9 @@ extern SFContext                 g_sf_context;
     } \
     } while (0)
 
+#define SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(path) \
+    SF_CHOWN_RETURN_ON_ERROR(path, geteuid(), getegid())
+
 #define SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext, \
         section_name, def_inner_port, def_outer_port, def_work_threads) \
     do { \
