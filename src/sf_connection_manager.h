@@ -102,15 +102,6 @@ typedef struct sf_cm_operations {
     sf_get_connection_parameters get_connection_params;
 } SFCMOperations;
 
-typedef struct sf_cm_simple_extra {
-    /* master connection cache */
-    struct {
-        ConnectionInfo *conn;
-        ConnectionInfo holder;
-    } master_cache;
-    void *args[2];
-} SFCMSimpleExtra;
-
 typedef struct sf_connection_manager {
     short server_group_index;
     short max_servers_per_group;
@@ -124,7 +115,7 @@ typedef struct sf_connection_manager {
     ConnectionPool cpool;
     struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
     SFCMOperations ops;
-    SFCMSimpleExtra *extra;   //for simple connection manager
+    void *extra;   //for simple connection manager
 } SFConnectionManager;
 
 int sf_connection_manager_init_ex(SFConnectionManager *cm,
@@ -155,6 +146,11 @@ int sf_connection_manager_prepare(SFConnectionManager *cm);
 
 //start thread
 int sf_connection_manager_start(SFConnectionManager *cm);
+
+int sf_cm_validate_connection_callback(ConnectionInfo *conn, void *args);
+
+const struct sf_connection_parameters *sf_cm_get_connection_params(
+        SFConnectionManager *cm, ConnectionInfo *conn);
 
 #ifdef __cplusplus
 extern "C" {

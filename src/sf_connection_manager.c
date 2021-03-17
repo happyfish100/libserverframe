@@ -447,13 +447,13 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
     return NULL;
 }
 
-static const struct sf_connection_parameters *get_connection_params(
+const struct sf_connection_parameters *sf_cm_get_connection_params(
         SFConnectionManager *cm, ConnectionInfo *conn)
 {
     return (SFConnectionParameters *)conn->args;
 }
 
-static int validate_connection_callback(ConnectionInfo *conn, void *args)
+int sf_cm_validate_connection_callback(ConnectionInfo *conn, void *args)
 {
     SFConnectionManager *cm;
     SFResponseInfo response;
@@ -502,7 +502,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     if ((result=conn_pool_init_ex1(&cm->cpool, common_cfg->connect_timeout,
                     max_count_per_entry, max_idle_time, socket_domain,
                     htable_init_capacity, connect_done_callback, args,
-                    validate_connection_callback, cm,
+                    sf_cm_validate_connection_callback, cm,
                     sizeof(SFConnectionParameters))) != 0)
     {
         return result;
@@ -535,7 +535,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     cm->ops.get_leader_connection = get_leader_connection;
     cm->ops.release_connection = release_connection;
     cm->ops.close_connection = close_connection;
-    cm->ops.get_connection_params = get_connection_params;
+    cm->ops.get_connection_params = sf_cm_get_connection_params;
     return 0;
 }
 
