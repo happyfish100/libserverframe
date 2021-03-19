@@ -172,6 +172,11 @@ typedef const char *(*sf_get_cmd_caption_func)(const int cmd);
 typedef int (*sf_get_cmd_log_level_func)(const int cmd);
 
 typedef struct {
+    char fixed[64 * 1024];
+    char *buff;
+} SFProtoRecvBuffer;
+
+typedef struct {
     sf_get_cmd_caption_func get_cmd_caption;
     sf_get_cmd_log_level_func get_cmd_log_level;
 } SFCommandCallbacks;
@@ -333,6 +338,25 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
         char *recv_data, const int expect_body_len);
 
+int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        SFProtoRecvBuffer *buffer, const int min_body_len);
+
+static inline void sf_init_recv_buffer(SFProtoRecvBuffer *buffer)
+{
+    buffer->buff = buffer->fixed;
+}
+
+static inline void sf_free_recv_buffer(SFProtoRecvBuffer *buffer)
+{
+    if (buffer->buff != buffer->fixed) {
+        if (buffer->buff != NULL) {
+            free(buffer->buff);
+        }
+        buffer->buff = buffer->fixed;
+    }
+}
+
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
         const int len, SFResponseInfo *response, const int network_timeout);
 
@@ -387,6 +411,11 @@ static inline int sf_send_and_recv_none_body_response(ConnectionInfo *conn,
     return sf_send_and_recv_response(conn, send_data, send_len, response,
         network_timeout, expect_cmd, recv_data, expect_body_len);
 }
+
+int sf_send_and_recv_vary_response(ConnectionInfo *conn,
+        char *send_data, const int send_len, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        SFProtoRecvBuffer *buffer, const int min_body_len);
 
 static inline void sf_proto_extract_header(SFCommonProtoHeader *header_proto,
         SFHeaderInfo *header_info)

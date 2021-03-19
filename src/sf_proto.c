@@ -92,19 +92,11 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
     return response->header.status;
 }
 
-int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
-        const int len, SFResponseInfo *response, const int network_timeout)
+static inline int sf_recv_response_header(ConnectionInfo *conn,
+        SFResponseInfo *response, const int network_timeout)
 {
     int result;
     SFCommonProtoHeader header_proto;
-
-    if ((result=tcpsenddata_nb(conn->sock, data, len, network_timeout)) != 0) {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "send data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
-        return result;
-    }
 
     if ((result=tcprecvdata_nb(conn->sock, &header_proto,
             sizeof(SFCommonProtoHeader), network_timeout)) != 0)
@@ -118,6 +110,22 @@ int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
 
     sf_proto_extract_header(&header_proto, &response->header);
     return 0;
+}
+
+int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
+        const int len, SFResponseInfo *response, const int network_timeout)
+{
+    int result;
+
+    if ((result=tcpsenddata_nb(conn->sock, data, len, network_timeout)) != 0) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "send data fail, errno: %d, error info: %s",
+                result, STRERROR(result));
+        return result;
+    }
+
+    return sf_recv_response_header(conn, response, network_timeout);
 }
 
 int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
@@ -234,19 +242,12 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
 {
     int result;
     int recv_bytes;
-    SFCommonProtoHeader header_proto;
 
-    if ((result=tcprecvdata_nb(conn->sock, &header_proto,
-                    sizeof(SFCommonProtoHeader), network_timeout)) != 0)
+    if ((result=sf_recv_response_header(conn, response,
+                    network_timeout)) != 0)
     {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "recv data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
         return result;
     }
-    sf_proto_extract_header(&header_proto, &response->header);
-
     if ((result=sf_check_response(conn, response, network_timeout,
                     expect_cmd)) != 0)
     {
@@ -264,8 +265,8 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data,
-                    expect_body_len, network_timeout, &recv_bytes)) != 0)
+    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
+                    network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
                 sizeof(response->error.message),
@@ -276,6 +277,80 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
     }
 
     return result;
+}
+
+int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        SFProtoRecvBuffer *buffer, const int min_body_len)
+{
+    int result;
+    int recv_bytes;
+
+    if ((result=sf_recv_response_header(conn, response,
+                    network_timeout)) != 0)
+    {
+        return result;
+    }
+    if ((result=sf_check_response(conn, response, network_timeout,
+                    expect_cmd)) != 0)
+    {
+        return result;
+    }
+
+    if (response->header.body_len < min_body_len) {
+        response->error.length = sprintf(response->error.message,
+                "response body length: %d < %d",
+                response->header.body_len, min_body_len);
+        return EINVAL;
+    }
+
+    if (response->header.body_len <= sizeof(buffer->fixed)) {
+        if (response->header.body_len == 0) {
+            return 0;
+        }
+    } else {
+        if (buffer->buff != buffer->fixed && buffer->buff != NULL) {
+            free(buffer->buff);
+        }
+        buffer->buff = (char *)fc_malloc(response->header.body_len);
+        if (buffer->buff == NULL) {
+            return ENOMEM;
+        }
+    }
+
+    if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
+                    header.body_len, network_timeout, &recv_bytes)) != 0)
+    {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "recv body fail, recv bytes: %d, expect body length: %d, "
+                "errno: %d, error info: %s", recv_bytes,
+                response->header.body_len,
+                result, STRERROR(result));
+    }
+
+    return result;
+}
+
+int sf_send_and_recv_vary_response(ConnectionInfo *conn,
+        char *send_data, const int send_len, SFResponseInfo *response,
+        const int network_timeout, const unsigned char expect_cmd,
+        SFProtoRecvBuffer *buffer, const int min_body_len)
+{
+    int result;
+
+    if ((result=tcpsenddata_nb(conn->sock, send_data,
+                    send_len, network_timeout)) != 0)
+    {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "send data fail, errno: %d, error info: %s",
+                result, STRERROR(result));
+        return result;
+    }
+
+    return sf_recv_vary_response(conn, response, network_timeout,
+            expect_cmd, buffer, min_body_len);
 }
 
 const char *sf_get_cmd_caption(const int cmd)
