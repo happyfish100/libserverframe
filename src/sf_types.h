@@ -25,6 +25,7 @@
 #include <time.h>
 #include "fastcommon/connection_pool.h"
 #include "fastcommon/fast_task_queue.h"
+#include "fastcommon/server_id_func.h"
 
 #define SF_ERROR_INFO_SIZE   256
 
@@ -196,5 +197,12 @@ typedef struct sf_key_value_array {
     int count;
     int alloc;
 } SFKeyValueArray;
+
+typedef struct sf_cluster_config {
+    FCServerConfig server_cfg;
+    unsigned char md5_digest[16];
+    int cluster_group_index;
+    int service_group_index;
+} SFClusterConfig;
 
 #endif
