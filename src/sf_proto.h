@@ -172,9 +172,16 @@ typedef const char *(*sf_get_cmd_caption_func)(const int cmd);
 typedef int (*sf_get_cmd_log_level_func)(const int cmd);
 
 typedef struct {
-    char fixed[64 * 1024];
+    int alloc_size;
+    int fixed_size;
+    char *fixed;
     char *buff;
 } SFProtoRecvBuffer;
+
+typedef struct {
+    char fixed[64 * 1024];
+    SFProtoRecvBuffer buffer;
+} SFProtoRBufferFixedWrapper;
 
 typedef struct {
     sf_get_cmd_caption_func get_cmd_caption;
@@ -342,9 +349,23 @@ int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
         SFProtoRecvBuffer *buffer, const int min_body_len);
 
-static inline void sf_init_recv_buffer(SFProtoRecvBuffer *buffer)
+static inline void sf_init_recv_buffer_by_wrapper(
+        SFProtoRBufferFixedWrapper *wrapper)
 {
-    buffer->buff = buffer->fixed;
+    wrapper->buffer.fixed_size = sizeof(wrapper->fixed);
+    wrapper->buffer.alloc_size = sizeof(wrapper->fixed);
+    wrapper->buffer.fixed = wrapper->fixed;
+    wrapper->buffer.buff = wrapper->fixed;
+}
+
+static inline int sf_init_recv_buffer(SFProtoRecvBuffer *buffer,
+        const int init_size)
+{
+    buffer->alloc_size = init_size;
+    buffer->fixed_size = 0;
+    buffer->fixed = NULL;
+    buffer->buff = (char *)fc_malloc(init_size);
+    return buffer->buff != NULL ? 0 : ENOMEM;
 }
 
 static inline void sf_free_recv_buffer(SFProtoRecvBuffer *buffer)
@@ -353,6 +374,7 @@ static inline void sf_free_recv_buffer(SFProtoRecvBuffer *buffer)
         if (buffer->buff != NULL) {
             free(buffer->buff);
         }
+        buffer->alloc_size = buffer->fixed_size;
         buffer->buff = buffer->fixed;
     }
 }

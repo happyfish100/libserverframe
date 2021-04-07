@@ -304,18 +304,33 @@ int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
         return EINVAL;
     }
 
-    if (response->header.body_len <= sizeof(buffer->fixed)) {
+    if (response->header.body_len <= buffer->alloc_size) {
         if (response->header.body_len == 0) {
             return 0;
         }
     } else {
+        int alloc_size;
+        char *buff;
+
+        if (buffer->alloc_size > 0) {
+            alloc_size = 2 * buffer->alloc_size;
+        } else {
+            alloc_size = 64 * 1024;
+        }
+        while (alloc_size < response->header.body_len) {
+            alloc_size *= 2;
+        }
+
+        buff = (char *)fc_malloc(alloc_size);
+        if (buff == NULL) {
+            return ENOMEM;
+        }
         if (buffer->buff != buffer->fixed && buffer->buff != NULL) {
             free(buffer->buff);
         }
-        buffer->buff = (char *)fc_malloc(response->header.body_len);
-        if (buffer->buff == NULL) {
-            return ENOMEM;
-        }
+
+        buffer->buff = buff;
+        buffer->alloc_size = alloc_size;
     }
 
     if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
