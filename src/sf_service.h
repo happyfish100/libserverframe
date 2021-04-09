@@ -105,6 +105,13 @@ struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context);
 #define sf_get_random_thread_data()  \
     sf_get_random_thread_data_ex(&g_sf_context)
 
+
+void sf_notify_all_threads_ex(SFContext *sf_context);
+
+#define sf_notify_all_threads()  \
+    sf_notify_all_threads_ex(&g_sf_context)
+
+
 void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
 int sf_init_task(struct fast_task_info *task);

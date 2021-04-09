@@ -678,6 +678,17 @@ struct nio_thread_data *sf_get_random_thread_data_ex(SFContext *sf_context)
     return sf_context->thread_data + index;
 }
 
+void sf_notify_all_threads_ex(SFContext *sf_context)
+{
+    struct nio_thread_data *tdata;
+    struct nio_thread_data *tend;
+
+    tend = sf_context->thread_data + sf_context->work_threads;
+    for (tdata=sf_context->thread_data; tdata<tend; tdata++) {
+        ioevent_notify_thread(tdata);
+    }
+}
+
 void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler)
 {
     sig_quit_handler = quit_handler;
