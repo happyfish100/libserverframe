@@ -56,7 +56,7 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
                     response->error.message,
                     "response cmd: %d != expect: %d",
                     response->header.cmd, expect_cmd);
-            return EINVAL;
+            return ERANGE;
         }
 
         return 0;
@@ -106,6 +106,16 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
                 "recv data fail, errno: %d, error info: %s",
                 result, STRERROR(result));
         return result;
+    }
+
+    if (!SF_PROTO_CHECK_MAGIC(header_proto.magic)) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
+                "expect: "SF_PROTO_MAGIC_FORMAT,
+                SF_PROTO_MAGIC_PARAMS(header_proto.magic),
+                SF_PROTO_MAGIC_EXPECT_PARAMS);
+        return EINVAL;
     }
 
     sf_proto_extract_header(&header_proto, &response->header);
