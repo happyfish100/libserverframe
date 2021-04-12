@@ -105,13 +105,12 @@ static int load_server_cfg(SFClusterConfig *cluster,
     return 0;
 }
 
-int sf_load_cluster_config_ex(SFClusterConfig *cluster,
-        IniFullContext *ini_ctx, const int default_port,
+int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
+        *ini_ctx, const int default_port, char *full_cluster_filename,
         char *full_server_filename, const int size)
 {
     int result;
     char *cluster_config_filename;
-    char full_cluster_filename[PATH_MAX];
     
     cluster_config_filename = iniGetStrValue(ini_ctx->section_name,
             "cluster_config_filename", ini_ctx->context);
@@ -123,7 +122,7 @@ int sf_load_cluster_config_ex(SFClusterConfig *cluster,
     }
     
     resolve_path(ini_ctx->filename, cluster_config_filename,
-            full_cluster_filename, sizeof(full_cluster_filename));
+            full_cluster_filename, size);
     if ((result=load_server_cfg(cluster, full_cluster_filename,
                     default_port, full_server_filename, size)) != 0)
     {
