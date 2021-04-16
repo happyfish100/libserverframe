@@ -85,6 +85,9 @@
         int2buff((resp_header).body_len, (proto_header)->body_len);\
     } while (0)
 
+#define SF_PROTO_RESP_BODY(task)  \
+    (task->data + sizeof(SFCommonProtoHeader))
+
 
 typedef struct sf_common_proto_header {
     unsigned char magic[4]; //magic number
@@ -118,6 +121,10 @@ typedef struct sf_proto_get_server_resp {
     char port[2];
     char padding[2];
 } SFProtoGetServerResp;
+
+typedef struct sf_proto_empty_body_req {
+    char nothing[0];
+} SFProtoEmptyBodyReq;
 
 typedef struct sf_proto_idempotency_additional_header {
     char req_id[8];

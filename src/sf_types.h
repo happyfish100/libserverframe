@@ -150,7 +150,7 @@ typedef struct sf_slow_log_context {
 typedef enum sf_data_read_rule {
     sf_data_read_rule_any_available,
     sf_data_read_rule_slave_first,
-    sf_data_read_rule_master_only,
+    sf_data_read_rule_master_only
 } SFDataReadRule;
 
 typedef enum sf_net_retry_interval_mode {
@@ -197,6 +197,11 @@ typedef struct sf_key_value_array {
     int count;
     int alloc;
 } SFKeyValueArray;
+
+typedef enum sf_server_group_index_type {
+    sf_server_group_index_type_cluster = 1,
+    sf_server_group_index_type_service
+} SFServerGroupIndexType;
 
 typedef struct sf_cluster_config {
     FCServerConfig server_cfg;
