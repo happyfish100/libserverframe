@@ -88,6 +88,35 @@
 #define SF_PROTO_RESP_BODY(task)  \
     (task->data + sizeof(SFCommonProtoHeader))
 
+#define SF_PROTO_UPDATE_EXTRA_BODY_SIZE \
+    sizeof(SFProtoIdempotencyAdditionalHeader) + FCFS_AUTH_SESSION_ID_LEN
+
+#define SF_PROTO_QUERY_EXTRA_BODY_SIZE  FCFS_AUTH_SESSION_ID_LEN
+
+#define SF_PROTO_CLIENT_SET_REQ(client_ctx, out_buff, \
+        header, req, the_req_id, out_bytes) \
+    do {   \
+        char *the_req_start;  \
+        header = (SFCommonProtoHeader *)out_buff; \
+        the_req_start = (char *)(header + 1);     \
+        out_bytes = sizeof(SFCommonProtoHeader) + sizeof(*req); \
+        if (client_ctx->auth.enabled) { \
+            out_bytes += FCFS_AUTH_SESSION_ID_LEN;   \
+            memcpy(the_req_start, client_ctx->auth.ctx-> \
+                    session_id, FCFS_AUTH_SESSION_ID_LEN);  \
+            the_req_start += FCFS_AUTH_SESSION_ID_LEN;   \
+        }  \
+        if (the_req_id > 0) {  \
+            long2buff(the_req_id, ((SFProtoIdempotencyAdditionalHeader *)\
+                        the_req_start)->req_id);  \
+            out_bytes += sizeof(SFProtoIdempotencyAdditionalHeader); \
+            req = (typeof(req))(the_req_start +   \
+                    sizeof(SFProtoIdempotencyAdditionalHeader));     \
+        } else {  \
+            req = (typeof(req))the_req_start;  \
+        }  \
+    } while (0)
+
 
 typedef struct sf_common_proto_header {
     unsigned char magic[4]; //magic number
