@@ -28,6 +28,7 @@
 #include "fastcommon/server_id_func.h"
 
 #define SF_ERROR_INFO_SIZE   256
+#define SF_CLUSTER_CONFIG_SIGN_LEN  16
 
 #define SF_SERVER_TASK_TYPE_NONE                 0
 #define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
@@ -205,7 +206,7 @@ typedef enum sf_server_group_index_type {
 
 typedef struct sf_cluster_config {
     FCServerConfig server_cfg;
-    unsigned char md5_digest[16];
+    unsigned char md5_digest[SF_CLUSTER_CONFIG_SIGN_LEN];
     int cluster_group_index;
     int service_group_index;
 } SFClusterConfig;
