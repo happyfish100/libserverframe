@@ -56,7 +56,7 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
                     response->error.message,
                     "response cmd: %d != expect: %d",
                     response->header.cmd, expect_cmd);
-            return ERANGE;
+            return EINVAL;
         }
 
         return 0;

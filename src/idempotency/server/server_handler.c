@@ -174,7 +174,7 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
 }
 
 IdempotencyRequest *sf_server_update_prepare_and_check(
-        struct fast_task_info *task, struct fast_mblock_man *
+        SFRequestInfo *req, struct fast_mblock_man *
         request_allocator, IdempotencyChannel *channel,
         SFResponseInfo *response, int *result)
 {
@@ -188,8 +188,7 @@ IdempotencyRequest *sf_server_update_prepare_and_check(
         return NULL;
     }
 
-    adheader = (SFProtoIdempotencyAdditionalHeader *)
-        (task->data + sizeof(SFCommonProtoHeader));
+    adheader = (SFProtoIdempotencyAdditionalHeader *)req->body;
     request = (IdempotencyRequest *)fast_mblock_alloc_object(request_allocator);
     if (request == NULL) {
         *result = ENOMEM;
