@@ -125,6 +125,8 @@ static inline int sf_localize_errno(const int errnum)
             return EOPNOTSUPP;
         case SF_ERROR_ENODATA:
             return ENODATA;
+        case SF_SESSION_ERROR_NOT_EXIST:
+            return EPERM;
         default:
             return errnum;
     }
