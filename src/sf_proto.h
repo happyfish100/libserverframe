@@ -269,8 +269,8 @@ static inline void sf_log_network_error_ex1(SFResponseInfo *response,
     if (response->error.length > 0) {
         log_it_ex(&g_log_context, log_level,
                 "file: %s, line: %d, "
-                "server %s:%u, %s", file, line,
-                conn->ip_addr, conn->port,
+                "server %s:%u response message: %s",
+                file, line, conn->ip_addr, conn->port,
                 response->error.message);
     } else {
         log_it_ex(&g_log_context, log_level,
