@@ -25,15 +25,14 @@ extern "C" {
 
 int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
         *ini_ctx, const int default_port, char *full_cluster_filename,
-        char *full_server_filename, const int size);
+        const int size);
 
 static inline int sf_load_cluster_config(SFClusterConfig *cluster,
         IniFullContext *ini_ctx, const int default_port)
 {
     char full_cluster_filename[PATH_MAX];
-    char full_server_filename[PATH_MAX];
     return sf_load_cluster_config_ex(cluster, ini_ctx, default_port,
-            full_cluster_filename, full_server_filename, PATH_MAX);
+            full_cluster_filename, PATH_MAX);
 }
 
 #ifdef __cplusplus

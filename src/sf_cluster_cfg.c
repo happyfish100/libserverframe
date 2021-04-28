@@ -68,10 +68,9 @@ static int find_group_indexes_in_cluster_config(SFClusterConfig *cluster,
 
 static int load_server_cfg(SFClusterConfig *cluster,
         const char *cluster_filename, const int default_port,
-        char *full_server_filename, const int size)
+        const int size)
 {
     IniContext ini_context;
-    char *server_config_filename;
     const int min_hosts_each_group = 1;
     const bool share_between_groups = true;
     int result;
@@ -83,31 +82,17 @@ static int load_server_cfg(SFClusterConfig *cluster,
         return result;
     }
 
-    server_config_filename = iniGetStrValue(NULL,
-            "server_config_filename", &ini_context);
-    if (server_config_filename == NULL || *server_config_filename == '\0') {
-        logError("file: "__FILE__", line: %d, "
-                "config file: %s, item \"server_config_filename\" "
-                "not exist or empty", __LINE__, cluster_filename);
-        return ENOENT;
-    }
-
-    resolve_path(cluster_filename, server_config_filename,
-            full_server_filename, size);
-    if ((result=fc_server_load_from_file_ex(&cluster->server_cfg,
-                    full_server_filename, default_port,
-                    min_hosts_each_group, share_between_groups)) != 0)
-    {   
-        return result;
-    }
+    result = fc_server_load_from_ini_context_ex(&cluster->server_cfg,
+            &ini_context, cluster_filename, default_port,
+            min_hosts_each_group, share_between_groups);
 
     iniFreeContext(&ini_context);
-    return 0;
+    return result;
 }
 
 int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
         *ini_ctx, const int default_port, char *full_cluster_filename,
-        char *full_server_filename, const int size)
+        const int size)
 {
     int result;
     char *cluster_config_filename;
@@ -124,7 +109,7 @@ int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
     resolve_path(ini_ctx->filename, cluster_config_filename,
             full_cluster_filename, size);
     if ((result=load_server_cfg(cluster, full_cluster_filename,
-                    default_port, full_server_filename, size)) != 0)
+                    default_port, size)) != 0)
     {
         return result;
     }
