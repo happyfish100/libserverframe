@@ -67,6 +67,7 @@ typedef struct sf_binlog_writer_buffer_ring {
 typedef struct binlog_writer_thread {
     struct fast_mblock_man mblock;
     struct fc_queue queue;
+    char name[64];
     bool running;
     bool use_fixed_buffer_size;
     short order_mode;
@@ -127,13 +128,13 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
         const int buffer_size, const int ring_size);
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
-        SFBinlogWriterInfo *writer, const short order_mode,
+        const char *name, SFBinlogWriterInfo *writer, const short order_mode,
         const short order_by, const int max_record_size,
         const int writer_count, const bool use_fixed_buffer_size);
 
-#define sf_binlog_writer_init_thread(thread, \
+#define sf_binlog_writer_init_thread(thread, name, \
         writer, order_by, max_record_size)   \
-    sf_binlog_writer_init_thread_ex(thread, writer, \
+    sf_binlog_writer_init_thread_ex(thread, name, writer, \
             SF_BINLOG_THREAD_ORDER_MODE_FIXED,      \
             order_by, max_record_size, 1, true)
 
@@ -148,8 +149,9 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         return result;
     }
 
-    return sf_binlog_writer_init_thread(&context->thread, &context->writer,
-            SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE, max_record_size);
+    return sf_binlog_writer_init_thread(&context->thread, subdir_name,
+            &context->writer, SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE,
+            max_record_size);
 }
 
 int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,

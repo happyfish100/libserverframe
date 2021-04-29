@@ -535,6 +535,16 @@ static void *binlog_writer_func(void *arg)
     SFBinlogWriterBuffer *wb_head;
 
     thread = (SFBinlogWriterThread *)arg;
+
+#ifdef OS_LINUX
+    {
+        char thread_name[64];
+        snprintf(thread_name, sizeof(thread_name),
+                "writer-%s", thread->name);
+        prctl(PR_SET_NAME, thread_name);
+    }
+#endif
+
     thread->running = true;
     while (SF_G_CONTINUE_FLAG) {
         wb_head = (SFBinlogWriterBuffer *)fc_queue_pop_all(&thread->queue);
@@ -641,7 +651,7 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
-        SFBinlogWriterInfo *writer, const short order_mode,
+        const char *name, SFBinlogWriterInfo *writer, const short order_mode,
         const short order_by, const int max_record_size,
         const int writer_count, const bool use_fixed_buffer_size)
 {
@@ -650,6 +660,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     pthread_t tid;
     int result;
 
+    snprintf(thread->name, sizeof(thread->name), "%s", name);
     thread->order_mode = order_mode;
     thread->order_by = order_by;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;

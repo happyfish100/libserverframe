@@ -41,6 +41,7 @@ typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 
 typedef struct sf_context {
+    char name[64];
     struct nio_thread_data *thread_data;
     volatile int thread_count;
     int outer_sock;

@@ -115,7 +115,7 @@ static int sf_init_free_queues(const int task_arg_size,
     return 0;
 }
 
-int sf_service_init_ex2(SFContext *sf_context,
+int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_alloc_thread_extra_data_callback
         alloc_thread_extra_data_callback,
         ThreadLoopCallback thread_loop_callback,
@@ -135,6 +135,7 @@ int sf_service_init_ex2(SFContext *sf_context,
     pthread_t tid;
     pthread_attr_t thread_attr;
 
+    snprintf(sf_context->name, sizeof(sf_context->name), "%s", name);
     sf_context->realloc_task_buffer = g_sf_global_vars.
                     min_buff_size < g_sf_global_vars.max_buff_size;
     sf_context->accept_done_func = accept_done_callback;
@@ -234,7 +235,7 @@ int sf_service_init_ex2(SFContext *sf_context,
         thread_ctx->sf_context = sf_context;
         thread_ctx->thread_data = thread_data;
         if ((result=pthread_create(&tid, &thread_attr,
-            worker_thread_entrance, thread_ctx)) != 0)
+                        worker_thread_entrance, thread_ctx)) != 0)
         {
             logError("file: "__FILE__", line: %d, "
                     "create thread failed, startup threads: %d, "
@@ -284,6 +285,17 @@ static void *worker_thread_entrance(void *arg)
     int thread_count;
 
     thread_ctx = (struct worker_thread_context *)arg;
+
+#ifdef OS_LINUX
+    {
+        char thread_name[32];
+        snprintf(thread_name, sizeof(thread_name), "%s-net[%d]",
+                thread_ctx->sf_context->name, (int)(thread_ctx->
+                    thread_data - thread_ctx->sf_context->thread_data));
+        prctl(PR_SET_NAME, thread_name);
+    }
+#endif
+
     thread_count = __sync_add_and_fetch(&thread_ctx->
             sf_context->thread_count, 1);
 
@@ -375,6 +387,16 @@ static void *accept_thread_entrance(void *arg)
     struct fast_task_info *task;
 
     accept_context = (struct accept_thread_context *)arg;
+
+#ifdef OS_LINUX
+    {
+        char thread_name[32];
+        snprintf(thread_name, sizeof(thread_name), "%s-listen",
+                accept_context->sf_context->name);
+        prctl(PR_SET_NAME, thread_name);
+    }
+#endif
+
     while (g_sf_global_vars.continue_flag) {
         sockaddr_len = sizeof(inaddr);
         incomesock = accept(accept_context->server_sock,

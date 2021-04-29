@@ -817,6 +817,10 @@ static void *connection_manager_thread_func(void *arg)
     SFConnectionManager *cm;
     struct common_blocked_node *head;
 
+#ifdef OS_LINUX
+    prctl(PR_SET_NAME, "cm-alive-detect");
+#endif
+
     cm = (SFConnectionManager *)arg;
     logInfo("file: "__FILE__", line: %d, "
             "[%s] connection manager thread start",
