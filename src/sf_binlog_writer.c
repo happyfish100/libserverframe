@@ -540,7 +540,7 @@ static void *binlog_writer_func(void *arg)
     {
         char thread_name[64];
         snprintf(thread_name, sizeof(thread_name),
-                "writer-%s", thread->name);
+                "%s-writer", thread->name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif
