@@ -377,25 +377,13 @@ int sf_socket_server_ex(SFContext *sf_context)
     return 0;
 }
 
-static void *accept_thread_entrance(void *arg)
+static void accept_run(struct accept_thread_context *accept_context)
 {
-    struct accept_thread_context *accept_context;
     int incomesock;
     int port;
     struct sockaddr_in inaddr;
     socklen_t sockaddr_len;
     struct fast_task_info *task;
-
-    accept_context = (struct accept_thread_context *)arg;
-
-#ifdef OS_LINUX
-    {
-        char thread_name[32];
-        snprintf(thread_name, sizeof(thread_name), "%s-listen",
-                accept_context->sf_context->name);
-        prctl(PR_SET_NAME, thread_name);
-    }
-#endif
 
     while (g_sf_global_vars.continue_flag) {
         sockaddr_len = sizeof(inaddr);
@@ -439,7 +427,21 @@ static void *accept_thread_entrance(void *arg)
             sf_release_task(task);
         }
     }
+}
 
+static void *accept_thread_entrance(struct accept_thread_context
+        *accept_context)
+{
+#ifdef OS_LINUX
+    {
+        char thread_name[32];
+        snprintf(thread_name, sizeof(thread_name), "%s-listen",
+                accept_context->sf_context->name);
+        prctl(PR_SET_NAME, thread_name);
+    }
+#endif
+
+    accept_run(accept_context);
     return NULL;
 }
 
@@ -464,7 +466,7 @@ void _accept_loop(struct accept_thread_context *accept_context,
     else {
         for (i=0; i<accept_threads; i++) {
             if ((result=pthread_create(&tid, &thread_attr,
-                            accept_thread_entrance,
+                            (void * (*)(void *))accept_thread_entrance,
                             accept_context)) != 0)
             {
                 logError("file: "__FILE__", line: %d, "
@@ -510,14 +512,14 @@ void sf_accept_loop_ex(SFContext *sf_context, const bool block)
 
         if (block) {
             _accept_loop(accept_contexts + 1, sf_context->accept_threads - 1);
-            accept_thread_entrance(accept_contexts + 1);
+            accept_run(accept_contexts + 1);
         } else {
             _accept_loop(accept_contexts + 1, sf_context->accept_threads);
         }
     } else {
         if (block) {
             _accept_loop(accept_contexts, sf_context->accept_threads - 1);
-            accept_thread_entrance(accept_contexts);
+            accept_run(accept_contexts);
         } else {
             _accept_loop(accept_contexts, sf_context->accept_threads);
         }
