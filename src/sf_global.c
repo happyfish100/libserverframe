@@ -120,11 +120,9 @@ static int load_network_parameters(IniFullContext *ini_ctx,
 
     if (task_buffer_extra_size > 0) {
         g_sf_global_vars.min_buff_size += task_buffer_extra_size;
-        if (g_sf_global_vars.max_buff_size < g_sf_global_vars.min_buff_size) {
-            g_sf_global_vars.max_buff_size = g_sf_global_vars.min_buff_size;
-        }
-        if (g_sf_global_vars.max_pkg_size < g_sf_global_vars.min_buff_size) {
-            g_sf_global_vars.max_pkg_size = g_sf_global_vars.min_buff_size;
+        g_sf_global_vars.max_buff_size += task_buffer_extra_size;
+        if (g_sf_global_vars.max_pkg_size < g_sf_global_vars.max_buff_size) {
+            g_sf_global_vars.max_pkg_size = g_sf_global_vars.max_buff_size;
         }
     }
 
@@ -509,27 +507,29 @@ void sf_slow_log_config_to_string(SFSlowLogConfig *slow_log_cfg,
 void sf_global_config_to_string(char *output, const int size)
 {
     int len;
-    char sz_thread_stack_size[32];
-    char sz_max_pkg_size[32];
-    char sz_min_buff_size[32];
-    char sz_max_buff_size[32];
+    int max_pkg_size;
+    int min_buff_size;
+    int max_buff_size;
 
+    max_pkg_size = g_sf_global_vars.max_pkg_size -
+        g_sf_global_vars.task_buffer_extra_size;
+    min_buff_size = g_sf_global_vars.min_buff_size -
+        g_sf_global_vars.task_buffer_extra_size;
+    max_buff_size = g_sf_global_vars.max_buff_size -
+        g_sf_global_vars.task_buffer_extra_size;
     len = snprintf(output, size,
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
-            "network_timeout=%d, thread_stack_size=%s, max_pkg_size=%s, "
-            "min_buff_size=%s, max_buff_size=%s, task_buffer_extra_size=%d, "
-            "tcp_quick_ack=%d, log_level=%s, "
+            "network_timeout=%d, thread_stack_size=%d KB, "
+            "max_pkg_size=%d KB, min_buff_size=%d KB, "
+            "max_buff_size=%d KB, tcp_quick_ack=%d, log_level=%s, "
             "run_by_group=%s, run_by_user=%s, ",
             g_sf_global_vars.base_path,
             g_sf_global_vars.max_connections,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,
-            int_to_comma_str(g_sf_global_vars.thread_stack_size,
-                sz_thread_stack_size),
-            int_to_comma_str(g_sf_global_vars.max_pkg_size, sz_max_pkg_size),
-            int_to_comma_str(g_sf_global_vars.min_buff_size, sz_min_buff_size),
-            int_to_comma_str(g_sf_global_vars.max_buff_size, sz_max_buff_size),
-            g_sf_global_vars.task_buffer_extra_size,
+            g_sf_global_vars.thread_stack_size / 1024,
+            max_pkg_size / 1024, min_buff_size / 1024,
+            max_buff_size / 1024,
             g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
             g_sf_global_vars.run_by_group,
