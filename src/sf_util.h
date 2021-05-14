@@ -58,8 +58,10 @@ __FILE__, eln, eres, emsg, strerror(eres))
 
 #define dszoffset(cls, mem) ((char*)&((cls*)0)->mem -  ((char*)0))
 
-#define sf_parse_daemon_mode_and_action(argc, argv, daemon_mode, action) \
-    sf_parse_daemon_mode_and_action_ex(argc, argv, daemon_mode, action, "start")
+#define sf_parse_daemon_mode_and_action(argc, argv, \
+        version, daemon_mode, action) \
+    sf_parse_daemon_mode_and_action_ex(argc, argv, \
+            version, daemon_mode, action, "start")
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,8 +75,9 @@ int sf_printbuffer(char* buffer,int32_t len);
 
 void sf_usage(const char *program);
 
-void sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
-        bool *daemon_mode, char **action, const char *default_action);
+const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
+        const Version *version, bool *daemon_mode, char **action,
+        const char *default_action);
 
 int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 

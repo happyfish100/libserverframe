@@ -95,30 +95,79 @@ int sf_printbuffer(char* buffer,int32_t len)
 
 void sf_usage(const char *program)
 {
-    fprintf(stderr, "Usage: %s <config_file> [--without-daemon | --no-daemon] "
-            "[start | stop | restart]\n", program);
+    fprintf(stderr, "Usage: %s [options] <config_file> "
+            "[start | stop | restart]\n\noptions:\n"
+            "\t[--without-daemon | --no-daemon]: run in foreground\n"
+            "\t[-V | --version]: show version info\n"
+            "\t[-h | --help]: for this usage\n\n", program);
 }
 
-void sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
-        bool *daemon_mode, char **action, const char *default_action)
+const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
+        const Version *version, bool *daemon_mode, char **action,
+        const char *default_action)
 {
     int i;
+    const char *config_filepath;
 
     *daemon_mode = true;
-    for (i=2; i<argc; i++) {
+    for (i=1; i<argc; i++) {
+        if (argv[i][0] != '-') {
+            continue;
+        }
         if (strcmp(argv[i], "--without-daemon") == 0 ||
                 strcmp(argv[i], "--no-daemon") == 0)
         {
             *daemon_mode = false;
             break;
         }
+        if (strcmp(argv[i], "-V") == 0 ||
+                strcmp(argv[i], "--version") == 0)
+        {
+            char *last_slash;
+            char *proc_name;
+            if ((last_slash=strrchr(argv[0], '/')) != NULL) {
+                proc_name = last_slash + 1;
+            } else {
+                proc_name = argv[0];
+            }
+            printf("%s V%d.%d.%d\n\n", proc_name, version->major,
+                    version->minor, version->patch);
+            return NULL;
+        }
+        if (strcmp(argv[i], "-h") == 0 ||
+                strcmp(argv[i], "--help") == 0)
+        {
+            sf_usage(argv[0]);
+            return NULL;
+        }
+    }
+
+    if (*daemon_mode) {
+        config_filepath = argv[1];
+    } else {
+        if (argc == 2) {
+            sf_usage(argv[0]);
+            return NULL;
+        }
+
+        config_filepath = (i == 1) ? argv[2] : argv[1];
     }
 
     if (argc - (*daemon_mode ? 0 : 1) > 2) {
-        *action = argv[argc - 1];
+        int last_index;
+        last_index = argc - 1;
+        if (*daemon_mode) {
+            *action = argv[last_index];
+        } else {
+            *action = (i == last_index) ?
+                argv[last_index - 1] :
+                argv[last_index];
+        }
     } else {
         *action = (char *)default_action;
     }
+
+    return config_filepath;
 }
 
 int sf_logger_init(LogContext *pContext, const char *filename_prefix)
