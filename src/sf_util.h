@@ -58,26 +58,54 @@ __FILE__, eln, eres, emsg, strerror(eres))
 
 #define dszoffset(cls, mem) ((char*)&((cls*)0)->mem -  ((char*)0))
 
+#define sf_usage(program) sf_usage_ex1(program, NULL)
+
 #define sf_parse_daemon_mode_and_action(argc, argv, \
         version, daemon_mode, action) \
-    sf_parse_daemon_mode_and_action_ex(argc, argv, \
-            version, daemon_mode, action, "start")
+    sf_parse_daemon_mode_and_action_ex1(argc, argv, \
+            version, daemon_mode, action, "start", NULL)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int64_t getticks() ;
+int64_t getticks();
 
-void log_plus(const int priority, const char* file, int line, const char* fmt, ...);
+void log_plus(const int priority, const char *file,
+        int line, const char *fmt, ...);
 
-int sf_printbuffer(char* buffer,int32_t len);
+int sf_printbuffer(char *buffer,int32_t len);
 
-void sf_usage(const char *program);
+void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options);
 
-const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
+static inline void sf_usage_ex(const char *program, const char *other_option)
+{
+    const char *strs[1];
+    str_ptr_array_t options;
+
+    strs[0] = other_option;
+    options.count = 1;
+    options.strs = (char **)strs;
+    sf_usage_ex1(program, &options);
+}
+
+const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
         const Version *version, bool *daemon_mode, char **action,
-        const char *default_action);
+        const char *default_action, const str_ptr_array_t *other_options);
+
+static inline const char *sf_parse_daemon_mode_and_action_ex(int argc,
+        char *argv[], const Version *version, bool *daemon_mode,
+        char **action, const char *default_action, const char *other_option)
+{
+    const char *strs[1];
+    str_ptr_array_t options;
+
+    strs[0] = other_option;
+    options.count = 1;
+    options.strs = (char **)strs;
+    return sf_parse_daemon_mode_and_action_ex1(argc, argv, version,
+            daemon_mode, action, default_action, &options);
+}
 
 int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 

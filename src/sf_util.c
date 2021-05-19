@@ -93,27 +93,49 @@ int sf_printbuffer(char* buffer,int32_t len)
     return(0);
 }
 
-void sf_usage(const char *program)
-{
-    fprintf(stderr, "Usage: %s [options] <config_file> "
-            "[start | stop | restart]\n\noptions:\n"
-            "\t[--without-daemon | --no-daemon]: run in foreground\n"
-            "\t[-V | --version]: show version info\n"
-            "\t[-h | --help]: for this usage\n\n", program);
-}
-
-const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
-        const Version *version, bool *daemon_mode, char **action,
-        const char *default_action)
+void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options)
 {
     int i;
+
+    fprintf(stderr, "Usage: %s [options] <config_file> "
+            "[start | stop | restart]\n\noptions:\n", program);
+
+    if (other_options != NULL) {
+        for (i=0; i<other_options->count; i++) {
+            fprintf(stderr, "\t%s\n", other_options->strs[i]);
+        }
+    }
+
+    fprintf(stderr, "\t--without-daemon | --no-daemon: run in foreground\n"
+            "\t-V | --version: show version info\n"
+            "\t-h | --help: for this usage\n\n");
+}
+
+const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
+        const Version *version, bool *daemon_mode, char **action,
+        const char *default_action, const str_ptr_array_t *other_options)
+{
+#define CMD_NORMAL_ARG_COUNT 2
+    int i;
+    struct {
+        int argc;
+        char *argv[CMD_NORMAL_ARG_COUNT];
+    } normal;
     const char *config_filepath;
 
+    normal.argc = 0;
     *daemon_mode = true;
     for (i=1; i<argc; i++) {
         if (argv[i][0] != '-') {
+            if (normal.argc == CMD_NORMAL_ARG_COUNT) {
+                fprintf(stderr, "too many arguments!\n\n");
+                sf_usage_ex1(argv[0], other_options);
+                return NULL;
+            }
+            normal.argv[normal.argc++] = argv[i];
             continue;
         }
+
         if (strcmp(argv[i], "--without-daemon") == 0 ||
                 strcmp(argv[i], "--no-daemon") == 0)
         {
@@ -137,32 +159,19 @@ const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
         if (strcmp(argv[i], "-h") == 0 ||
                 strcmp(argv[i], "--help") == 0)
         {
-            sf_usage(argv[0]);
+            sf_usage_ex1(argv[0], other_options);
             return NULL;
         }
     }
 
-    if (*daemon_mode) {
-        config_filepath = argv[1];
-    } else {
-        if (argc == 2) {
-            sf_usage(argv[0]);
-            return NULL;
-        }
-
-        config_filepath = (i == 1) ? argv[2] : argv[1];
+    if (normal.argc == 0) {
+        sf_usage_ex1(argv[0], other_options);
+        return NULL;
     }
 
-    if (argc - (*daemon_mode ? 0 : 1) > 2) {
-        int last_index;
-        last_index = argc - 1;
-        if (*daemon_mode) {
-            *action = argv[last_index];
-        } else {
-            *action = (i == last_index) ?
-                argv[last_index - 1] :
-                argv[last_index];
-        }
+    config_filepath = normal.argv[0];
+    if (normal.argc > 1) {
+        *action = normal.argv[1];
     } else {
         *action = (char *)default_action;
     }
