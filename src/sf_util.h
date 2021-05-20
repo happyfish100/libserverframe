@@ -107,6 +107,10 @@ static inline const char *sf_parse_daemon_mode_and_action_ex(int argc,
             daemon_mode, action, default_action, &options);
 }
 
+void sf_parse_cmd_option_bool(int argc, char *argv[],
+        const string_t *short_option, const string_t *long_option,
+        bool *value);
+
 int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 
 ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,

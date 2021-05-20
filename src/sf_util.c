@@ -97,7 +97,7 @@ void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options)
 {
     int i;
 
-    fprintf(stderr, "Usage: %s [options] <config_file> "
+    fprintf(stderr, "\nUsage: %s [options] <config_file> "
             "[start | stop | restart]\n\noptions:\n", program);
 
     if (other_options != NULL) {
@@ -106,7 +106,8 @@ void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options)
         }
     }
 
-    fprintf(stderr, "\t--without-daemon | --no-daemon: run in foreground\n"
+    fprintf(stderr, "\t-n | --without-daemon | --no-daemon: "
+            "run in foreground\n"
             "\t-V | --version: show version info\n"
             "\t-h | --help: for this usage\n\n");
 }
@@ -128,7 +129,7 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
     for (i=1; i<argc; i++) {
         if (argv[i][0] != '-') {
             if (normal.argc == CMD_NORMAL_ARG_COUNT) {
-                fprintf(stderr, "too many arguments!\n\n");
+                fprintf(stderr, "\nError: too many arguments!\n");
                 sf_usage_ex1(argv[0], other_options);
                 return NULL;
             }
@@ -136,7 +137,8 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
             continue;
         }
 
-        if (strcmp(argv[i], "--without-daemon") == 0 ||
+        if (strcmp(argv[i], "-n") == 0 ||
+                strcmp(argv[i], "--without-daemon") == 0 ||
                 strcmp(argv[i], "--no-daemon") == 0)
         {
             *daemon_mode = false;
@@ -152,7 +154,7 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
             } else {
                 proc_name = argv[0];
             }
-            printf("%s V%d.%d.%d\n\n", proc_name, version->major,
+            printf("\n%s V%d.%d.%d\n\n", proc_name, version->major,
                     version->minor, version->patch);
             return NULL;
         }
@@ -165,6 +167,7 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
     }
 
     if (normal.argc == 0) {
+        fprintf(stderr, "\nError: expect config file!\n");
         sf_usage_ex1(argv[0], other_options);
         return NULL;
     }
@@ -177,6 +180,31 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
     }
 
     return config_filepath;
+}
+
+void sf_parse_cmd_option_bool(int argc, char *argv[],
+        const string_t *short_option, const string_t *long_option,
+        bool *value)
+{
+    char **pp;
+    char **end;
+    int len;
+
+    *value = false;
+    end = argv + argc;
+    for (pp=argv + 1; pp<end; pp++) {
+        if (**pp != '-') {
+            continue;
+        }
+
+        len = strlen(*pp);
+        if (fc_string_equals2(short_option, *pp, len) ||
+                fc_string_equals2(long_option, *pp, len))
+        {
+            *value = true;
+            break;
+        }
+    }
 }
 
 int sf_logger_init(LogContext *pContext, const char *filename_prefix)
