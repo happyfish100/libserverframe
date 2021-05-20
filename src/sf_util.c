@@ -181,6 +181,11 @@ const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
             inc = match_option(argv[i], other_options);
             if (inc > 0) {
                 i += inc;
+                if (i > argc) {
+                    fprintf(stderr, "\nError: expect argument!\n");
+                    sf_usage_ex(argv[0], other_options);
+                    return NULL;
+                }
                 continue;
             }
         }
