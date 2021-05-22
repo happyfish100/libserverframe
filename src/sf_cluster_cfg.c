@@ -68,11 +68,10 @@ static int find_group_indexes_in_cluster_config(SFClusterConfig *cluster,
 
 static int load_server_cfg(SFClusterConfig *cluster,
         const char *cluster_filename, const int default_port,
-        const int size)
+        const bool share_between_groups)
 {
     IniContext ini_context;
     const int min_hosts_each_group = 1;
-    const bool share_between_groups = true;
     int result;
 
     if ((result=iniLoadFromFile(cluster_filename, &ini_context)) != 0) {
@@ -90,11 +89,38 @@ static int load_server_cfg(SFClusterConfig *cluster,
     return result;
 }
 
+int sf_load_cluster_config_by_file(SFClusterConfig *cluster,
+        const char *full_cluster_filename, const int default_port,
+        const bool share_between_groups, const bool calc_sign)
+{
+    int result;
+
+    if ((result=load_server_cfg(cluster, full_cluster_filename,
+                    default_port, share_between_groups)) != 0)
+    {
+        return result;
+    }
+
+    if ((result=find_group_indexes_in_cluster_config(cluster,
+                    full_cluster_filename)) != 0)
+    {
+        return result;
+    }
+
+    if (calc_sign) {
+        if ((result=calc_cluster_config_sign(cluster)) != 0) {
+            return result;
+        }
+    }
+
+    return 0;
+}
+
 int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
         *ini_ctx, const int default_port, char *full_cluster_filename,
         const int size)
 {
-    int result;
+    const bool share_between_groups = true;
     char *cluster_config_filename;
     
     cluster_config_filename = iniGetStrValue(ini_ctx->section_name,
@@ -108,21 +134,6 @@ int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
     
     resolve_path(ini_ctx->filename, cluster_config_filename,
             full_cluster_filename, size);
-    if ((result=load_server_cfg(cluster, full_cluster_filename,
-                    default_port, size)) != 0)
-    {
-        return result;
-    }
-
-    if ((result=find_group_indexes_in_cluster_config(
-                    cluster, ini_ctx->filename)) != 0)
-    {
-        return result;
-    }
-
-    if ((result=calc_cluster_config_sign(cluster)) != 0) {
-        return result;
-    }
-
-    return 0;
+    return sf_load_cluster_config_by_file(cluster, full_cluster_filename,
+            default_port, share_between_groups, true);
 }

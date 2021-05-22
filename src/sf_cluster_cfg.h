@@ -35,6 +35,10 @@ static inline int sf_load_cluster_config(SFClusterConfig *cluster,
             full_cluster_filename, PATH_MAX);
 }
 
+int sf_load_cluster_config_by_file(SFClusterConfig *cluster,
+        const char *full_cluster_filename, const int default_port,
+        const bool share_between_groups, const bool calc_sign);
+
 #ifdef __cplusplus
 }
 #endif
