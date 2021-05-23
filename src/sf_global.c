@@ -37,7 +37,8 @@ SFGlobalVariables g_sf_global_vars = {
     {'/', 't', 'm', 'p', '\0'}, true, true, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
-    0, 0, 0, {'\0'}, {'\0'}, {SYNC_LOG_BUFF_DEF_INTERVAL, false}, {0, 0}
+    0, 0, 0, {'\0'}, {'\0'}, {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
+    {0, 0}
 };
 
 SFContext g_sf_context = {
@@ -147,9 +148,9 @@ int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
 
     log_cfg->sync_log_buff_interval = iniGetIntValueEx(
             ini_ctx->section_name, "sync_log_buff_interval",
-            ini_ctx->context, SYNC_LOG_BUFF_DEF_INTERVAL, true);
+            ini_ctx->context, SF_DEF_SYNC_LOG_BUFF_INTERVAL, true);
     if (log_cfg->sync_log_buff_interval <= 0) {
-        log_cfg->sync_log_buff_interval = SYNC_LOG_BUFF_DEF_INTERVAL;
+        log_cfg->sync_log_buff_interval = SF_DEF_SYNC_LOG_BUFF_INTERVAL;
     }
 
     log_cfg->rotate_everyday = iniGetBoolValueEx(ini_ctx->section_name,
