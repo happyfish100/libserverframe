@@ -63,7 +63,7 @@ __FILE__, eln, eres, emsg, strerror(eres))
 
 #define sf_parse_daemon_mode_and_action(argc, argv, \
         version, daemon_mode, action) \
-    sf_parse_daemon_mode_and_action_ex1(argc, argv, \
+    sf_parse_daemon_mode_and_action_ex(argc, argv, \
             version, daemon_mode, action, "start", NULL)
 
 #define SF_COMMON_OPT_STRING  "NVh"
