@@ -200,6 +200,13 @@ typedef struct sf_key_value_array {
     int alloc;
 } SFKeyValueArray;
 
+typedef struct sf_cmd_option {
+    string_t name;
+    int val;
+    bool has_arg;
+    const char *desc;
+} SFCMDOption;
+
 typedef enum sf_server_group_index_type {
     sf_server_group_index_type_cluster = 1,
     sf_server_group_index_type_service

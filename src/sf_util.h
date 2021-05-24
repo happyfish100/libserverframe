@@ -18,6 +18,7 @@
 #ifndef _SF_UTIL_H_
 #define _SF_UTIL_H_
 
+#include <getopt.h>
 #include "fastcommon/logger.h"
 #include "fastcommon/sched_thread.h"
 #include "sf_define.h"
@@ -58,12 +59,18 @@ __FILE__, eln, eres, emsg, strerror(eres))
 
 #define dszoffset(cls, mem) ((char*)&((cls*)0)->mem -  ((char*)0))
 
-#define sf_usage(program) sf_usage_ex1(program, NULL)
+#define sf_usage(program) sf_usage_ex(program, NULL)
 
 #define sf_parse_daemon_mode_and_action(argc, argv, \
         version, daemon_mode, action) \
     sf_parse_daemon_mode_and_action_ex1(argc, argv, \
             version, daemon_mode, action, "start", NULL)
+
+#define SF_COMMON_OPT_STRING  "NVh"
+#define SF_COMMON_LONG_OPTIONS  \
+    {"no-daemon", no_argument, NULL, 'N'}, \
+    {"version",   no_argument, NULL, 'V'},   \
+    {"help",      no_argument, NULL, 'h'}
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,36 +83,11 @@ void log_plus(const int priority, const char *file,
 
 int sf_printbuffer(char *buffer,int32_t len);
 
-void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options);
+void sf_usage_ex(const char *program, const SFCMDOption *other_options);
 
-static inline void sf_usage_ex(const char *program, const char *other_option)
-{
-    const char *strs[1];
-    str_ptr_array_t options;
-
-    strs[0] = other_option;
-    options.count = 1;
-    options.strs = (char **)strs;
-    sf_usage_ex1(program, &options);
-}
-
-const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
+const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
         const Version *version, bool *daemon_mode, char **action,
-        const char *default_action, const str_ptr_array_t *other_options);
-
-static inline const char *sf_parse_daemon_mode_and_action_ex(int argc,
-        char *argv[], const Version *version, bool *daemon_mode,
-        char **action, const char *default_action, const char *other_option)
-{
-    const char *strs[1];
-    str_ptr_array_t options;
-
-    strs[0] = other_option;
-    options.count = 1;
-    options.strs = (char **)strs;
-    return sf_parse_daemon_mode_and_action_ex1(argc, argv, version,
-            daemon_mode, action, default_action, &options);
-}
+        const char *default_action, const SFCMDOption *other_options);
 
 void sf_parse_cmd_option_bool(int argc, char *argv[],
         const string_t *short_option, const string_t *long_option,

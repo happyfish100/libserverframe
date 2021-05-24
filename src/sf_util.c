@@ -93,31 +93,70 @@ int sf_printbuffer(char* buffer,int32_t len)
     return(0);
 }
 
-void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options)
+void sf_usage_ex(const char *program, const SFCMDOption *other_options)
 {
-    int i;
-
     fprintf(stderr, "\nUsage: %s [options] <config_file> "
             "[start | stop | restart]\n\noptions:\n", program);
 
     if (other_options != NULL) {
-        for (i=0; i<other_options->count; i++) {
-            fprintf(stderr, "\t%s\n", other_options->strs[i]);
+        const SFCMDOption *option;
+        option = other_options;
+        while (option->name.str != NULL) {
+            fprintf(stderr, "\t%s\n", option->desc);
+            option++;
         }
     }
 
-    fprintf(stderr, "\t-N | --without-daemon | --no-daemon: "
-            "run in foreground\n"
+    fprintf(stderr, "\t-N | --no-daemon: run in foreground\n"
             "\t-V | --version: show version info\n"
             "\t-h | --help: for this usage\n\n");
 }
 
-const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
+static int match_option(const char *str, const SFCMDOption *option)
+{
+    const char *start;
+    const char *end;
+
+    if (str[1] == '-') {
+        start = str + 2;
+        while (option->name.str != NULL) {
+            if (strncmp(option->name.str, start,
+                        option->name.len) == 0)
+            {
+                end = start + option->name.len;
+                if (*end == '\0') {
+                    return option->has_arg ? 2 : 1;
+                } else if (*end == '=') {
+                    return 1;
+                }
+            }
+
+            option++;
+        }
+    } else {
+        while (option->name.str != NULL) {
+            if (option->val == str[1]) {
+                if (str[2] == '\0') {
+                    return option->has_arg ? 2 : 1;
+                } else {
+                    return 1;
+                }
+            }
+            option++;
+        }
+    }
+
+    return 0;
+}
+
+
+const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
         const Version *version, bool *daemon_mode, char **action,
-        const char *default_action, const str_ptr_array_t *other_options)
+        const char *default_action, const SFCMDOption *other_options)
 {
 #define CMD_NORMAL_ARG_COUNT 2
     int i;
+    bool inc;
     struct {
         int argc;
         char *argv[CMD_NORMAL_ARG_COUNT];
@@ -126,24 +165,26 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
 
     normal.argc = 0;
     *daemon_mode = true;
-    for (i=1; i<argc; i++) {
+    i = 1;
+    while (i < argc) {
         if (argv[i][0] != '-') {
             if (normal.argc == CMD_NORMAL_ARG_COUNT) {
                 fprintf(stderr, "\nError: too many arguments!\n");
-                sf_usage_ex1(argv[0], other_options);
+                sf_usage_ex(argv[0], other_options);
                 return NULL;
             }
-            normal.argv[normal.argc++] = argv[i];
+            normal.argv[normal.argc++] = argv[i++];
             continue;
         }
 
-        if (strcmp(argv[i], "-N") == 0 ||
-                strcmp(argv[i], "--without-daemon") == 0 ||
-                strcmp(argv[i], "--no-daemon") == 0)
-        {
-            *daemon_mode = false;
-            break;
+        if (other_options != NULL) {
+            inc = match_option(argv[i], other_options);
+            if (inc > 0) {
+                i += inc;
+                continue;
+            }
         }
+
         if (strcmp(argv[i], "-V") == 0 ||
                 strcmp(argv[i], "--version") == 0)
         {
@@ -161,14 +202,25 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
         if (strcmp(argv[i], "-h") == 0 ||
                 strcmp(argv[i], "--help") == 0)
         {
-            sf_usage_ex1(argv[0], other_options);
+            sf_usage_ex(argv[0], other_options);
+            return NULL;
+        }
+
+        if (strcmp(argv[i], "-N") == 0 ||
+                strcmp(argv[i], "--no-daemon") == 0)
+        {
+            *daemon_mode = false;
+            i++;
+        } else {
+            fprintf(stderr, "\nError: unrecognized option: %s\n", argv[i]);
+            sf_usage_ex(argv[0], other_options);
             return NULL;
         }
     }
 
     if (normal.argc == 0) {
         fprintf(stderr, "\nError: expect config file!\n");
-        sf_usage_ex1(argv[0], other_options);
+        sf_usage_ex(argv[0], other_options);
         return NULL;
     }
 
