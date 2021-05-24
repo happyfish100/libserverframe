@@ -106,7 +106,7 @@ void sf_usage_ex1(const char *program, const str_ptr_array_t *other_options)
         }
     }
 
-    fprintf(stderr, "\t-n | --without-daemon | --no-daemon: "
+    fprintf(stderr, "\t-N | --without-daemon | --no-daemon: "
             "run in foreground\n"
             "\t-V | --version: show version info\n"
             "\t-h | --help: for this usage\n\n");
@@ -137,7 +137,7 @@ const char *sf_parse_daemon_mode_and_action_ex1(int argc, char *argv[],
             continue;
         }
 
-        if (strcmp(argv[i], "-n") == 0 ||
+        if (strcmp(argv[i], "-N") == 0 ||
                 strcmp(argv[i], "--without-daemon") == 0 ||
                 strcmp(argv[i], "--no-daemon") == 0)
         {
