@@ -156,7 +156,7 @@ const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
 {
 #define CMD_NORMAL_ARG_COUNT 2
     int i;
-    bool inc;
+    int inc;
     struct {
         int argc;
         char *argv[CMD_NORMAL_ARG_COUNT];
