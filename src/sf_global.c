@@ -236,8 +236,7 @@ int sf_load_global_config_ex(const char *server_name,
                     "\"base_path\"!", __LINE__, ini_ctx->filename);
             return ENOENT;
         }
-        snprintf(SF_G_BASE_PATH, sizeof(SF_G_BASE_PATH), "%s", pBasePath);
-        g_sf_global_vars.base_path.inited = true;
+        sf_set_global_base_path(pBasePath);
     }
 
     chopPath(SF_G_BASE_PATH);

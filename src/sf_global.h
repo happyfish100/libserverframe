@@ -199,6 +199,12 @@ void sf_log_config_ex(const char *other_config);
 #define sf_log_config_to_string(log_cfg, caption, output, size)  \
     sf_log_config_to_string_ex(log_cfg, caption, NULL, output, size)
 
+static inline void sf_set_global_base_path(const char *base_path)
+{
+    snprintf(SF_G_BASE_PATH, sizeof(SF_G_BASE_PATH), "%s", base_path);
+    g_sf_global_vars.base_path.inited = true;
+}
+
 #ifdef __cplusplus
 }
 #endif
