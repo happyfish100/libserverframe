@@ -32,7 +32,10 @@ typedef struct sf_connection_stat {
 typedef struct sf_global_variables {
     int connect_timeout;
     int network_timeout;
-    char base_path[MAX_PATH_SIZE];
+    struct {
+        char str[MAX_PATH_SIZE];
+        bool inited;
+    } base_path;
 
     volatile bool continue_flag;
     bool tcp_quick_ack;
@@ -67,7 +70,7 @@ extern "C" {
 extern SFGlobalVariables         g_sf_global_vars;
 extern SFContext                 g_sf_context;
 
-#define SF_G_BASE_PATH           g_sf_global_vars.base_path
+#define SF_G_BASE_PATH           g_sf_global_vars.base_path.str
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout

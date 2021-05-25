@@ -271,7 +271,7 @@ int sf_logger_init(LogContext *pContext, const char *filename_prefix)
         return result;
     }
 
-    if ((result=log_set_prefix_ex(pContext, g_sf_global_vars.base_path,
+    if ((result=log_set_prefix_ex(pContext, SF_G_BASE_PATH,
                     filename_prefix)) != 0)
     {
         return result;

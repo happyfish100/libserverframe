@@ -539,7 +539,7 @@ static void sigDumpHandler(int sig)
     bDumpFlag = true;
 
     snprintf(filename, sizeof(filename), 
-        "%s/logs/sf_dump.log", g_sf_global_vars.base_path);
+        "%s/logs/sf_dump.log", SF_G_BASE_PATH);
     //manager_dump_global_vars_to_file(filename);
 
     bDumpFlag = false;
