@@ -239,17 +239,17 @@ int sf_load_global_config_ex(const char *server_name,
         sf_set_global_base_path(pBasePath);
     }
 
-    chopPath(SF_G_BASE_PATH);
-    if (!fileExists(SF_G_BASE_PATH)) {
+    chopPath(SF_G_BASE_PATH_STR);
+    if (!fileExists(SF_G_BASE_PATH_STR)) {
         logError("file: "__FILE__", line: %d, "
                 "\"%s\" can't be accessed, error info: %s",
-                __LINE__, SF_G_BASE_PATH, strerror(errno));
+                __LINE__, SF_G_BASE_PATH_STR, strerror(errno));
         return errno != 0 ? errno : ENOENT;
     }
-    if (!isDir(SF_G_BASE_PATH)) {
+    if (!isDir(SF_G_BASE_PATH_STR)) {
         logError("file: "__FILE__", line: %d, "
                 "\"%s\" is not a directory!",
-                __LINE__, SF_G_BASE_PATH);
+                __LINE__, SF_G_BASE_PATH_STR);
         return ENOTDIR;
     }
 
@@ -340,7 +340,7 @@ int sf_load_global_config_ex(const char *server_name,
     ini_ctx->section_name = old_section_name;
 
     load_log_level(ini_ctx->context);
-    if ((result=log_set_prefix(SF_G_BASE_PATH, server_name)) != 0) {
+    if ((result=log_set_prefix(SF_G_BASE_PATH_STR, server_name)) != 0) {
         return result;
     }
 
@@ -525,7 +525,7 @@ void sf_global_config_to_string(char *output, const int size)
             "network_timeout=%d, thread_stack_size=%d KB, "
             "max_pkg_size=%d KB, min_buff_size=%d KB, "
             "max_buff_size=%d KB, tcp_quick_ack=%d, log_level=%s, "
-            "run_by_group=%s, run_by_user=%s, ", SF_G_BASE_PATH,
+            "run_by_group=%s, run_by_user=%s, ", SF_G_BASE_PATH_STR,
             g_sf_global_vars.max_connections,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,

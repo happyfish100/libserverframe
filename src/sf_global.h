@@ -70,7 +70,8 @@ extern "C" {
 extern SFGlobalVariables         g_sf_global_vars;
 extern SFContext                 g_sf_context;
 
-#define SF_G_BASE_PATH           g_sf_global_vars.base_path.str
+#define SF_G_BASE_PATH_STR       g_sf_global_vars.base_path.str
+#define SF_G_BASE_PATH_INITED    g_sf_global_vars.base_path.inited
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
@@ -201,8 +202,9 @@ void sf_log_config_ex(const char *other_config);
 
 static inline void sf_set_global_base_path(const char *base_path)
 {
-    snprintf(SF_G_BASE_PATH, sizeof(SF_G_BASE_PATH), "%s", base_path);
-    g_sf_global_vars.base_path.inited = true;
+    snprintf(SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR),
+            "%s", base_path);
+    SF_G_BASE_PATH_INITED = true;
 }
 
 #ifdef __cplusplus
