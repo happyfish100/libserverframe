@@ -131,7 +131,8 @@ static int check_report_req_receipt(struct fast_task_info *task)
         return 0;
     }
 
-    fc_queue_pop_to_queue(&channel->queue, &channel->waiting_resp_qinfo);
+    fc_queue_try_pop_to_queue(&channel->queue,
+            &channel->waiting_resp_qinfo);
     if (channel->waiting_resp_qinfo.head == NULL) {
         return 0;
     }
