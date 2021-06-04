@@ -207,6 +207,11 @@ typedef struct sf_cmd_option {
     const char *desc;
 } SFCMDOption;
 
+typedef struct sf_memory_watermark {
+    int64_t low;
+    int64_t high;
+} SFMemoryWatermark;
+
 typedef enum sf_server_group_index_type {
     sf_server_group_index_type_cluster = 1,
     sf_server_group_index_type_service
