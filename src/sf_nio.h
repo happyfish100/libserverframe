@@ -32,13 +32,14 @@ extern "C" {
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
-        sf_recv_timeout_callback timeout_callback);
+        sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
+        release_buffer_callback);
 
 #define sf_set_parameters(header_size, set_body_length_func, \
         deal_func, cleanup_func, timeout_callback)   \
     sf_set_parameters_ex(&g_sf_context, header_size, \
             set_body_length_func, deal_func, \
-            cleanup_func, timeout_callback)
+            cleanup_func, timeout_callback, NULL)
 
 static inline void sf_set_deal_task_func_ex(SFContext *sf_context,
         sf_deal_task_func deal_func)

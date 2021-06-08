@@ -40,6 +40,9 @@ typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
 typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 
+/* calback for release iovec buffer */
+typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
+
 typedef struct sf_context {
     char name[64];
     struct nio_thread_data *thread_data;
@@ -63,6 +66,7 @@ typedef struct sf_context {
     sf_accept_done_callback accept_done_func;
     TaskCleanUpCallback task_cleanup_func;
     sf_recv_timeout_callback timeout_callback;
+    sf_release_buffer_callback release_buffer_callback;
 } SFContext;
 
 typedef struct {

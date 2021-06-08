@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -45,13 +46,15 @@
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
-        sf_recv_timeout_callback timeout_callback)
+        sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
+        release_buffer_callback)
 {
     sf_context->header_size = header_size;
     sf_context->set_body_length = set_body_length_func;
     sf_context->deal_task = deal_func;
     sf_context->task_cleanup_func = cleanup_func;
     sf_context->timeout_callback = timeout_callback;
+    sf_context->release_buffer_callback = release_buffer_callback;
 }
 
 void sf_task_detach_thread(struct fast_task_info *task)
@@ -76,6 +79,17 @@ void sf_task_switch_thread(struct fast_task_info *task,
     task->thread_data = SF_CTX->thread_data + new_thread_index;
 }
 
+static inline void release_iovec_buffer(struct fast_task_info *task)
+{
+    if (task->iovec_array.iovs != NULL) {
+        if (SF_CTX->release_buffer_callback != NULL) {
+            SF_CTX->release_buffer_callback(task);
+        }
+        task->iovec_array.iovs = NULL;
+        task->iovec_array.count = 0;
+    }
+}
+
 void sf_task_finish_clean_up(struct fast_task_info *task)
 {
     /*
@@ -92,6 +106,8 @@ void sf_task_finish_clean_up(struct fast_task_info *task)
         task->finish_callback(task);
         task->finish_callback = NULL;
     }
+
+    release_iovec_buffer(task);
 
     sf_task_detach_thread(task);
     close(task->event.fd);
@@ -667,8 +683,13 @@ int sf_client_sock_write(int sock, short event, void *arg)
             &task->event.timer, g_current_time +
             task->network_timeout);
 
-        bytes = write(sock, task->data + task->offset,
-                task->length - task->offset);
+        if (task->iovec_array.iovs != NULL) {
+            bytes = writev(sock, task->iovec_array.iovs,
+                    task->iovec_array.count);
+        } else {
+            bytes = write(sock, task->data + task->offset,
+                    task->length - task->offset);
+        }
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
@@ -704,12 +725,43 @@ int sf_client_sock_write(int sock, short event, void *arg)
         total_write += bytes;
         task->offset += bytes;
         if (task->offset >= task->length) {
+            release_iovec_buffer(task);
+
             task->offset = 0;
             task->length = 0;
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }
             break;
+        }
+
+        /* set next writev iovec array */
+        if (task->iovec_array.iovs != NULL) {
+            struct iovec *iov;
+            struct iovec *end;
+            int iov_sum;
+            int iov_remain;
+
+            iov = task->iovec_array.iovs;
+            end = task->iovec_array.iovs + task->iovec_array.count;
+            iov_sum = 0;
+            do {
+                iov_sum += iov->iov_len;
+                iov_remain = iov_sum - bytes;
+                if (iov_remain == 0) {
+                    iov++;
+                    break;
+                } else if (iov_remain > 0) {
+                    iov->iov_base += (iov->iov_len - iov_remain);
+                    iov->iov_len = iov_remain;
+                    break;
+                }
+
+                iov++;
+            } while (iov < end);
+
+            task->iovec_array.iovs = iov;
+            task->iovec_array.count = end - iov;
         }
     }
 
