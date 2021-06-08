@@ -685,7 +685,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
         if (task->iovec_array.iovs != NULL) {
             bytes = writev(sock, task->iovec_array.iovs,
-                    task->iovec_array.count);
+                    FC_MIN(task->iovec_array.count, IOV_MAX));
         } else {
             bytes = write(sock, task->data + task->offset,
                     task->length - task->offset);
