@@ -79,7 +79,7 @@ static int init_sharding(SFHtableSharding *sharding,
 
     sharding->hashtable.capacity = per_capacity;
     sharding->element_count = 0;
-    sharding->last_reclaim_time_ms = 1000LL * get_current_time();
+    sharding->last_reclaim_time_ms = 1000LL * (int64_t)get_current_time();
     FC_INIT_LIST_HEAD(&sharding->lru);
     return 0;
 }
@@ -222,7 +222,7 @@ static inline void htable_insert(SFHtableShardingContext *sharding_ctx,
     fc_list_add_internal(&entry->dlinks.htable, previous, previous->next);
 }
 
-static SFShardingHashEntry *otid_entry_reclaim(SFHtableSharding *sharding)
+static SFShardingHashEntry *hash_entry_reclaim(SFHtableSharding *sharding)
 {
     int64_t current_time_ms;
     int64_t reclaim_ttl_ms;
@@ -251,7 +251,7 @@ static SFShardingHashEntry *otid_entry_reclaim(SFHtableSharding *sharding)
 
     first = NULL;
     reclaim_count = 0;
-    current_time_ms = 1000LL * get_current_time();
+    current_time_ms = 1000LL * (int64_t)get_current_time();
     reclaim_ttl_ms = (int64_t)(sharding->ctx->sharding_reclaim.max_ttl_ms -
             sharding->ctx->sharding_reclaim.elt_ttl_ms * delta);
     fc_list_for_each_entry_safe(entry, tmp, &sharding->lru, dlinks.lru) {
@@ -300,13 +300,13 @@ static inline SFShardingHashEntry *htable_entry_alloc(
     if (sharding->element_count > sharding->ctx->
             sharding_reclaim.elt_water_mark)
     {
-        current_time_ms = 1000LL * get_current_time();
+        current_time_ms = 1000LL * (int64_t)get_current_time();
         last_reclaim_time_ms = FC_ATOMIC_GET(sharding->last_reclaim_time_ms);
         if (current_time_ms - last_reclaim_time_ms > 100 &&
                 __sync_bool_compare_and_swap(&sharding->last_reclaim_time_ms,
                     last_reclaim_time_ms, current_time_ms))
         {
-            if ((entry=otid_entry_reclaim(sharding)) != NULL) {
+            if ((entry=hash_entry_reclaim(sharding)) != NULL) {
                 return entry;
             }
         }
@@ -378,7 +378,7 @@ int sf_sharding_htable_insert(SFHtableShardingContext
             fc_list_move_tail(&entry->dlinks.lru, &sharding->lru);
         }
 
-        entry->last_update_time_ms = 1000LL * get_current_time();
+        entry->last_update_time_ms = 1000LL * (int64_t)get_current_time();
         result = sharding_ctx->insert_callback(
                 entry, arg, new_create);
     } while (0);
