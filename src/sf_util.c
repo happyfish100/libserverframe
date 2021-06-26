@@ -96,7 +96,7 @@ int sf_printbuffer(char* buffer,int32_t len)
 void sf_usage_ex(const char *program, const SFCMDOption *other_options)
 {
     fprintf(stderr, "\nUsage: %s [options] <config_file> "
-            "[start | stop | restart]\n\noptions:\n", program);
+            "[start | stop | restart | status]\n\noptions:\n", program);
 
     if (other_options != NULL) {
         const SFCMDOption *option;

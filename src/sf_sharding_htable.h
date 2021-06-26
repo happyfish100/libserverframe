@@ -96,7 +96,7 @@ typedef struct sf_htable_sharding_context {
     struct {
         int count;
         struct fast_mblock_man *elts;
-    } allocators;
+    } allocators;  //shared allocators
 
     SFShardingHtableKeyType key_type;  //id count in the hash entry
     sf_sharding_htable_insert_callback insert_callback;
