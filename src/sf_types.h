@@ -216,6 +216,11 @@ typedef struct sf_memory_watermark {
     int64_t high;
 } SFMemoryWatermark;
 
+typedef struct sf_list_limit_info {
+    int offset;
+    int count;
+} SFListLimitInfo;
+
 typedef enum sf_server_group_index_type {
     sf_server_group_index_type_cluster = 1,
     sf_server_group_index_type_service

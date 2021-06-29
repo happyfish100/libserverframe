@@ -127,6 +127,11 @@ typedef struct sf_common_proto_header {
     char padding[3];
 } SFCommonProtoHeader;
 
+typedef struct sf_proto_limit_info {
+    char offset[4];
+    char count[4];
+} SFProtoLimitInfo;
+
 typedef struct sf_proto_get_group_servers_req {
     char group_id[4];
     char padding[4];
@@ -476,8 +481,8 @@ int sf_send_and_recv_vary_response(ConnectionInfo *conn,
         const int network_timeout, const unsigned char expect_cmd,
         SFProtoRecvBuffer *buffer, const int min_body_len);
 
-static inline void sf_proto_extract_header(SFCommonProtoHeader *header_proto,
-        SFHeaderInfo *header_info)
+static inline void sf_proto_extract_header(const SFCommonProtoHeader
+        *header_proto, SFHeaderInfo *header_info)
 {
     header_info->cmd = header_proto->cmd;
     header_info->body_len = buff2int(header_proto->body_len);
@@ -486,6 +491,20 @@ static inline void sf_proto_extract_header(SFCommonProtoHeader *header_proto,
     if (header_info->status > 255) {
         header_info->status = sf_localize_errno(header_info->status);
     }
+}
+
+static inline void sf_proto_pack_limit(const SFListLimitInfo
+        *limit_info, SFProtoLimitInfo *limit_proto)
+{
+    int2buff(limit_info->offset, limit_proto->offset);
+    int2buff(limit_info->count, limit_proto->count);
+}
+
+static inline void sf_proto_extract_limit(const SFProtoLimitInfo
+        *limit_proto, SFListLimitInfo *limit_info)
+{
+    limit_info->offset = buff2int(limit_proto->offset);
+    limit_info->count = buff2int(limit_proto->count);
 }
 
 static inline int sf_active_test(ConnectionInfo *conn,
