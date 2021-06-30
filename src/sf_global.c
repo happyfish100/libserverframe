@@ -39,7 +39,7 @@ SFGlobalVariables g_sf_global_vars = {
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
     0, 0, 0, {'\0'}, {'\0'}, {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
-    {0, 0}
+    {0, 0}, NULL, {NULL, 0}
 };
 
 SFContext g_sf_context = {

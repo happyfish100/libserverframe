@@ -54,6 +54,8 @@ typedef struct sf_global_variables {
 
     SFLogConfig error_log;
     SFConnectionStat connection_stat;
+    sf_error_handler_callback error_handler;
+    string_t empty;
 } SFGlobalVariables;
 
 typedef struct sf_context_ini_config {
@@ -83,6 +85,9 @@ extern SFContext                 g_sf_context;
 #define SF_G_THREAD_INDEX(tdata) (int)(tdata - g_sf_context.thread_data)
 #define SF_G_CONN_CURRENT_COUNT  g_sf_global_vars.connection_stat.current_count
 #define SF_G_CONN_MAX_COUNT      g_sf_global_vars.connection_stat.max_count
+
+#define SF_G_ERROR_HANDLER       g_sf_global_vars.error_handler
+#define SF_G_EMPTY_STRING        g_sf_global_vars.empty
 
 #define SF_WORK_THREADS(sf_context)        sf_context.work_threads
 #define SF_ALIVE_THREAD_COUNT(sf_context)  sf_context.thread_count
@@ -205,6 +210,12 @@ static inline void sf_set_global_base_path(const char *base_path)
     snprintf(SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR),
             "%s", base_path);
     SF_G_BASE_PATH_INITED = true;
+}
+
+static inline void sf_set_error_handler(
+        sf_error_handler_callback error_handler)
+{
+    SF_G_ERROR_HANDLER = error_handler;
 }
 
 #ifdef __cplusplus

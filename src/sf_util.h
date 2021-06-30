@@ -23,6 +23,7 @@
 #include "fastcommon/sched_thread.h"
 #include "sf_define.h"
 #include "sf_types.h"
+#include "sf_global.h"
 
 #ifdef DEBUG_FLAG  /*only for format check*/
 
@@ -127,8 +128,12 @@ static inline int sf_unify_errno(const int errnum)
     }
 }
 
-static inline int sf_localize_errno(const int errnum)
+static inline int sf_localize_errno(int errnum)
 {
+    if (SF_G_ERROR_HANDLER != NULL) {
+        errnum = SF_G_ERROR_HANDLER(errnum);
+    }
+
     switch (errnum) {
         case SF_ERROR_EBUSY:
             return EBUSY;

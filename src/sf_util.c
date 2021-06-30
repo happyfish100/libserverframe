@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
-#include "sf_global.h"
 #include "sf_define.h"
 #include "sf_util.h"
 

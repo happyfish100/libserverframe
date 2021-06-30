@@ -43,6 +43,8 @@ typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 /* calback for release iovec buffer */
 typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
 
+typedef int (*sf_error_handler_callback)(const int errnum);
+
 typedef struct sf_context {
     char name[64];
     struct nio_thread_data *thread_data;

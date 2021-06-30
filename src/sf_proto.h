@@ -103,7 +103,7 @@
         if (client_ctx->auth.enabled) { \
             out_bytes += FCFS_AUTH_SESSION_ID_LEN;   \
             memcpy(the_req_start, client_ctx->auth.ctx-> \
-                    session_id, FCFS_AUTH_SESSION_ID_LEN);  \
+                    session.id, FCFS_AUTH_SESSION_ID_LEN);  \
             the_req_start += FCFS_AUTH_SESSION_ID_LEN;   \
         }  \
         if (the_req_id > 0) {  \
