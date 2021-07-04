@@ -331,7 +331,7 @@ int sf_load_global_config_ex(const char *server_name,
             SF_MIN_THREAD_STACK_SIZE, SF_MAX_THREAD_STACK_SIZE, true);
 
     old_section_name = ini_ctx->section_name;
-    ini_ctx->section_name = "error_log";
+    ini_ctx->section_name = "error-log";
     if ((result=sf_load_log_config(ini_ctx, &g_log_context,
                     &g_sf_global_vars.error_log)) != 0)
     {
@@ -539,7 +539,7 @@ void sf_global_config_to_string(char *output, const int size)
                 );
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,
-            "error_log", output + len, size - len);
+            "error-log", output + len, size - len);
 }
 
 void sf_log_config_ex(const char *other_config)

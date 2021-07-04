@@ -181,7 +181,7 @@ static inline int sf_load_slow_log_config(const char *config_file,
 {
     IniFullContext ini_ctx;
 
-    FAST_INI_SET_FULL_CTX_EX(ini_ctx, config_file, "slow_log", ini_context);
+    FAST_INI_SET_FULL_CTX_EX(ini_ctx, config_file, "slow-log", ini_context);
     return sf_load_slow_log_config_ex(&ini_ctx, log_ctx, slow_log_cfg);
 }
 
