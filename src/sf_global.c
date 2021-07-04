@@ -33,7 +33,7 @@
 #include "sf_global.h"
 
 SFGlobalVariables g_sf_global_vars = {
-    DEFAULT_CONNECT_TIMEOUT, DEFAULT_NETWORK_TIMEOUT,
+    SF_DEFAULT_CONNECT_TIMEOUT, SF_DEFAULT_NETWORK_TIMEOUT,
     {{'/', 't', 'm', 'p', '\0'}, false},
     true, true, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
@@ -65,16 +65,18 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     char *pMinBuffSize;
     char *pMaxBuffSize;
 
-    g_sf_global_vars.connect_timeout = iniGetIntValueEx(ini_ctx->section_name,
-            "connect_timeout", ini_ctx->context, DEFAULT_CONNECT_TIMEOUT, true);
+    g_sf_global_vars.connect_timeout = iniGetIntValueEx(ini_ctx->
+            section_name, "connect_timeout", ini_ctx->context,
+            SF_DEFAULT_CONNECT_TIMEOUT, true);
     if (g_sf_global_vars.connect_timeout <= 0) {
-        g_sf_global_vars.connect_timeout = DEFAULT_CONNECT_TIMEOUT;
+        g_sf_global_vars.connect_timeout = SF_DEFAULT_CONNECT_TIMEOUT;
     }
 
-    g_sf_global_vars.network_timeout = iniGetIntValueEx(ini_ctx->section_name,
-            "network_timeout", ini_ctx->context, DEFAULT_NETWORK_TIMEOUT, true);
+    g_sf_global_vars.network_timeout = iniGetIntValueEx(ini_ctx->
+            section_name, "network_timeout", ini_ctx->context,
+            SF_DEFAULT_NETWORK_TIMEOUT, true);
     if (g_sf_global_vars.network_timeout <= 0) {
-        g_sf_global_vars.network_timeout = DEFAULT_NETWORK_TIMEOUT;
+        g_sf_global_vars.network_timeout = SF_DEFAULT_NETWORK_TIMEOUT;
     }
 
     g_sf_global_vars.max_connections = iniGetIntValueEx(ini_ctx->section_name,
