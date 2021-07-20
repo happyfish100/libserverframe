@@ -68,7 +68,7 @@ typedef struct binlog_writer_thread {
     struct fast_mblock_man mblock;
     struct fc_queue queue;
     char name[64];
-    bool running;
+    volatile bool running;
     bool use_fixed_buffer_size;
     short order_mode;
     short order_by;

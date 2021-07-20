@@ -671,7 +671,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     if (use_fixed_buffer_size) {
         element_size += max_record_size;
     }
-    if ((result=fast_mblock_init_ex1(&thread->mblock, "binlog_wbuffer",
+    if ((result=fast_mblock_init_ex1(&thread->mblock, "binlog-wbuffer",
                      element_size, alloc_elements_once, 0,
                      binlog_wbuffer_alloc_init, writer, true)) != 0)
     {

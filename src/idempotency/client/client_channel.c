@@ -129,7 +129,7 @@ static int idempotency_channel_alloc_init(void *element, void *args)
 
     channel = (IdempotencyClientChannel *)element;
     if ((result=fast_mblock_init_ex1(&channel->receipt_allocator,
-                    "idempotency_receipt", sizeof(IdempotencyClientReceipt),
+                    "idempotency-receipt", sizeof(IdempotencyClientReceipt),
                     1024, 0, NULL, NULL, true)) != 0)
     {
         return result;
@@ -153,7 +153,7 @@ int client_channel_init(IniFullContext *ini_ctx)
     }
 
     if ((result=fast_mblock_init_ex1(&channel_context.channel_allocator,
-                    "channel_info", sizeof(IdempotencyClientChannel),
+                    "channel-info", sizeof(IdempotencyClientChannel),
                     64, 0, idempotency_channel_alloc_init, NULL, true)) != 0)
     {
         return result;

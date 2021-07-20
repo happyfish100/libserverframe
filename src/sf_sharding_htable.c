@@ -45,7 +45,7 @@ static int init_allocators(SFHtableShardingContext *sharding_ctx,
 
     end = sharding_ctx->allocators.elts + allocator_count;
     for (pa=sharding_ctx->allocators.elts; pa<end; pa++) {
-        if ((result=fast_mblock_init_ex1(pa, "sharding_hkey", element_size,
+        if ((result=fast_mblock_init_ex1(pa, "sharding-hkey", element_size,
                         alloc_elts_once, 0, NULL, NULL, true)) != 0)
         {
             return result;

@@ -100,7 +100,7 @@ int idempotency_channel_init(const uint32_t max_channel_id,
     element_size = sizeof(IdempotencyChannel) + sizeof(IdempotencyRequest *) *
         request_htable_capacity;
     if ((result=fast_mblock_init_ex1(&channel_context.channel_allocator,
-                    "channel_info", element_size, 1024, max_channel_id,
+                    "channel-info", element_size, 1024, max_channel_id,
                     idempotency_channel_alloc_init, NULL, true)) != 0)
     {
         return result;

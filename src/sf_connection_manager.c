@@ -861,7 +861,7 @@ int sf_connection_manager_prepare(SFConnectionManager *cm)
     element_size = sizeof(SFCMServerPtrArray) +
         sizeof(SFCMServerEntry *) * cm->max_servers_per_group;
     if ((result=fast_mblock_init_ex1(&cm->sptr_array_allocator,
-                    "server_ptr_array", element_size, 4 * 1024, 0,
+                    "server-ptr-array", element_size, 4 * 1024, 0,
                     sptr_array_alloc_init, NULL, true)) != 0)
     {
         return result;
