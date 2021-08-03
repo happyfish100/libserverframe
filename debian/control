@@ -1,0 +1,25 @@
+Source: libserverframe
+Section: net
+Priority: optional
+Maintainer: YuQing <384681@qq.com>
+Build-Depends: debhelper (>=11~)
+ , libfastcommon-dev (>= 1.0.52)
+Standards-Version: 4.1.4
+Homepage: https://github.com/happyfish100/libserverframe
+
+Package: libserverframe-dev
+Section: net
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, libserverframe (= ${binary:Version})
+Description: libserverframe (development files)
+  This package contains header files.
+
+Package: libserverframe
+Section: net
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, libfastcommon (>= 1.0.52)
+Description: this network service framework library extract from FastDFS

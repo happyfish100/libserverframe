@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+
+export DESTDIR = $(CURDIR)/debian/tmp
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	./make.sh clean && ./make.sh
+
+override_dh_auto_install:
+	./make.sh install
+	dh_auto_install
