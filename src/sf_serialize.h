@@ -83,12 +83,6 @@ typedef struct sf_serialize_pack_field_array {
 
 #define SF_SERIALIZE_PACK_HEADER_SIZE  sizeof(SFSerializePackHeader)
 
-typedef struct sf_serialize_iterator {
-    const char *p;
-    int64_array_t int_array;
-    key_value_array_t kv_array;
-} SFSerializeIterator;
-
 typedef struct sf_serialize_field_value {
     unsigned char fid;
     SFSerializeValueType type;
@@ -99,6 +93,18 @@ typedef struct sf_serialize_field_value {
         key_value_array_t kv_array;
     } value;
 } SFSerializeFieldValue;
+
+typedef struct sf_serialize_iterator {
+    const char *p;
+    const char *end;
+    int64_array_t int_array;
+    key_value_array_t kv_array;
+    int int_array_alloc;
+    int kv_array_alloc;
+    SFSerializeFieldValue field;
+    int error_no;
+    char error_info[256];
+} SFSerializeIterator;
 
 #ifdef __cplusplus
 extern "C" {
@@ -321,13 +327,27 @@ static inline void sf_serialize_pack_end(FastBuffer *buffer)
     int2buff(crc32, header->crc32);
 }
 
-int sf_serialize_iterator_init(SFSerializeIterator *it);
+static inline void sf_serialize_iterator_init(SFSerializeIterator *it)
+{
+    memset(it, 0, sizeof(SFSerializeIterator));
+}
 
-void sf_serialize_iterator_destroy(SFSerializeIterator *it);
+static inline void sf_serialize_iterator_destroy(SFSerializeIterator *it)
+{
+    if (it->int_array.values != NULL) {
+        free(it->int_array.values);
+        it->int_array_alloc = 0;
+    }
+
+    if (it->kv_array.kv_pairs != NULL) {
+        free(it->kv_array.kv_pairs);
+        it->kv_array_alloc = 0;
+    }
+}
 
 int sf_serialize_unpack(SFSerializeIterator *it, const string_t *content);
 
-int sf_serialize_next(SFSerializeIterator *it, SFSerializeFieldValue *field);
+const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it);
 
 #ifdef __cplusplus
 }
