@@ -27,21 +27,27 @@
 #include "fastcommon/logger.h"
 #include "sf_serialize.h"
 
+#define FIELD_ID_AND_TYPE_FORMAT  "fid: %d, type: %s"
+#define FIELD_ID_AND_TYPE_PARAMS  it->field.fid, \
+    value_type_configs[it->field.type].name
+
+
 typedef struct {
+    const char *name;
     int min_size;
     int elt_size;
 } SFSerializeTypeConfig;
 
 static SFSerializeTypeConfig value_type_configs[SF_SERIALIZE_VALUE_TYPE_COUNT] =
 {
-    {sizeof(SFSerializePackFieldInt8), 0},
-    {sizeof(SFSerializePackFieldInt16), 0},
-    {sizeof(SFSerializePackFieldInt32), 0},
-    {sizeof(SFSerializePackFieldInt64), 0},
-    {sizeof(SFSerializePackStringValue), 0},
-    {sizeof(SFSerializePackFieldArray), 4},
-    {sizeof(SFSerializePackFieldArray), 8},
-    {sizeof(SFSerializePackFieldArray), 2 *
+    {"int8",   sizeof(SFSerializePackFieldInt8),   0},
+    {"int16",  sizeof(SFSerializePackFieldInt16),  0},
+    {"int32",  sizeof(SFSerializePackFieldInt32),  0},
+    {"int64",  sizeof(SFSerializePackFieldInt64),  0},
+    {"string", sizeof(SFSerializePackStringValue), 0},
+    {"int32_array", sizeof(SFSerializePackFieldArray), 4},
+    {"int64_array", sizeof(SFSerializePackFieldArray), 8},
+    {"map", sizeof(SFSerializePackFieldArray), 2 *
         sizeof(SFSerializePackStringValue)}
 };
 
@@ -87,13 +93,14 @@ static int check_field_type(SFSerializeIterator *it,
 {
     if (!(type >= 0 && type < SF_SERIALIZE_VALUE_TYPE_COUNT)) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "unknown type: %d", type);
+                "fid: %d, unknown type: %d", it->field.fid, type);
         return EINVAL;
     }
 
     if (remain_len < value_type_configs[type].min_size) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "remain length: %d is too small which < %d",
+                FIELD_ID_AND_TYPE_FORMAT", remain length: %d "
+                "is too small which < %d", FIELD_ID_AND_TYPE_PARAMS,
                 remain_len, value_type_configs[type].min_size);
         return EINVAL;
     }
@@ -105,13 +112,15 @@ static inline int check_string_value(SFSerializeIterator *it,
 {
     if (s->len < 0) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "invalid string length: %d < 0", s->len);
+                FIELD_ID_AND_TYPE_FORMAT", invalid string length: %d < 0",
+                FIELD_ID_AND_TYPE_PARAMS, s->len);
         return EINVAL;
     }
 
     if (s->len > remain_len) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "string length: %d is too large > remain length: %d",
+                FIELD_ID_AND_TYPE_FORMAT", string length: %d is too "
+                "large > remain length: %d", FIELD_ID_AND_TYPE_PARAMS,
                 s->len, remain_len);
         return EINVAL;
     }
@@ -127,14 +136,16 @@ static inline int unpack_array_count(SFSerializeIterator *it,
     *count = buff2int(((SFSerializePackFieldArray *)it->p)->value.count);
     if (*count < 0) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "invalid array count: %d < 0", *count);
+                FIELD_ID_AND_TYPE_FORMAT", invalid array count: %d < 0",
+                FIELD_ID_AND_TYPE_PARAMS, *count);
         return EINVAL;
     }
 
     min_size = value_type_configs[it->field.type].elt_size * (*count);
     if (min_size > remain_len) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "array min bytes: %d is too large > remain: %d",
+                FIELD_ID_AND_TYPE_FORMAT", array min bytes: %d is "
+                "too large > remain: %d", FIELD_ID_AND_TYPE_PARAMS,
                 min_size, remain_len);
         return EINVAL;
     }
@@ -142,8 +153,8 @@ static inline int unpack_array_count(SFSerializeIterator *it,
     return 0;
 }
 
-static int array_expand(void_array_t *array, const int elt_size,
-        const int target_count, int *alloc_size)
+static int array_expand(SFSerializeIterator *it, void_array_t *array,
+        const int elt_size, const int target_count, int *alloc_size)
 {
     int new_alloc;
     void *new_elts;
@@ -159,6 +170,9 @@ static int array_expand(void_array_t *array, const int elt_size,
 
     new_elts = fc_malloc(elt_size * new_alloc);
     if (new_elts == NULL) {
+        snprintf(it->error_info, sizeof(it->error_info),
+                FIELD_ID_AND_TYPE_FORMAT", malloc %d bytes fail",
+                FIELD_ID_AND_TYPE_PARAMS, elt_size * new_alloc);
         return ENOMEM;
     }
 
@@ -175,7 +189,8 @@ static inline int unpack_string(SFSerializeIterator *it, const int remain_len,
 {
     if (remain_len < sizeof(SFSerializePackStringValue)) {
         snprintf(it->error_info, sizeof(it->error_info),
-                "remain length: %d is too small < %d",
+                FIELD_ID_AND_TYPE_FORMAT", remain length: %d "
+                "is too small < %d", FIELD_ID_AND_TYPE_PARAMS,
                 remain_len, (int)sizeof(SFSerializePackStringValue));
         return EINVAL;
     }
@@ -199,7 +214,7 @@ static int unpack_array(SFSerializeIterator *it, const int remain_len)
     }
 
     if (count > it->int_array_alloc) {
-        if ((result=array_expand((void_array_t *)&it->int_array,
+        if ((result=array_expand(it, (void_array_t *)&it->int_array,
                         sizeof(int64_t), count, &it->int_array_alloc)) != 0)
         {
             return result;
@@ -233,7 +248,7 @@ static int unpack_map(SFSerializeIterator *it, const int remain_len)
     }
 
     if (count > it->kv_array_alloc) {
-        if ((result=array_expand((void_array_t *)&it->kv_array,
+        if ((result=array_expand(it, (void_array_t *)&it->kv_array,
                         sizeof(key_value_pair_t), count,
                         &it->kv_array_alloc)) != 0)
         {
@@ -282,7 +297,6 @@ const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it)
     }
 
     field = (SFSerializePackFieldInfo *)it->p;
-
     it->field.fid = field->id;
     it->field.type = field->type;
     if ((it->error_no=check_field_type(it, remain_len, field->type)) != 0) {
@@ -329,6 +343,7 @@ const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it)
             {
                 return NULL;
             }
+            it->field.value.int_array = it->int_array;
             break;
         case sf_serialize_value_type_map:
             if ((it->error_no=unpack_map(it, remain_len - sizeof(
@@ -336,6 +351,7 @@ const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it)
             {
                 return NULL;
             }
+            it->field.value.kv_array = it->kv_array;
             break;
     }
 

@@ -22,7 +22,7 @@
 #include "fastcommon/fast_buffer.h"
 #include "fastcommon/hash.h"
 
-#define SF_SERIALIZE_VALUE_TYPE_COUNT 8
+#define SF_SERIALIZE_VALUE_TYPE_COUNT  8
 
 typedef enum {
     sf_serialize_value_type_int8 = 0,
@@ -83,8 +83,6 @@ typedef struct sf_serialize_pack_field_array {
     } value;
 } SFSerializePackFieldArray;
 
-#define SF_SERIALIZE_PACK_HEADER_SIZE  sizeof(SFSerializePackHeader)
-
 typedef struct sf_serialize_field_value {
     unsigned char fid;
     SFSerializeValueType type;
@@ -99,8 +97,8 @@ typedef struct sf_serialize_field_value {
 typedef struct sf_serialize_iterator {
     const char *p;
     const char *end;
-    int64_array_t int_array;
-    key_value_array_t kv_array;
+    int64_array_t int_array;     //int64_t array holder
+    key_value_array_t kv_array;  //key-value array holder
     int int_array_alloc;
     int kv_array_alloc;
     SFSerializeFieldValue field;
@@ -114,7 +112,7 @@ extern "C" {
 
 static inline void sf_serialize_pack_begin(FastBuffer *buffer)
 {
-    buffer->length = SF_SERIALIZE_PACK_HEADER_SIZE;
+    buffer->length = sizeof(SFSerializePackHeader);
 }
 
 static inline int sf_serialize_pack_int8(FastBuffer *buffer,
