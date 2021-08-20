@@ -22,8 +22,10 @@
 #include "fastcommon/fast_buffer.h"
 #include "fastcommon/hash.h"
 
+#define SF_SERIALIZE_VALUE_TYPE_COUNT 8
+
 typedef enum {
-    sf_serialize_value_type_int8 = 1,
+    sf_serialize_value_type_int8 = 0,
     sf_serialize_value_type_int16,
     sf_serialize_value_type_int32,
     sf_serialize_value_type_int64,
@@ -334,8 +336,8 @@ static inline void sf_serialize_iterator_init(SFSerializeIterator *it)
 
 static inline void sf_serialize_iterator_destroy(SFSerializeIterator *it)
 {
-    if (it->int_array.values != NULL) {
-        free(it->int_array.values);
+    if (it->int_array.elts != NULL) {
+        free(it->int_array.elts);
         it->int_array_alloc = 0;
     }
 
