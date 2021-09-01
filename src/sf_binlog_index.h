@@ -30,6 +30,17 @@
         }  \
     } while (0)
 
+#define SF_BINLOG_PARSE_INT_SILENCE2(var, caption, index, echr1, echr2, min_val) \
+    do {   \
+        var = strtol(cols[index].str, &endptr, 10);  \
+        if (!(*endptr == echr1 || *endptr == echr2) || (var < min_val)) { \
+            sprintf(error_info, "invalid %s: %.*s",  \
+                    caption, cols[index].len, cols[index].str); \
+            return EINVAL;  \
+        }  \
+    } while (0)
+
+
 typedef int (*pack_record_func)(char *buff, void *record);
 typedef int (*unpack_record_func)(const string_t *line,
         void *record, char *error_info);

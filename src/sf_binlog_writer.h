@@ -27,6 +27,8 @@
 #define SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE     0
 #define SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION  1
 
+#define SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION  1
+
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
 #define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
@@ -103,6 +105,13 @@ typedef struct sf_binlog_writer_info {
     } version_ctx;
     SFBinlogBuffer binlog_buffer;
     SFBinlogWriterThread *thread;
+
+    short flags;
+    struct {
+        int64_t pending;
+        volatile int64_t done;
+    } last_versions;
+
     struct {
         bool in_queue;
         struct sf_binlog_writer_info *next;
@@ -159,6 +168,25 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
+
+static inline void sf_binlog_writer_set_flags(
+        SFBinlogWriterInfo *writer, const short flags)
+{
+    writer->flags = flags;
+}
+
+static inline int64_t sf_binlog_writer_get_last_version(
+        SFBinlogWriterInfo *writer)
+{
+    if (writer->flags & SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION) {
+        return writer->last_versions.done;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "should set writer flags to %d!", __LINE__,
+                SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION);
+        return -1;
+    }
+}
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 

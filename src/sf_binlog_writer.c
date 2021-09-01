@@ -269,7 +269,14 @@ static inline int deal_binlog_one_record(SFBinlogWriterBuffer *wb)
             }
         }
 
-        return check_write_to_file(wb->writer, wb->bf.buff, wb->bf.length);
+        if ((result=check_write_to_file(wb->writer, wb->bf.buff,
+                        wb->bf.length)) == 0)
+        {
+            if (wb->writer->flags & SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION) {
+                wb->writer->last_versions.pending = wb->version.last;
+            }
+        }
+        return result;
     }
 
     if (wb->writer->file.size + SF_BINLOG_BUFFER_LENGTH(wb->writer->
@@ -286,9 +293,13 @@ static inline int deal_binlog_one_record(SFBinlogWriterBuffer *wb)
         }
     }
 
+    if (wb->writer->flags & SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION) {
+        wb->writer->last_versions.pending = wb->version.last;
+    }
     memcpy(wb->writer->binlog_buffer.end,
             wb->bf.buff, wb->bf.length);
     wb->writer->binlog_buffer.end += wb->bf.length;
+
     return 0;
 }
 
@@ -411,6 +422,9 @@ static inline int flush_writer_files(SFBinlogWriterThread *thread)
             return result;
         }
 
+        if (writer->flags & SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION) {
+            writer->last_versions.done = writer->last_versions.pending;
+        }
         writer->flush.in_queue = false;
         writer = writer->flush.next;
     }
@@ -594,6 +608,9 @@ int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
 
     writer->total_count = 0;
     writer->flush.in_queue = false;
+    writer->last_versions.pending = 0;
+    writer->last_versions.done = 0;
+    writer->flags = 0;
     if ((result=sf_binlog_buffer_init(&writer->binlog_buffer,
                     buffer_size)) != 0)
     {
