@@ -25,7 +25,7 @@
 #include <errno.h>
 #include "fastcommon/shared_func.h"
 #include "fastcommon/logger.h"
-#include "sf_serialize.h"
+#include "sf_serializer.h"
 
 #define FIELD_ID_AND_TYPE_FORMAT  "fid: %d, type: %s"
 #define FIELD_ID_AND_TYPE_PARAMS  it->field.fid, \
@@ -36,41 +36,41 @@ typedef struct {
     const char *name;
     int min_size;
     int elt_size;
-} SFSerializeTypeConfig;
+} SFSerializerTypeConfig;
 
-static SFSerializeTypeConfig value_type_configs[SF_SERIALIZE_VALUE_TYPE_COUNT] =
+static SFSerializerTypeConfig value_type_configs[SF_SERIALIZER_VALUE_TYPE_COUNT] =
 {
-    {"int8",   sizeof(SFSerializePackFieldInt8),   0},
-    {"int16",  sizeof(SFSerializePackFieldInt16),  0},
-    {"int32",  sizeof(SFSerializePackFieldInt32),  0},
-    {"int64",  sizeof(SFSerializePackFieldInt64),  0},
-    {"string", sizeof(SFSerializePackStringValue), 0},
-    {"int32_array", sizeof(SFSerializePackFieldArray), 4},
-    {"int64_array", sizeof(SFSerializePackFieldArray), 8},
-    {"map", sizeof(SFSerializePackFieldArray), 2 *
-        sizeof(SFSerializePackStringValue)}
+    {"int8",   sizeof(SFSerializerPackFieldInt8),   0},
+    {"int16",  sizeof(SFSerializerPackFieldInt16),  0},
+    {"int32",  sizeof(SFSerializerPackFieldInt32),  0},
+    {"int64",  sizeof(SFSerializerPackFieldInt64),  0},
+    {"string", sizeof(SFSerializerPackStringValue), 0},
+    {"int32_array", sizeof(SFSerializerPackFieldArray), 4},
+    {"int64_array", sizeof(SFSerializerPackFieldArray), 8},
+    {"map", sizeof(SFSerializerPackFieldArray), 2 *
+        sizeof(SFSerializerPackStringValue)}
 };
 
-int sf_serialize_unpack(SFSerializeIterator *it, const string_t *content)
+int sf_serializer_unpack(SFSerializerIterator *it, const string_t *content)
 {
-    SFSerializePackHeader *header;
+    SFSerializerPackHeader *header;
     int length;
     int calc_crc32;
     int header_crc32;
 
-    if (content->len < sizeof(SFSerializePackHeader)) {
+    if (content->len < sizeof(SFSerializerPackHeader)) {
         snprintf(it->error_info, sizeof(it->error_info),
                 "content length: %d is too small which < %d",
-                content->len, (int)sizeof(SFSerializePackHeader));
+                content->len, (int)sizeof(SFSerializerPackHeader));
         return EINVAL;
     }
 
-    header = (SFSerializePackHeader *)content->str;
+    header = (SFSerializerPackHeader *)content->str;
     length = buff2int(header->length);
-    if (content->len != length + sizeof(SFSerializePackHeader)) {
+    if (content->len != length + sizeof(SFSerializerPackHeader)) {
         snprintf(it->error_info, sizeof(it->error_info),
                 "content length: %d != %d", content->len,
-                (int)(length + sizeof(SFSerializePackHeader)));
+                (int)(length + sizeof(SFSerializerPackHeader)));
         return EINVAL;
     }
 
@@ -88,10 +88,10 @@ int sf_serialize_unpack(SFSerializeIterator *it, const string_t *content)
     return 0;
 }
 
-static int check_field_type(SFSerializeIterator *it,
-        const int remain_len, const SFSerializeValueType type)
+static int check_field_type(SFSerializerIterator *it,
+        const int remain_len, const SFSerializerValueType type)
 {
-    if (!(type >= 0 && type < SF_SERIALIZE_VALUE_TYPE_COUNT)) {
+    if (!(type >= 0 && type < SF_SERIALIZER_VALUE_TYPE_COUNT)) {
         snprintf(it->error_info, sizeof(it->error_info),
                 "fid: %d, unknown type: %d", it->field.fid, type);
         return EINVAL;
@@ -107,7 +107,7 @@ static int check_field_type(SFSerializeIterator *it,
     return 0;
 }
 
-static inline int check_string_value(SFSerializeIterator *it,
+static inline int check_string_value(SFSerializerIterator *it,
         const int remain_len, const string_t *s)
 {
     if (s->len < 0) {
@@ -128,12 +128,12 @@ static inline int check_string_value(SFSerializeIterator *it,
     return 0;
 }
 
-static inline int unpack_array_count(SFSerializeIterator *it,
+static inline int unpack_array_count(SFSerializerIterator *it,
         const int remain_len, int *count)
 {
     int min_size;
 
-    *count = buff2int(((SFSerializePackFieldArray *)it->p)->value.count);
+    *count = buff2int(((SFSerializerPackFieldArray *)it->p)->value.count);
     if (*count < 0) {
         snprintf(it->error_info, sizeof(it->error_info),
                 FIELD_ID_AND_TYPE_FORMAT", invalid array count: %d < 0",
@@ -153,7 +153,7 @@ static inline int unpack_array_count(SFSerializeIterator *it,
     return 0;
 }
 
-static int array_expand(SFSerializeIterator *it, void_array_t *array,
+static int array_expand(SFSerializerIterator *it, void_array_t *array,
         const int elt_size, const int target_count, int *alloc_size)
 {
     int new_alloc;
@@ -184,25 +184,25 @@ static int array_expand(SFSerializeIterator *it, void_array_t *array,
     return 0;
 }
 
-static inline int unpack_string(SFSerializeIterator *it, const int remain_len,
-        SFSerializePackStringValue *input, string_t *output)
+static inline int unpack_string(SFSerializerIterator *it, const int remain_len,
+        SFSerializerPackStringValue *input, string_t *output)
 {
-    if (remain_len < sizeof(SFSerializePackStringValue)) {
+    if (remain_len < sizeof(SFSerializerPackStringValue)) {
         snprintf(it->error_info, sizeof(it->error_info),
                 FIELD_ID_AND_TYPE_FORMAT", remain length: %d "
                 "is too small < %d", FIELD_ID_AND_TYPE_PARAMS,
-                remain_len, (int)sizeof(SFSerializePackStringValue));
+                remain_len, (int)sizeof(SFSerializerPackStringValue));
         return EINVAL;
     }
 
     output->len = buff2int(input->len);
     output->str = input->str;
-    it->p += sizeof(SFSerializePackStringValue) + output->len;
+    it->p += sizeof(SFSerializerPackStringValue) + output->len;
     return check_string_value(it, remain_len -
-            sizeof(SFSerializePackStringValue), output);
+            sizeof(SFSerializerPackStringValue), output);
 }
 
-static int unpack_array(SFSerializeIterator *it, const int remain_len)
+static int unpack_array(SFSerializerIterator *it, const int remain_len)
 {
     int result;
     int count;
@@ -221,10 +221,10 @@ static int unpack_array(SFSerializeIterator *it, const int remain_len)
         }
     }
 
-    it->p += sizeof(SFSerializePackFieldArray);
+    it->p += sizeof(SFSerializerPackFieldArray);
     end = it->int_array.elts + count;
     for (pn=it->int_array.elts; pn<end; pn++) {
-        if (it->field.type == sf_serialize_value_type_int32_array) {
+        if (it->field.type == sf_serializer_value_type_int32_array) {
             *pn = buff2int(it->p);
         } else {
             *pn = buff2long(it->p);
@@ -236,7 +236,7 @@ static int unpack_array(SFSerializeIterator *it, const int remain_len)
     return 0;
 }
 
-static int unpack_map(SFSerializeIterator *it, const int remain_len)
+static int unpack_map(SFSerializerIterator *it, const int remain_len)
 {
     int result;
     int count;
@@ -256,17 +256,17 @@ static int unpack_map(SFSerializeIterator *it, const int remain_len)
         }
     }
 
-    it->p += sizeof(SFSerializePackFieldArray);
+    it->p += sizeof(SFSerializerPackFieldArray);
     end = it->kv_array.kv_pairs + count;
     for (pair=it->kv_array.kv_pairs; pair<end; pair++) {
         if ((result=unpack_string(it, it->end - it->p,
-                        (SFSerializePackStringValue *)it->p,
+                        (SFSerializerPackStringValue *)it->p,
                         &pair->key)) != 0)
         {
             return result;
         }
         if ((result=unpack_string(it, it->end - it->p,
-                        (SFSerializePackStringValue *)it->p,
+                        (SFSerializerPackStringValue *)it->p,
                         &pair->value)) != 0)
         {
             return result;
@@ -277,26 +277,26 @@ static int unpack_map(SFSerializeIterator *it, const int remain_len)
     return 0;
 }
 
-const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it)
+const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
 {
     int remain_len;
-    SFSerializePackFieldInfo *field;
-    SFSerializePackFieldString *fs;
+    SFSerializerPackFieldInfo *field;
+    SFSerializerPackFieldString *fs;
 
     remain_len = it->end - it->p;
     if (remain_len == 0) {
         return NULL;
     }
 
-    if (remain_len <= sizeof(SFSerializePackFieldInfo)) {
+    if (remain_len <= sizeof(SFSerializerPackFieldInfo)) {
         snprintf(it->error_info, sizeof(it->error_info),
                 "remain length: %d is too small which <= %d",
-                remain_len, (int)sizeof(SFSerializePackFieldInfo));
+                remain_len, (int)sizeof(SFSerializerPackFieldInfo));
         it->error_no = EINVAL;
         return NULL;
     }
 
-    field = (SFSerializePackFieldInfo *)it->p;
+    field = (SFSerializerPackFieldInfo *)it->p;
     it->field.fid = field->id;
     it->field.type = field->type;
     if ((it->error_no=check_field_type(it, remain_len, field->type)) != 0) {
@@ -304,50 +304,50 @@ const SFSerializeFieldValue *sf_serialize_next(SFSerializeIterator *it)
     }
 
     switch (field->type) {
-        case sf_serialize_value_type_int8:
-            it->field.value.n = ((SFSerializePackFieldInt8 *)it->p)->value;
-            it->p += sizeof(SFSerializePackFieldInt8);
+        case sf_serializer_value_type_int8:
+            it->field.value.n = ((SFSerializerPackFieldInt8 *)it->p)->value;
+            it->p += sizeof(SFSerializerPackFieldInt8);
             break;
-        case sf_serialize_value_type_int16:
+        case sf_serializer_value_type_int16:
             it->field.value.n = buff2short(
-                    ((SFSerializePackFieldInt16 *)
+                    ((SFSerializerPackFieldInt16 *)
                      it->p)->value);
-            it->p += sizeof(SFSerializePackFieldInt16);
+            it->p += sizeof(SFSerializerPackFieldInt16);
             break;
-        case sf_serialize_value_type_int32:
+        case sf_serializer_value_type_int32:
             it->field.value.n = buff2int(
-                    ((SFSerializePackFieldInt32 *)
+                    ((SFSerializerPackFieldInt32 *)
                      it->p)->value);
-            it->p += sizeof(SFSerializePackFieldInt32);
+            it->p += sizeof(SFSerializerPackFieldInt32);
             break;
-        case sf_serialize_value_type_int64:
+        case sf_serializer_value_type_int64:
             it->field.value.n = buff2long(
-                    ((SFSerializePackFieldInt64 *)
+                    ((SFSerializerPackFieldInt64 *)
                      it->p)->value);
-            it->p += sizeof(SFSerializePackFieldInt64);
+            it->p += sizeof(SFSerializerPackFieldInt64);
             break;
-        case sf_serialize_value_type_string:
-            fs = (SFSerializePackFieldString *)it->p;
-            it->p += sizeof(SFSerializePackFieldInfo);
+        case sf_serializer_value_type_string:
+            fs = (SFSerializerPackFieldString *)it->p;
+            it->p += sizeof(SFSerializerPackFieldInfo);
             if ((it->error_no=unpack_string(it, remain_len -
-                            sizeof(SFSerializePackFieldInfo),
+                            sizeof(SFSerializerPackFieldInfo),
                             &fs->value, &it->field.value.s)) != 0)
             {
                 return NULL;
             }
             break;
-        case sf_serialize_value_type_int32_array:
-        case sf_serialize_value_type_int64_array:
+        case sf_serializer_value_type_int32_array:
+        case sf_serializer_value_type_int64_array:
             if ((it->error_no=unpack_array(it, remain_len - sizeof(
-                                SFSerializePackFieldArray))) != 0)
+                                SFSerializerPackFieldArray))) != 0)
             {
                 return NULL;
             }
             it->field.value.int_array = it->int_array;
             break;
-        case sf_serialize_value_type_map:
+        case sf_serializer_value_type_map:
             if ((it->error_no=unpack_map(it, remain_len - sizeof(
-                                SFSerializePackFieldArray))) != 0)
+                                SFSerializerPackFieldArray))) != 0)
             {
                 return NULL;
             }
