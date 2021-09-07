@@ -195,6 +195,24 @@ static inline int sf_serializer_pack_int64(FastBuffer *buffer,
     return 0;
 }
 
+static inline int sf_serializer_pack_integer(FastBuffer *buffer,
+        const unsigned char fid, const int64_t value)
+{
+    if (value >= INT16_MIN && value <= INT16_MAX) {
+        if (value >= INT8_MIN && value <= INT8_MAX) {
+            return sf_serializer_pack_int8(buffer, fid, value);
+        } else {
+            return sf_serializer_pack_int16(buffer, fid, value);
+        }
+    } else {
+        if (value >= INT32_MIN && value <= INT32_MAX) {
+            return sf_serializer_pack_int32(buffer, fid, value);
+        } else {
+            return sf_serializer_pack_int64(buffer, fid, value);
+        }
+    }
+}
+
 #define SF_SERIALIZER_PACK_STRING(ps, value)  \
     int2buff((value)->len, (ps)->len);   \
     memcpy((ps)->str, (value)->str, (value)->len)
