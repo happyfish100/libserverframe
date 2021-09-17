@@ -1,5 +1,4 @@
 %define LibserverframeDevel libserverframe-devel
-%define LibserverframeDebuginfo  libserverframe-debuginfo
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe

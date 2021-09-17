@@ -22,7 +22,7 @@
 #include "fastcommon/fast_buffer.h"
 #include "fastcommon/hash.h"
 
-#define SF_SERIALIZER_VALUE_TYPE_COUNT  8
+#define SF_SERIALIZER_VALUE_TYPE_COUNT  10
 
 typedef enum {
     sf_serializer_value_type_int8 = 0,
@@ -30,6 +30,8 @@ typedef enum {
     sf_serializer_value_type_int32,
     sf_serializer_value_type_int64,
     sf_serializer_value_type_string,
+    sf_serializer_value_type_int8_array,
+    sf_serializer_value_type_int16_array,
     sf_serializer_value_type_int32_array,
     sf_serializer_value_type_int64_array,
     sf_serializer_value_type_map
@@ -242,6 +244,60 @@ static inline int sf_serializer_pack_string(FastBuffer *buffer,
     return 0;
 }
 
+static inline int sf_serializer_pack_int8_array(FastBuffer *buffer,
+        const unsigned char fid, const int8_t *array, const int count)
+{
+    int result;
+    int length;
+    SFSerializerPackFieldArray *obj;
+    const int8_t *pn;
+    const int8_t *end;
+    char *ps;
+
+    length = sizeof(SFSerializerPackFieldArray) + count * 1;
+    if ((result=fast_buffer_check_inc_size(buffer, length)) != 0) {
+        return result;
+    }
+
+    obj = (SFSerializerPackFieldArray *)(buffer->data + buffer->length);
+    obj->field.id = fid;
+    obj->field.type = sf_serializer_value_type_int8_array;
+    int2buff(count, obj->value.count);
+    end = array + count;
+    for (pn=array, ps=obj->value.ptr; pn<end; pn++) {
+        *ps++ = *pn;
+    }
+    buffer->length += length;
+    return 0;
+}
+
+static inline int sf_serializer_pack_int16_array(FastBuffer *buffer,
+        const unsigned char fid, const int16_t *array, const int count)
+{
+    int result;
+    int length;
+    SFSerializerPackFieldArray *obj;
+    const int16_t *pn;
+    const int16_t *end;
+    char *ps;
+
+    length = sizeof(SFSerializerPackFieldArray) + count * 2;
+    if ((result=fast_buffer_check_inc_size(buffer, length)) != 0) {
+        return result;
+    }
+
+    obj = (SFSerializerPackFieldArray *)(buffer->data + buffer->length);
+    obj->field.id = fid;
+    obj->field.type = sf_serializer_value_type_int16_array;
+    int2buff(count, obj->value.count);
+    end = array + count;
+    for (pn=array, ps=obj->value.ptr; pn<end; pn++, ps+=2) {
+        short2buff(*pn, ps);
+    }
+    buffer->length += length;
+    return 0;
+}
+
 static inline int sf_serializer_pack_int32_array(FastBuffer *buffer,
         const unsigned char fid, const int32_t *array, const int count)
 {
@@ -287,10 +343,10 @@ static inline int sf_serializer_pack_int64_array(FastBuffer *buffer,
     obj = (SFSerializerPackFieldArray *)(buffer->data + buffer->length);
     obj->field.id = fid;
     obj->field.type = sf_serializer_value_type_int64_array;
-    long2buff(count, obj->value.count);
+    int2buff(count, obj->value.count);
     end = array + count;
     for (pn=array, ps=obj->value.ptr; pn<end; pn++, ps+=8) {
-        int2buff(*pn, ps);
+        long2buff(*pn, ps);
     }
     buffer->length += length;
     return 0;
@@ -366,6 +422,8 @@ static inline void sf_serializer_iterator_destroy(SFSerializerIterator *it)
 int sf_serializer_unpack(SFSerializerIterator *it, const string_t *content);
 
 const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it);
+
+int sf_serializer_read(int fd, char *buff, const int size);
 
 #ifdef __cplusplus
 }

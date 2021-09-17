@@ -45,6 +45,8 @@ static SFSerializerTypeConfig value_type_configs[SF_SERIALIZER_VALUE_TYPE_COUNT]
     {"int32",  sizeof(SFSerializerPackFieldInt32),  0},
     {"int64",  sizeof(SFSerializerPackFieldInt64),  0},
     {"string", sizeof(SFSerializerPackStringValue), 0},
+    {"int8_array",  sizeof(SFSerializerPackFieldArray), 1},
+    {"int16_array", sizeof(SFSerializerPackFieldArray), 2},
     {"int32_array", sizeof(SFSerializerPackFieldArray), 4},
     {"int64_array", sizeof(SFSerializerPackFieldArray), 8},
     {"map", sizeof(SFSerializerPackFieldArray), 2 *
@@ -224,10 +226,19 @@ static int unpack_array(SFSerializerIterator *it, const int remain_len)
     it->p += sizeof(SFSerializerPackFieldArray);
     end = it->int_array.elts + count;
     for (pn=it->int_array.elts; pn<end; pn++) {
-        if (it->field.type == sf_serializer_value_type_int32_array) {
-            *pn = buff2int(it->p);
-        } else {
-            *pn = buff2long(it->p);
+        switch (it->field.type) {
+            case sf_serializer_value_type_int8_array:
+                *pn = *it->p;
+                break;
+            case sf_serializer_value_type_int16_array:
+                *pn = buff2short(it->p);
+                break;
+            case sf_serializer_value_type_int32_array:
+                *pn = buff2int(it->p);
+                break;
+            default:
+                *pn = buff2long(it->p);
+                break;
         }
         it->p += value_type_configs[it->field.type].elt_size;
     }
@@ -336,6 +347,8 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
                 return NULL;
             }
             break;
+        case sf_serializer_value_type_int8_array:
+        case sf_serializer_value_type_int16_array:
         case sf_serializer_value_type_int32_array:
         case sf_serializer_value_type_int64_array:
             if ((it->error_no=unpack_array(it, remain_len - sizeof(
@@ -356,4 +369,49 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
     }
 
     return &it->field;
+}
+
+int sf_serializer_read(int fd, char *buff, const int size)
+{
+    SFSerializerPackHeader *header;
+    int length;
+    int total_bytes;
+
+    if (size <= sizeof(SFSerializerPackHeader)) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+
+    if (fc_safe_read(fd, buff, sizeof(SFSerializerPackHeader)) !=
+            sizeof(SFSerializerPackHeader))
+    {
+        if (errno == 0) {
+            errno = ENODATA;
+        }
+        return -1;
+    }
+
+    header = (SFSerializerPackHeader *)buff;
+    length = buff2int(header->length);
+    if (length <= 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    total_bytes = sizeof(SFSerializerPackHeader) + length;
+    if (total_bytes > size) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+
+    if (fc_safe_read(fd, buff + sizeof(SFSerializerPackHeader),
+                length) != length)
+    {
+        if (errno == 0) {
+            errno = ENODATA;
+        }
+        return -1;
+    }
+
+    return total_bytes;
 }
