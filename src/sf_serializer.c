@@ -371,7 +371,7 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
     return &it->field;
 }
 
-int sf_serializer_read(int fd, char *buff, const int size)
+int sf_serializer_read_message(int fd, char *buff, const int size)
 {
     SFSerializerPackHeader *header;
     int length;
