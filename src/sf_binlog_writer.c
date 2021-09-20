@@ -258,7 +258,7 @@ static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
     writer->version_ctx.next = next_version;
 }
 
-static inline int deal_binlog_one_record(SFBinlogWriterBuffer *wb)
+static int deal_binlog_one_record(SFBinlogWriterBuffer *wb)
 {
     int result;
 
