@@ -20,6 +20,7 @@
 
 #include "fastcommon/fc_queue.h"
 #include "sf_types.h"
+#include "sf_file_writer.h"
 
 #define SF_BINLOG_THREAD_ORDER_MODE_FIXED       0
 #define SF_BINLOG_THREAD_ORDER_MODE_VARY        1
@@ -27,19 +28,9 @@
 #define SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE     0
 #define SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION  1
 
-#define SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION  1
-
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
 #define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
-
-#define SF_BINLOG_SUBDIR_NAME_SIZE 128
-#define SF_BINLOG_FILE_MAX_SIZE   (1024 * 1024 * 1024)  //for binlog rotating by size
-#define SF_BINLOG_FILE_PREFIX     "binlog"
-#define SF_BINLOG_FILE_EXT_FMT    ".%06d"
-
-#define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).end - (buffer).buff)
-#define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -81,36 +72,14 @@ typedef struct binlog_writer_thread {
 } SFBinlogWriterThread;
 
 typedef struct sf_binlog_writer_info {
-    struct {
-        char subdir_name[SF_BINLOG_SUBDIR_NAME_SIZE];
-        int max_record_size;
-    } cfg;
+    SFFileWriterInfo fw;
 
-    struct {
-        int index;
-        int compress_index;
-    } binlog;
-
-    struct {
-        int fd;
-        int64_t size;
-        char *name;
-    } file;
-
-    int64_t total_count;
     struct {
         SFBinlogWriterBufferRing ring;
         int64_t next;
         int64_t change_count;  //version change count
     } version_ctx;
-    SFBinlogBuffer binlog_buffer;
     SFBinlogWriterThread *thread;
-
-    short flags;
-    struct {
-        int64_t pending;
-        volatile int64_t done;
-    } last_versions;
 
     struct {
         bool in_queue;
@@ -169,31 +138,19 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
 
-static inline void sf_binlog_writer_set_flags(
-        SFBinlogWriterInfo *writer, const short flags)
-{
-    writer->flags = flags;
-}
+#define sf_binlog_writer_set_flags(writer, flags) \
+    sf_file_writer_set_flags(&writer->fw, flags)
 
-static inline int64_t sf_binlog_writer_get_last_version(
-        SFBinlogWriterInfo *writer)
-{
-    if (writer->flags & SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION) {
-        return writer->last_versions.done;
-    } else {
-        logError("file: "__FILE__", line: %d, "
-                "should set writer flags to %d!", __LINE__,
-                SF_BINLOG_WRITER_FLAGS_WANT_DONE_VERSION);
-        return -1;
-    }
-}
+#define sf_binlog_writer_get_last_version(writer) \
+    sf_file_writer_get_last_version(&writer->fw)
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
-int sf_binlog_get_current_write_index(SFBinlogWriterInfo *writer);
+#define sf_binlog_get_current_write_index(writer) \
+    sf_file_writer_get_current_index(&writer->fw)
 
-void sf_binlog_get_current_write_position(SFBinlogWriterInfo *writer,
-        SFBinlogFilePosition *position);
+#define sf_binlog_get_current_write_position(writer, position) \
+    sf_file_writer_get_current_position(&writer->fw, position)
 
 static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_buffer(
         SFBinlogWriterThread *thread)
@@ -226,24 +183,17 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
     return buffer;
 }
 
-static inline const char *sf_binlog_writer_get_filepath(const char *subdir_name,
-        char *filename, const int size)
-{
-    snprintf(filename, size, "%s/%s", g_sf_binlog_data_path, subdir_name);
-    return filename;
-}
+#define sf_binlog_writer_get_filepath(subdir_name, filename, size) \
+    sf_file_writer_get_filepath(g_sf_binlog_data_path, \
+            subdir_name, filename, size)
 
-static inline const char *sf_binlog_writer_get_filename(const char *subdir_name,
-        const int binlog_index, char *filename, const int size)
-{
-    snprintf(filename, size, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
-            g_sf_binlog_data_path, subdir_name,
-            SF_BINLOG_FILE_PREFIX, binlog_index);
-    return filename;
-}
+#define sf_binlog_writer_get_filename(subdir_name, \
+        binlog_index, filename, size) \
+        sf_file_writer_get_filename(g_sf_binlog_data_path, \
+                subdir_name, binlog_index, filename, size)
 
-int sf_binlog_writer_set_binlog_index(SFBinlogWriterInfo *writer,
-        const int binlog_index);
+#define sf_binlog_writer_set_binlog_index(writer, binlog_index) \
+    sf_file_writer_set_binlog_index(writer, binlog_index)
 
 #define sf_push_to_binlog_thread_queue(thread, buffer) \
     fc_queue_push(&(thread)->queue, buffer)
@@ -255,9 +205,10 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
     fc_queue_push(&writer->thread->queue, buffer);
 }
 
-int sf_binlog_writer_get_last_lines(const char *subdir_name,
-        const int current_write_index, char *buff,
-        const int buff_size, int *count, int *length);
+#define sf_binlog_writer_get_last_lines(subdir_name, current_write_index, \
+        buff, buff_size, count, length)  \
+        sf_file_writer_get_last_lines(g_sf_binlog_data_path, subdir_name, \
+                current_write_index, buff, buff_size, count, length)
 
 #ifdef __cplusplus
 }
