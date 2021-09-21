@@ -96,14 +96,14 @@ typedef struct sf_binlog_writer_context {
 extern "C" {
 #endif
 
-    extern char *g_sf_binlog_data_path;
-
 int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
-        const char *subdir_name, const int buffer_size);
+        const char *data_path, const char *subdir_name,
+        const int buffer_size);
 
 int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
-        const char *subdir_name, const uint64_t next_version,
-        const int buffer_size, const int ring_size);
+        const char *data_path, const char *subdir_name,
+        const uint64_t next_version, const int buffer_size,
+        const int ring_size);
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
@@ -117,12 +117,12 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
             order_by, max_record_size, 1, true)
 
 static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
-        const char *subdir_name, const int buffer_size,
-        const int max_record_size)
+        const char *data_path, const char *subdir_name,
+        const int buffer_size, const int max_record_size)
 {
     int result;
     if ((result=sf_binlog_writer_init_normal(&context->writer,
-                    subdir_name, buffer_size)) != 0)
+                    data_path, subdir_name, buffer_size)) != 0)
     {
         return result;
     }
@@ -139,18 +139,18 @@ int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
 
 #define sf_binlog_writer_set_flags(writer, flags) \
-    sf_file_writer_set_flags(&writer->fw, flags)
+    sf_file_writer_set_flags(&(writer)->fw, flags)
 
 #define sf_binlog_writer_get_last_version(writer) \
-    sf_file_writer_get_last_version(&writer->fw)
+    sf_file_writer_get_last_version(&(writer)->fw)
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
 #define sf_binlog_get_current_write_index(writer) \
-    sf_file_writer_get_current_index(&writer->fw)
+    sf_file_writer_get_current_index(&(writer)->fw)
 
 #define sf_binlog_get_current_write_position(writer, position) \
-    sf_file_writer_get_current_position(&writer->fw, position)
+    sf_file_writer_get_current_position(&(writer)->fw, position)
 
 static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_buffer(
         SFBinlogWriterThread *thread)
@@ -183,17 +183,16 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
     return buffer;
 }
 
-#define sf_binlog_writer_get_filepath(subdir_name, filename, size) \
-    sf_file_writer_get_filepath(g_sf_binlog_data_path, \
-            subdir_name, filename, size)
+#define sf_binlog_writer_get_filepath(data_path, subdir_name, filename, size) \
+    sf_file_writer_get_filepath(data_path, subdir_name, filename, size)
 
-#define sf_binlog_writer_get_filename(subdir_name, \
-        binlog_index, filename, size) \
-        sf_file_writer_get_filename(g_sf_binlog_data_path, \
-                subdir_name, binlog_index, filename, size)
+#define sf_binlog_writer_get_filename(data_path, \
+        subdir_name, binlog_index, filename, size) \
+        sf_file_writer_get_filename(data_path, subdir_name, \
+                binlog_index, filename, size)
 
 #define sf_binlog_writer_set_binlog_index(writer, binlog_index) \
-    sf_file_writer_set_binlog_index(writer, binlog_index)
+    sf_file_writer_set_binlog_index(&(writer)->fw, binlog_index)
 
 #define sf_push_to_binlog_thread_queue(thread, buffer) \
     fc_queue_push(&(thread)->queue, buffer)
@@ -205,9 +204,9 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
     fc_queue_push(&writer->thread->queue, buffer);
 }
 
-#define sf_binlog_writer_get_last_lines(subdir_name, current_write_index, \
-        buff, buff_size, count, length)  \
-        sf_file_writer_get_last_lines(g_sf_binlog_data_path, subdir_name, \
+#define sf_binlog_writer_get_last_lines(data_path, subdir_name, \
+        current_write_index, buff, buff_size, count, length)  \
+        sf_file_writer_get_last_lines(data_path, subdir_name, \
                 current_write_index, buff, buff_size, count, length)
 
 #ifdef __cplusplus

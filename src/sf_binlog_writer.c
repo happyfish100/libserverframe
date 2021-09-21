@@ -34,8 +34,6 @@
 #include "sf_func.h"
 #include "sf_binlog_writer.h"
 
-char *g_sf_binlog_data_path = NULL;
-
 static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
         const uint64_t next_version)
 {
@@ -341,16 +339,18 @@ static int binlog_wbuffer_alloc_init(void *element, void *args)
 }
 
 int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
-        const char *subdir_name, const int buffer_size)
+        const char *data_path, const char *subdir_name,
+        const int buffer_size)
 {
     writer->flush.in_queue = false;
     return sf_file_writer_init_normal(&writer->fw,
-            g_sf_binlog_data_path, subdir_name, buffer_size);
+            data_path, subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
-        const char *subdir_name, const uint64_t next_version,
-        const int buffer_size, const int ring_size)
+        const char *data_path, const char *subdir_name,
+        const uint64_t next_version, const int buffer_size,
+        const int ring_size)
 {
     int bytes;
 
@@ -366,7 +366,8 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
     writer->version_ctx.change_count = 0;
 
     binlog_writer_set_next_version(writer, next_version);
-    return sf_binlog_writer_init_normal(writer, subdir_name, buffer_size);
+    return sf_binlog_writer_init_normal(writer,
+            data_path, subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
