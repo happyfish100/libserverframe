@@ -21,10 +21,10 @@
 #include "fastcommon/sorted_queue.h"
 #include "sf_file_writer.h"
 
-typedef struct sf_writer_version_info {
+typedef struct sf_writer_version_entry {
     int64_t version;
-    struct sf_writer_version_info *next;
-} SFWriterVersionInfo;
+    struct sf_writer_version_entry *next;
+} SFWriterVersionEntry;
 
 typedef struct sf_ordered_writer_buffer {
     int64_t version;
@@ -44,6 +44,7 @@ typedef struct sf_orderd_writer_thread {
     } queues;
     char name[64];
     volatile bool running;
+    SFOrderedWriterBuffer waiting; //for less equal than object
 } SFOrderedWriterThread;
 
 typedef struct sf_ordered_writer_info {
@@ -65,33 +66,40 @@ int sf_ordered_writer_init(SFOrderedWriterContext *context,
         const char *data_path, const char *subdir_name,
         const int buffer_size, const int max_record_size);
 
-#define sf_ordered_writer_set_flags(writer, flags) \
-    sf_file_writer_set_flags(&(writer)->fw, flags)
+#define sf_ordered_writer_set_flags(ctx, flags) \
+    sf_file_writer_set_flags(&(ctx)->writer.fw, flags)
 
-#define sf_ordered_writer_get_last_version(writer) \
-    sf_ordered_writer_get_last_version(&(writer)->fw)
+#define sf_ordered_writer_get_last_version(ctx) \
+    sf_ordered_writer_get_last_version(&(ctx)->writer.fw)
 
-void sf_ordered_writer_finish(SFOrderedWriterInfo *writer);
+void sf_ordered_writer_finish(SFOrderedWriterContext *ctx);
 
-#define sf_ordered_writer_get_current_index(writer) \
-    sf_file_writer_get_current_index(&(writer)->fw)
+#define sf_ordered_writer_get_current_index(ctx) \
+    sf_file_writer_get_current_index(&(ctx)->writer.fw)
 
-#define sf_ordered_writer_get_current_position(writer, position) \
-    sf_file_writer_get_current_position(&(writer)->fw, position)
+#define sf_ordered_writer_get_current_position(ctx, position) \
+    sf_file_writer_get_current_position(&(ctx)->writer.fw, position)
 
-static inline SFOrderedWriterBuffer *sf_ordered_writer_alloc_buffer(
-        SFOrderedWriterThread *thread)
+static inline int sf_ordered_writer_alloc_versions(
+        SFOrderedWriterContext *ctx, const int count,
+        struct fc_queue_info *chain)
 {
-    return (SFOrderedWriterBuffer *)fast_mblock_alloc_object(
-            &thread->allocators.buffer);
+    return fc_queue_alloc_chain(&ctx->thread.queues.version,
+            &ctx->thread.allocators.version, count, chain);
 }
 
-static inline SFOrderedWriterBuffer *sf_ordered_writer_alloc_versioned_buffer_ex(
-        SFOrderedWriterInfo *writer, const int64_t version)
+static inline void sf_ordered_writer_push_versions(
+        SFOrderedWriterContext *ctx, struct fc_queue_info *chain)
+{
+    fc_queue_push_queue_to_tail(&ctx->thread.queues.version, chain);
+}
+
+static inline SFOrderedWriterBuffer *sf_ordered_writer_alloc_buffer(
+        SFOrderedWriterContext *ctx, const int64_t version)
 {
     SFOrderedWriterBuffer *buffer;
     buffer = (SFOrderedWriterBuffer *)fast_mblock_alloc_object(
-            &writer->thread->allocators.buffer);
+            &ctx->thread.allocators.buffer);
     if (buffer != NULL) {
         buffer->version = version;
     }
@@ -106,16 +114,16 @@ static inline SFOrderedWriterBuffer *sf_ordered_writer_alloc_versioned_buffer_ex
         sf_file_writer_get_filename(data_path, subdir_name, \
                 binlog_index, filename, size)
 
-#define sf_ordered_writer_set_binlog_index(writer, binlog_index) \
-    sf_file_writer_set_binlog_index(&(writer)->fw, binlog_index)
+#define sf_ordered_writer_set_binlog_index(ctx, binlog_index) \
+    sf_file_writer_set_binlog_index(&(ctx)->writer.fw, binlog_index)
 
-#define sf_push_to_binlog_thread_queue(thread, buffer) \
-    sorted_queue_push(&(thread)->queues.buffer, buffer)
+#define sf_push_to_binlog_thread_queue(ctx, buffer) \
+    sorted_queue_push(&(ctx)->thread.queues.buffer, buffer)
 
-static inline void sf_push_to_binlog_write_queue(SFOrderedWriterInfo *writer,
+static inline void sf_push_to_binlog_write_queue(SFOrderedWriterContext *ctx,
         SFOrderedWriterBuffer *buffer)
 {
-    sorted_queue_push(&writer->thread->queues.buffer, buffer);
+    sorted_queue_push(&ctx->thread.queues.buffer, buffer);
 }
 
 #ifdef __cplusplus
