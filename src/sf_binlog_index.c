@@ -243,29 +243,28 @@ int sf_binlog_index_save(SFBinlogIndexContext *ctx)
     return 0;
 }
 
-int sf_binlog_index_expand(SFBinlogIndexContext *ctx)
+int sf_binlog_index_expand_array(SFBinlogIndexArray *array,
+        const int elt_size)
 {
     int alloc;
     void *indexes;
 
-    if (ctx->index_array.alloc == 0) {
-        alloc = 64;
+    if (array->alloc == 0) {
+        alloc = 1024;
     } else {
-        alloc = ctx->index_array.alloc * 2;
+        alloc = array->alloc * 2;
     }
-    indexes = fc_malloc(ctx->array_elt_size * alloc);
+    indexes = fc_malloc(elt_size * alloc);
     if (indexes == NULL) {
         return ENOMEM;
     }
 
-    if (ctx->index_array.count > 0) {
-        memcpy(indexes, ctx->index_array.indexes,
-                ctx->array_elt_size *
-                ctx->index_array.count);
-        free(ctx->index_array.indexes);
+    if (array->count > 0) {
+        memcpy(indexes, array->indexes, elt_size * array->count);
+        free(array->indexes);
     }
 
-    ctx->index_array.indexes = indexes;
-    ctx->index_array.alloc = alloc;
+    array->indexes = indexes;
+    array->alloc = alloc;
     return 0;
 }

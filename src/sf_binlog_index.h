@@ -75,7 +75,14 @@ int sf_binlog_index_load(SFBinlogIndexContext *ctx);
 
 int sf_binlog_index_save(SFBinlogIndexContext *ctx);
 
-int sf_binlog_index_expand(SFBinlogIndexContext *ctx);
+int sf_binlog_index_expand_array(SFBinlogIndexArray *array,
+        const int elt_size);
+
+static inline int sf_binlog_index_expand(SFBinlogIndexContext *ctx)
+{
+    return sf_binlog_index_expand_array(&ctx->
+            index_array, ctx->array_elt_size);
+}
 
 static inline void sf_binlog_index_free(SFBinlogIndexContext *ctx)
 {
