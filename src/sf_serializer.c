@@ -49,6 +49,8 @@ static SFSerializerTypeConfig value_type_configs[SF_SERIALIZER_VALUE_TYPE_COUNT]
     {"int16_array", sizeof(SFSerializerPackFieldArray), 2},
     {"int32_array", sizeof(SFSerializerPackFieldArray), 4},
     {"int64_array", sizeof(SFSerializerPackFieldArray), 8},
+    {"string_array", sizeof(SFSerializerPackFieldArray),
+        sizeof(SFSerializerPackStringValue)},
     {"map", sizeof(SFSerializerPackFieldArray), 2 *
         sizeof(SFSerializerPackStringValue)}
 };
@@ -144,11 +146,11 @@ static inline int unpack_array_count(SFSerializerIterator *it,
     }
 
     min_size = value_type_configs[it->field.type].elt_size * (*count);
-    if (min_size > remain_len) {
+    if (remain_len < min_size) {
         snprintf(it->error_info, sizeof(it->error_info),
-                FIELD_ID_AND_TYPE_FORMAT", array min bytes: %d is "
-                "too large > remain: %d", FIELD_ID_AND_TYPE_PARAMS,
-                min_size, remain_len);
+                FIELD_ID_AND_TYPE_FORMAT", remain length: %d is too "
+                "small < array min bytes: %d", FIELD_ID_AND_TYPE_PARAMS,
+                remain_len, min_size);
         return EINVAL;
     }
 
@@ -204,7 +206,7 @@ static inline int unpack_string(SFSerializerIterator *it, const int remain_len,
             sizeof(SFSerializerPackStringValue), output);
 }
 
-static int unpack_array(SFSerializerIterator *it, const int remain_len)
+static int unpack_integer_array(SFSerializerIterator *it, const int remain_len)
 {
     int result;
     int count;
@@ -243,6 +245,40 @@ static int unpack_array(SFSerializerIterator *it, const int remain_len)
         it->p += value_type_configs[it->field.type].elt_size;
     }
     it->int_array.count = count;
+
+    return 0;
+}
+
+static int unpack_string_array(SFSerializerIterator *it, const int remain_len)
+{
+    int result;
+    int count;
+    string_t *str;
+    string_t *end;
+
+    if ((result=unpack_array_count(it, remain_len, &count)) != 0) {
+        return result;
+    }
+
+    if (count > it->str_array_alloc) {
+        if ((result=array_expand(it, (void_array_t *)&it->str_array,
+                        sizeof(string_t), count, &it->str_array_alloc)) != 0)
+        {
+            return result;
+        }
+    }
+
+    it->p += sizeof(SFSerializerPackFieldArray);
+    end = it->str_array.strings + count;
+    for (str=it->str_array.strings; str<end; str++) {
+        if ((result=unpack_string(it, it->end - it->p,
+                        (SFSerializerPackStringValue *)
+                        it->p, str)) != 0)
+        {
+            return result;
+        }
+    }
+    it->str_array.count = count;
 
     return 0;
 }
@@ -351,12 +387,20 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
         case sf_serializer_value_type_int16_array:
         case sf_serializer_value_type_int32_array:
         case sf_serializer_value_type_int64_array:
-            if ((it->error_no=unpack_array(it, remain_len - sizeof(
-                                SFSerializerPackFieldArray))) != 0)
+            if ((it->error_no=unpack_integer_array(it, remain_len -
+                            sizeof(SFSerializerPackFieldArray))) != 0)
             {
                 return NULL;
             }
             it->field.value.int_array = it->int_array;
+            break;
+        case sf_serializer_value_type_string_array:
+            if ((it->error_no=unpack_string_array(it, remain_len - sizeof(
+                                SFSerializerPackFieldArray))) != 0)
+            {
+                return NULL;
+            }
+            it->field.value.str_array = it->str_array;
             break;
         case sf_serializer_value_type_map:
             if ((it->error_no=unpack_map(it, remain_len - sizeof(
