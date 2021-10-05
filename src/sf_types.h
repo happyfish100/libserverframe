@@ -235,4 +235,12 @@ typedef struct sf_cluster_config {
     int service_group_index;
 } SFClusterConfig;
 
+typedef struct sf_synchronize_context {
+    pthread_lock_cond_pair_t lcp;
+    union {
+        bool done;
+        int result;
+    };
+} SFSynchronizeContext;
+
 #endif

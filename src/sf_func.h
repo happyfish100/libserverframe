@@ -18,7 +18,7 @@
 #ifndef _SF_FUNC_H
 #define _SF_FUNC_H
 
-#include "fastcommon/common_define.h"
+#include "fastcommon/pthread_func.h"
 #include "sf_types.h"
 #include "sf_global.h"
 
@@ -67,6 +67,11 @@ static inline void sf_binlog_buffer_destroy(SFBinlogBuffer *buffer)
         buffer->current = buffer->end = buffer->buff = NULL;
         buffer->size = 0;
     }
+}
+
+static inline int sf_synchronize_ctx_init(SFSynchronizeContext *sctx)
+{
+    return init_pthread_lock_cond_pair(&sctx->lcp);
 }
 
 #ifdef __cplusplus
