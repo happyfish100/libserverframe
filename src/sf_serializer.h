@@ -248,6 +248,14 @@ static inline int sf_serializer_pack_string(FastBuffer *buffer,
     return 0;
 }
 
+static inline int sf_serializer_pack_buffer(FastBuffer *buffer,
+        const unsigned char fid, const FastBuffer *value)
+{
+    string_t str;
+    FC_SET_STRING_EX(str, value->data, value->length);
+    return sf_serializer_pack_string(buffer, fid, &str);
+}
+
 static inline int sf_serializer_pack_int8_array(FastBuffer *buffer,
         const unsigned char fid, const int8_t *array, const int count)
 {
