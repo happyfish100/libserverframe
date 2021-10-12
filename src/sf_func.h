@@ -19,6 +19,7 @@
 #define _SF_FUNC_H
 
 #include "fastcommon/pthread_func.h"
+#include "fastcommon/fc_atomic.h"
 #include "sf_types.h"
 #include "sf_global.h"
 
@@ -71,7 +72,17 @@ static inline void sf_binlog_buffer_destroy(SFBinlogBuffer *buffer)
 
 static inline int sf_synchronize_ctx_init(SFSynchronizeContext *sctx)
 {
+    sctx->waiting_count = 0;
     return init_pthread_lock_cond_pair(&sctx->lcp);
+}
+
+static inline void sf_synchronize_counter_wait(SFSynchronizeContext *sctx)
+{
+    PTHREAD_MUTEX_LOCK(&sctx->lcp.lock);
+    while (FC_ATOMIC_GET(sctx->waiting_count) != 0) {
+        pthread_cond_wait(&sctx->lcp.cond, &sctx->lcp.lock);
+    }
+    PTHREAD_MUTEX_UNLOCK(&sctx->lcp.lock);
 }
 
 #ifdef __cplusplus
