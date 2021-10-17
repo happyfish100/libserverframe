@@ -19,6 +19,7 @@
 #define _SF_SERIALIZER_H
 
 #include "fastcommon/common_define.h"
+#include "fastcommon/shared_func.h"
 #include "fastcommon/fast_buffer.h"
 #include "fastcommon/hash.h"
 

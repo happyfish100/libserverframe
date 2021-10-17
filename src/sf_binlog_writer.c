@@ -38,6 +38,9 @@ static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
         const uint64_t next_version)
 {
     writer->version_ctx.next = next_version;
+    if (writer->fw.flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
+        writer->fw.last_versions.done = next_version - 1;
+    }
 }
 
 #define deal_binlog_one_record(wb) \
