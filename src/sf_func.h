@@ -76,6 +76,14 @@ static inline int sf_synchronize_ctx_init(SFSynchronizeContext *sctx)
     return init_pthread_lock_cond_pair(&sctx->lcp);
 }
 
+static inline void sf_synchronize_counter_notify(SFSynchronizeContext *sctx,
+        const int count)
+{
+    if (__sync_sub_and_fetch(&sctx->waiting_count, count) == 0) {
+        pthread_cond_signal(&sctx->lcp.cond);
+    }
+}
+
 static inline void sf_synchronize_counter_wait(SFSynchronizeContext *sctx)
 {
     PTHREAD_MUTEX_LOCK(&sctx->lcp.lock);
