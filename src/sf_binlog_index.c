@@ -100,9 +100,8 @@ static int parse(SFBinlogIndexContext *ctx, const string_t *lines,
     }
 
     end = lines + row_count;
-    for (line=lines+1, bindex = ctx->index_array.indexes;
-            line<end; line++, bindex++)
-    {
+    bindex = ctx->index_array.indexes;
+    for (line=lines+1; line<end; line++) {
         if ((result=ctx->unpack_record(line, bindex, error_info)) != 0) {
             logError("file: "__FILE__", line: %d, "
                     "%s index file: %s, parse line #%d fail, error "
@@ -110,9 +109,11 @@ static int parse(SFBinlogIndexContext *ctx, const string_t *lines,
                     (int)(line - lines) + 1, error_info);
             return result;
         }
+
+        bindex = (char *)bindex + ctx->array_elt_size;
     }
 
-    ctx->index_array.count = bindex - ctx->index_array.indexes;
+    ctx->index_array.count = row_count - 1;
     return 0;
 }
 
@@ -168,10 +169,10 @@ static int save(SFBinlogIndexContext *ctx, const char *filename)
     char buff[16 * 1024];
     char *bend;
     void *index;
-    void *end;
     char *p;
     int fd;
     int len;
+    int i;
     int result;
 
     if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0) {
@@ -189,8 +190,8 @@ static int save(SFBinlogIndexContext *ctx, const char *filename)
             ctx->index_array.count,
             ctx->last_version);
 
-    end = ctx->index_array.indexes + ctx->index_array.count;
-    for (index=ctx->index_array.indexes; index<end; index++) {
+    index = ctx->index_array.indexes;
+    for (i=0; i<ctx->index_array.count; i++) {
         if (bend - p < ctx->record_max_size) {
             len = p - buff;
             if (fc_safe_write(fd, buff, len) != len) {
@@ -204,6 +205,7 @@ static int save(SFBinlogIndexContext *ctx, const char *filename)
         }
 
         p += ctx->pack_record(p, index);
+        index = (char *)index + ctx->array_elt_size;
     }
 
     if (result == 0) {
