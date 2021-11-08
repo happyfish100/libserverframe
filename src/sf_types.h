@@ -240,7 +240,7 @@ typedef struct sf_synchronize_context {
     union {
         bool finished;
         int result;
-        volatile int waiting_count;
+        int waiting_count;
     };
 } SFSynchronizeContext;
 
