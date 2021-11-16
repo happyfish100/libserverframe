@@ -22,7 +22,7 @@
 
 #define SF_BINLOG_PARSE_INT_SILENCE(var, caption, index, endchr, min_val) \
     do {   \
-        var = strtol(cols[index].str, &endptr, 10);  \
+        var = strtoll(cols[index].str, &endptr, 10);  \
         if (*endptr != endchr || var < min_val) {    \
             sprintf(error_info, "invalid %s: %.*s",  \
                     caption, cols[index].len, cols[index].str); \
@@ -32,7 +32,7 @@
 
 #define SF_BINLOG_PARSE_INT_SILENCE2(var, caption, index, echr1, echr2, min_val) \
     do {   \
-        var = strtol(cols[index].str, &endptr, 10);  \
+        var = strtoll(cols[index].str, &endptr, 10);  \
         if (!(*endptr == echr1 || *endptr == echr2) || (var < min_val)) { \
             sprintf(error_info, "invalid %s: %.*s",  \
                     caption, cols[index].len, cols[index].str); \

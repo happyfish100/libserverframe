@@ -23,7 +23,7 @@
 #include "fastcommon/fast_buffer.h"
 #include "fastcommon/hash.h"
 
-#define SF_SERIALIZER_VALUE_TYPE_COUNT  11
+#define SF_SERIALIZER_VALUE_TYPE_COUNT  12
 
 typedef enum {
     sf_serializer_value_type_int8 = 0,
@@ -36,6 +36,7 @@ typedef enum {
     sf_serializer_value_type_int32_array,
     sf_serializer_value_type_int64_array,
     sf_serializer_value_type_string_array,
+    sf_serializer_value_type_id_name_array,
     sf_serializer_value_type_map
 } SFSerializerValueType;
 
@@ -94,20 +95,23 @@ typedef struct sf_serializer_field_value {
         int64_t n;
         string_t s;
         int64_array_t int_array;
-        key_value_array_t kv_array;
         string_array_t str_array;
+        id_name_array_t id_name_array;
+        key_value_array_t kv_array;
     } value;
 } SFSerializerFieldValue;
 
 typedef struct sf_serializer_iterator {
     const char *p;
     const char *end;
-    int64_array_t int_array;     //int64_t array holder
-    key_value_array_t kv_array;  //key-value array holder
-    string_array_t str_array;    //string_t array holder
+    int64_array_t int_array;       //int64_t array holder
+    string_array_t str_array;      //string_t array holder
+    id_name_array_t id_name_array; //id name array holder
+    key_value_array_t kv_array;    //key value array holder
     int int_array_alloc;
-    int kv_array_alloc;
     int str_array_alloc;
+    int id_name_array_alloc;
+    int kv_array_alloc;
     SFSerializerFieldValue field;
     int error_no;
     char error_info[256];
@@ -224,10 +228,9 @@ static inline int sf_serializer_pack_integer(FastBuffer *buffer,
     int2buff((value)->len, (ps)->len);   \
     memcpy((ps)->str, (value)->str, (value)->len)
 
-#define SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(ps, value)  \
-    SF_SERIALIZER_PACK_STRING(ps, value);  \
-    ps = (SFSerializerPackStringValue *)(((char *)ps) + sizeof( \
-                    SFSerializerPackStringValue) + (value)->len)
+#define SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, value)  \
+    SF_SERIALIZER_PACK_STRING((SFSerializerPackStringValue *)p, value); \
+    p += (sizeof(SFSerializerPackStringValue) + (value)->len)
 
 static inline int sf_serializer_pack_string(FastBuffer *buffer,
         const unsigned char fid, const string_t *value)
@@ -373,7 +376,7 @@ static inline int sf_serializer_pack_string_array(FastBuffer *buffer,
     SFSerializerPackFieldArray *obj;
     const string_t *str;
     const string_t *end;
-    SFSerializerPackStringValue *ps;
+    char *p;
 
     length = sizeof(SFSerializerPackFieldArray);
     end = strings + count;
@@ -390,9 +393,46 @@ static inline int sf_serializer_pack_string_array(FastBuffer *buffer,
     obj->field.type = sf_serializer_value_type_string_array;
     int2buff(count, obj->value.count);
 
-    ps = (SFSerializerPackStringValue *)obj->value.ptr;
+    p = obj->value.ptr;
     for (str=strings; str<end; str++) {
-        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(ps, str);
+        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, str);
+    }
+    buffer->length += length;
+    return 0;
+}
+
+static inline int sf_serializer_pack_id_name_array(FastBuffer *buffer,
+        const unsigned char fid, const id_name_pair_t *in_pairs,
+        const int count)
+{
+    int result;
+    int length;
+    SFSerializerPackFieldArray *obj;
+    const id_name_pair_t *pair;
+    const id_name_pair_t *end;
+    char *p;
+
+    length = sizeof(SFSerializerPackFieldArray);
+    end = in_pairs + count;
+    for (pair=in_pairs; pair<end; pair++) {
+        length += sizeof(int64_t) + pair->name.len +
+            sizeof(SFSerializerPackStringValue);
+    }
+
+    if ((result=fast_buffer_check_inc_size(buffer, length)) != 0) {
+        return result;
+    }
+
+    obj = (SFSerializerPackFieldArray *)(buffer->data + buffer->length);
+    obj->field.id = fid;
+    obj->field.type = sf_serializer_value_type_id_name_array;
+    int2buff(count, obj->value.count);
+
+    p = obj->value.ptr;
+    for (pair=in_pairs; pair<end; pair++) {
+        long2buff(pair->id, p);
+        p += sizeof(int64_t);
+        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, &pair->name);
     }
     buffer->length += length;
     return 0;
@@ -407,7 +447,7 @@ static inline int sf_serializer_pack_map(FastBuffer *buffer,
     SFSerializerPackFieldArray *obj;
     const key_value_pair_t *pair;
     const key_value_pair_t *end;
-    SFSerializerPackStringValue *ps;
+    char *p;
 
     length = sizeof(SFSerializerPackFieldArray);
     end = kv_pairs + count;
@@ -425,10 +465,10 @@ static inline int sf_serializer_pack_map(FastBuffer *buffer,
     obj->field.type = sf_serializer_value_type_map;
     int2buff(count, obj->value.count);
 
-    ps = (SFSerializerPackStringValue *)obj->value.ptr;
+    p = obj->value.ptr;
     for (pair=kv_pairs; pair<end; pair++) {
-        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(ps, &pair->key);
-        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(ps, &pair->value);
+        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, &pair->key);
+        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, &pair->value);
     }
     buffer->length += length;
     return 0;

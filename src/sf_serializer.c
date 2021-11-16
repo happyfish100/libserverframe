@@ -51,6 +51,8 @@ static SFSerializerTypeConfig value_type_configs[SF_SERIALIZER_VALUE_TYPE_COUNT]
     {"int64_array", sizeof(SFSerializerPackFieldArray), 8},
     {"string_array", sizeof(SFSerializerPackFieldArray),
         sizeof(SFSerializerPackStringValue)},
+    {"id_name_array", sizeof(SFSerializerPackFieldArray),
+        sizeof(int64_t) + sizeof(SFSerializerPackStringValue)},
     {"map", sizeof(SFSerializerPackFieldArray), 2 *
         sizeof(SFSerializerPackStringValue)}
 };
@@ -283,6 +285,54 @@ static int unpack_string_array(SFSerializerIterator *it, const int remain_len)
     return 0;
 }
 
+static int unpack_id_name_array(SFSerializerIterator *it, const int remain_len)
+{
+    int result;
+    int count;
+    id_name_pair_t *pair;
+    id_name_pair_t *end;
+
+    if ((result=unpack_array_count(it, remain_len, &count)) != 0) {
+        return result;
+    }
+
+    if (count > it->id_name_array_alloc) {
+        if ((result=array_expand(it, (void_array_t *)&it->id_name_array,
+                        sizeof(id_name_pair_t), count,
+                        &it->id_name_array_alloc)) != 0)
+        {
+            return result;
+        }
+    }
+
+    it->p += sizeof(SFSerializerPackFieldArray);
+    end = it->id_name_array.elts + count;
+    for (pair=it->id_name_array.elts; pair<end; pair++) {
+        if ((it->end - it->p) < (sizeof(int64_t) +
+                    sizeof(SFSerializerPackStringValue)))
+        {
+            snprintf(it->error_info, sizeof(it->error_info),
+                    FIELD_ID_AND_TYPE_FORMAT", remain length: %d "
+                    "is too small < %d", FIELD_ID_AND_TYPE_PARAMS,
+                    (int)(it->end - it->p), (int)(sizeof(int64_t) +
+                        sizeof(SFSerializerPackStringValue)));
+            return EINVAL;
+        }
+
+        pair->id = buff2long(it->p);
+        it->p += sizeof(int64_t);
+        if ((result=unpack_string(it, it->end - it->p,
+                        (SFSerializerPackStringValue *)it->p,
+                        &pair->name)) != 0)
+        {
+            return result;
+        }
+    }
+    it->id_name_array.count = count;
+
+    return 0;
+}
+
 static int unpack_map(SFSerializerIterator *it, const int remain_len)
 {
     int result;
@@ -401,6 +451,14 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
                 return NULL;
             }
             it->field.value.str_array = it->str_array;
+            break;
+        case sf_serializer_value_type_id_name_array:
+            if ((it->error_no=unpack_id_name_array(it, remain_len -
+                            sizeof(SFSerializerPackFieldArray))) != 0)
+            {
+                return NULL;
+            }
+            it->field.value.id_name_array = it->id_name_array;
             break;
         case sf_serializer_value_type_map:
             if ((it->error_no=unpack_map(it, remain_len - sizeof(
