@@ -514,7 +514,8 @@ int sf_serializer_unpack(SFSerializerIterator *it, const string_t *content);
 
 const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it);
 
-int sf_serializer_read_message(int fd, char *buff, const int size);
+int sf_serializer_read_message(int fd, BufferInfo *buffer,
+        const int max_size);
 
 #ifdef __cplusplus
 }

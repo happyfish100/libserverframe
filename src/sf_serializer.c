@@ -473,47 +473,49 @@ const SFSerializerFieldValue *sf_serializer_next(SFSerializerIterator *it)
     return &it->field;
 }
 
-int sf_serializer_read_message(int fd, char *buff, const int size)
+int sf_serializer_read_message(int fd, BufferInfo *buffer,
+        const int max_size)
 {
     SFSerializerPackHeader *header;
+    char *new_buff;
+    int new_alloc;
     int length;
     int total_bytes;
 
-    if (size <= sizeof(SFSerializerPackHeader)) {
-        errno = EOVERFLOW;
-        return -1;
+    if (fc_safe_read(fd, buffer->buff, sizeof(*header)) != sizeof(*header)) {
+        return ENODATA;
     }
 
-    if (fc_safe_read(fd, buff, sizeof(SFSerializerPackHeader)) !=
-            sizeof(SFSerializerPackHeader))
-    {
-        if (errno == 0) {
-            errno = ENODATA;
-        }
-        return -1;
-    }
-
-    header = (SFSerializerPackHeader *)buff;
+    header = (SFSerializerPackHeader *)buffer->buff;
     length = buff2int(header->length);
-    if (length <= 0) {
-        errno = EINVAL;
-        return -1;
+    if (length <= 0 || length > max_size) {
+        return EINVAL;
     }
 
-    total_bytes = sizeof(SFSerializerPackHeader) + length;
-    if (total_bytes > size) {
-        errno = EOVERFLOW;
-        return -1;
+    total_bytes = sizeof(*header) + length;
+    if (buffer->alloc_size < total_bytes) {
+        new_alloc = buffer->alloc_size * 2;
+        while (new_alloc < total_bytes) {
+            new_alloc *= 2;
+        }
+
+        new_buff = (char *)fc_malloc(new_alloc);
+        if (new_buff == NULL) {
+            return ENOMEM;
+        }
+
+        memcpy(new_buff, buffer->buff, sizeof(*header));
+        free(buffer->buff);
+        buffer->buff = new_buff;
+        buffer->alloc_size = new_alloc;
     }
 
-    if (fc_safe_read(fd, buff + sizeof(SFSerializerPackHeader),
+    if (fc_safe_read(fd, buffer->buff + sizeof(*header),
                 length) != length)
     {
-        if (errno == 0) {
-            errno = ENODATA;
-        }
-        return -1;
+        return ENODATA;
     }
 
-    return total_bytes;
+    buffer->length = total_bytes;
+    return 0;
 }
