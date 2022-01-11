@@ -106,7 +106,7 @@ static inline void sf_synchronize_counter_notify(
 static inline void sf_synchronize_counter_wait(SFSynchronizeContext *sctx)
 {
     PTHREAD_MUTEX_LOCK(&sctx->lcp.lock);
-    while (sctx->waiting_count != 0) {
+    while (sctx->waiting_count != 0 && SF_G_CONTINUE_FLAG) {
         pthread_cond_wait(&sctx->lcp.cond, &sctx->lcp.lock);
     }
     PTHREAD_MUTEX_UNLOCK(&sctx->lcp.lock);
