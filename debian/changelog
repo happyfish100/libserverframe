@@ -1,3 +1,9 @@
+libserverframe (1.1.12-1) UNRELEASED; urgency=medium
+
+  * upgrade version to 1.1.12
+
+ -- YuQing <384681@qq.com>  Sat, 15 Jan 2022 20:00:21 +0800
+
 libserverframe (1.1.11-1) unstable; urgency=medium
 
   * upgrade version to 1.1.11
