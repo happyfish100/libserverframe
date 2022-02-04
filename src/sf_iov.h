@@ -34,8 +34,9 @@ typedef struct sf_dynamic_iov_array {
     int cnt;
 } SFDynamicIOVArray;
 
-#define sf_iova_init(iova, _iov, _cnt)    \
-    (iova).iov = (iova).input.iov = _iov; \
+#define sf_iova_init(iova, _iov, _cnt)  \
+    (iova).input.iov = _iov;            \
+    (iova).iov = (struct iovec *)_iov;  \
     (iova).cnt = (iova).input.cnt = _cnt
 
 #define sf_iova_destroy(iova) \
@@ -74,6 +75,9 @@ int sf_iova_first_slice(SFDynamicIOVArray *iova, const int slice_len);
 
 int sf_iova_next_slice(SFDynamicIOVArray *iova,
         const int consume_len, const int slice_len);
+
+int sf_iova_memset(SFDynamicIOVArray *iova, int c,
+        const int offset, const int length);
 
 #ifdef __cplusplus
 }

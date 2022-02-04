@@ -21,7 +21,8 @@
 int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
 {
     struct iovec *iob;
-    int bytes;
+    struct iovec *end;
+    int sum_bytes;
     int remain_len;
     int result;
 
@@ -35,17 +36,18 @@ int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
         return result;
     }
 
+    end = iova->iov + iova->cnt;
     iob = iova->iov;
-    bytes = iob->iov_len;
-    while (bytes < consume_len) {
-        ++iob;
-        bytes += iob->iov_len;
+    sum_bytes = iob->iov_len;
+    for (iob=iob + 1; sum_bytes <= consume_len && iob < end; iob++) {
+        sum_bytes += iob->iov_len;
     }
-    if (bytes == consume_len) {
-        ++iob;
-        if (iob < (iova->iov + iova->cnt)) {
-            bytes += iob->iov_len;
-        }
+
+    if (sum_bytes < consume_len) {
+        logError("file: "__FILE__", line: %d, "
+                "iov length: %d < consume length: %d",
+                __LINE__, sum_bytes, consume_len);
+        return EOVERFLOW;
     }
 
     iova->cnt -= (iob - iova->iov);
@@ -58,7 +60,7 @@ int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
         last->iov_len = 0;
     } else {
         /* adjust the first element */
-        remain_len = bytes - consume_len;
+        remain_len = sum_bytes - consume_len;
         if (remain_len < iob->iov_len) {
             iob->iov_base = (char *)iob->iov_base +
                 (iob->iov_len - remain_len);
@@ -73,18 +75,18 @@ static inline int iova_slice(SFDynamicIOVArray *iova, const int slice_len)
 {
     struct iovec *iob;
     struct iovec *end;
-    int bytes;
+    int sum_bytes;
     int exceed_len;
 
-    bytes = 0;
+    sum_bytes = 0;
     end = iova->ptr + iova->input.cnt;
     for (iob=iova->iov; iob<end; iob++) {
-        bytes += iob->iov_len;
-        if (bytes > slice_len) {
-            exceed_len = bytes - slice_len;
+        sum_bytes += iob->iov_len;
+        if (sum_bytes > slice_len) {
+            exceed_len = sum_bytes - slice_len;
             iob->iov_len -= exceed_len;
             break;
-        } else if (bytes == slice_len) {
+        } else if (sum_bytes == slice_len) {
             break;
         }
     }
@@ -95,7 +97,7 @@ static inline int iova_slice(SFDynamicIOVArray *iova, const int slice_len)
     } else {
         logError("file: "__FILE__", line: %d, "
                 "iov remain bytes: %d < slice length: %d",
-                __LINE__, bytes, slice_len);
+                __LINE__, sum_bytes, slice_len);
         iova->cnt = 0;
         return EOVERFLOW;
     }
@@ -136,4 +138,59 @@ int sf_iova_next_slice(SFDynamicIOVArray *iova,
     }
 
     return iova_slice(iova, slice_len);
+}
+
+int sf_iova_memset(SFDynamicIOVArray *iova, int c,
+        const int offset, const int length)
+{
+    struct iovec *iob;
+    struct iovec *end;
+    int sum_bytes;
+    int remain_len;
+    int left_bytes;
+    char *start;
+
+    if (length == 0) {
+        return 0;
+    }
+
+    sum_bytes = 0;
+    end = iova->iov + iova->cnt;
+    for (iob=iova->iov; iob<end; iob++) {
+        sum_bytes += iob->iov_len;
+        if (sum_bytes > offset) {
+            break;
+        }
+    }
+
+    if (iob == end) {
+        logError("file: "__FILE__", line: %d, "
+                "iov length: %d < (offset: %d + length: %d)",
+                __LINE__, sum_bytes, offset, length);
+        return EOVERFLOW;
+    }
+
+    remain_len = sum_bytes - offset;
+    start = (char *)iob->iov_base + (iob->iov_len - remain_len);
+    if (length <= remain_len) {
+        memset(start, c, length);
+        return 0;
+    }
+
+    memset(start, c, remain_len);
+    left_bytes = length - remain_len;
+    while (++iob < end) {
+        if (left_bytes <= iob->iov_len) {
+            memset(iob->iov_base, c, left_bytes);
+            return 0;
+        }
+
+        memset(iob->iov_base, c, iob->iov_len);
+        left_bytes -= iob->iov_len;
+    }
+
+    logError("file: "__FILE__", line: %d, "
+            "iov length is too short, overflow bytes: %d",
+            __LINE__, left_bytes);
+    return EOVERFLOW;
 }
