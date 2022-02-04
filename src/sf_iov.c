@@ -140,11 +140,11 @@ int sf_iova_next_slice(SFDynamicIOVArray *iova,
     return iova_slice(iova, slice_len);
 }
 
-int sf_iova_memset_ex(struct iovec *iov, const int iovcnt,
+int sf_iova_memset_ex(const struct iovec *iov, const int iovcnt,
         int c, const int offset, const int length)
 {
-    struct iovec *iob;
-    struct iovec *end;
+    const struct iovec *iob;
+    const struct iovec *end;
     int sum_bytes;
     int remain_len;
     int left_bytes;

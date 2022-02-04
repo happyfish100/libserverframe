@@ -76,7 +76,7 @@ int sf_iova_first_slice(SFDynamicIOVArray *iova, const int slice_len);
 int sf_iova_next_slice(SFDynamicIOVArray *iova,
         const int consume_len, const int slice_len);
 
-int sf_iova_memset_ex(struct iovec *iov, const int iovcnt,
+int sf_iova_memset_ex(const struct iovec *iov, const int iovcnt,
         int c, const int offset, const int length);
 
 #define sf_iova_memset(iova, c, offset, length) \
