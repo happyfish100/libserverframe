@@ -52,6 +52,7 @@ int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
     iova->iov = iob;
     if (iova->cnt == 0) {
         struct iovec *last;
+
         last = iob - 1;
         last->iov_base = (char *)last->iov_base + last->iov_len;
         last->iov_len = 0;
@@ -68,7 +69,7 @@ int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
     return 0;
 }
 
-static inline void iova_slice(SFDynamicIOVArray *iova, const int slice_len)
+static inline int iova_slice(SFDynamicIOVArray *iova, const int slice_len)
 {
     struct iovec *iob;
     struct iovec *end;
@@ -88,7 +89,16 @@ static inline void iova_slice(SFDynamicIOVArray *iova, const int slice_len)
         }
     }
 
-    iova->cnt = (iob - iova->iov) + 1;
+    if (iob < end) {
+        iova->cnt = (iob - iova->iov) + 1;
+        return 0;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "iov remain bytes: %d < slice length: %d",
+                __LINE__, bytes, slice_len);
+        iova->cnt = 0;
+        return EOVERFLOW;
+    }
 }
 
 int sf_iova_first_slice(SFDynamicIOVArray *iova, const int slice_len)
@@ -99,15 +109,14 @@ int sf_iova_first_slice(SFDynamicIOVArray *iova, const int slice_len)
         return result;
     }
 
-    iova_slice(iova, slice_len);
-    return 0;
+    return iova_slice(iova, slice_len);
 }
 
 int sf_iova_next_slice(SFDynamicIOVArray *iova,
         const int consume_len, const int slice_len)
 {
     struct iovec *last;
-    struct iovec *origin;
+    const struct iovec *origin;
     int remain_len;
     int result;
 
@@ -126,6 +135,5 @@ int sf_iova_next_slice(SFDynamicIOVArray *iova,
         }
     }
 
-    iova_slice(iova, slice_len);
-    return 0;
+    return iova_slice(iova, slice_len);
 }

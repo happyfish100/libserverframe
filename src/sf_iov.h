@@ -26,7 +26,7 @@ typedef struct sf_dynamic_iov_array {
     struct iovec *ptr;
 
     struct {
-        struct iovec *iov;
+        const struct iovec *iov;
         int cnt;
     } input;
 
@@ -39,7 +39,7 @@ typedef struct sf_dynamic_iov_array {
     (iova).cnt = (iova).input.cnt = _cnt
 
 #define sf_iova_destroy(iova) \
-    if ((iova).iov != (iova).input.iov && \
+    if ((iova).iov != (struct iovec *)(iova).input.iov && \
             (iova).ptr != (iova).holder)  \
             free((iova).ptr)
 
@@ -49,7 +49,7 @@ extern "C" {
 
 static inline int sf_iova_check_alloc(SFDynamicIOVArray *iova)
 {
-    if (iova->iov == iova->input.iov) {
+    if (iova->iov == (struct iovec *)iova->input.iov) {
         if (iova->input.cnt <= SF_IOV_FIXED_SIZE) {
             iova->ptr = iova->holder;
         } else {
