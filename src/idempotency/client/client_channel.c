@@ -240,7 +240,7 @@ struct idempotency_client_channel *idempotency_client_channel_get(
     IdempotencyClientChannel *channel;
 
     key_len = snprintf(key, sizeof(key), "%s_%u", server_ip, server_port);
-    hash_code = simple_hash(key, key_len);
+    hash_code = fc_simple_hash(key, key_len);
     bucket = channel_context.htable.buckets +
         hash_code % channel_context.htable.capacity;
     previous = NULL;
