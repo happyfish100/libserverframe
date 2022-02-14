@@ -55,6 +55,7 @@ int sf_iova_consume(SFDynamicIOVArray *iova, const int consume_len)
     if (iova->cnt == 0) {
         struct iovec *last;
 
+        /* update the last iov for next slice */
         last = iob - 1;
         last->iov_base = (char *)last->iov_base + last->iov_len;
         last->iov_len = 0;

@@ -82,6 +82,33 @@ int sf_iova_memset_ex(const struct iovec *iov, const int iovcnt,
 #define sf_iova_memset(iova, c, offset, length) \
     sf_iova_memset_ex((iova).iov, (iova).cnt, c, offset, length)
 
+static inline void sf_iova_memcpy_ex(const struct iovec *iov,
+        const int iovcnt, const char *buff, const int length)
+{
+    const struct iovec *iob;
+    const struct iovec *end;
+    const char *current;
+    int remain;
+    int bytes;
+
+    current = buff;
+    remain = length;
+    end = iov + iovcnt;
+    for (iob=iov; iob<end; iob++) {
+        bytes = FC_MIN(remain, iob->iov_len);
+        memcpy(iob->iov_base, current, bytes);
+
+        remain -= bytes;
+        if (remain == 0) {
+            break;
+        }
+        current += bytes;
+    }
+}
+
+#define sf_iova_memcpy(iova, buff, length) \
+    sf_iova_memcpy_ex((iova).iov, (iova).cnt, buff, length)
+
 #ifdef __cplusplus
 }
 #endif
