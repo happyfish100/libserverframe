@@ -822,7 +822,7 @@ static void *connection_manager_thread_func(void *arg)
 #endif
 
     cm = (SFConnectionManager *)arg;
-    logInfo("file: "__FILE__", line: %d, "
+    logDebug("file: "__FILE__", line: %d, "
             "[%s] connection manager thread start",
             __LINE__, cm->module_name);
 
