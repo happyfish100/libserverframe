@@ -219,17 +219,10 @@ int sf_load_slow_log_config_ex(IniFullContext *ini_ctx, LogContext *log_ctx,
     return 0;
 }
 
-int sf_load_global_config_ex(const char *server_name,
-        IniFullContext *ini_ctx, const bool load_network_params,
-        const int task_buffer_extra_size)
+int sf_load_global_base_path(IniFullContext *ini_ctx)
 {
-    int result;
-    const char *old_section_name;
     char *pBasePath;
-    char *pRunByGroup;
-    char *pRunByUser;
 
-    g_sf_global_vars.task_buffer_extra_size = task_buffer_extra_size;
     if (!g_sf_global_vars.base_path.inited) {
         pBasePath = iniGetStrValue(NULL, "base_path", ini_ctx->context);
         if (pBasePath == NULL) {
@@ -255,6 +248,23 @@ int sf_load_global_config_ex(const char *server_name,
         return ENOTDIR;
     }
 
+    return 0;
+}
+
+int sf_load_global_config_ex(const char *server_name,
+        IniFullContext *ini_ctx, const bool load_network_params,
+        const int task_buffer_extra_size)
+{
+    int result;
+    const char *old_section_name;
+    char *pRunByGroup;
+    char *pRunByUser;
+
+    if ((result=sf_load_global_base_path(ini_ctx)) != 0) {
+        return result;
+    }
+
+    g_sf_global_vars.task_buffer_extra_size = task_buffer_extra_size;
     g_sf_global_vars.tcp_quick_ack = iniGetBoolValue(NULL,
             "tcp_quick_ack", ini_ctx->context, true);
     tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
