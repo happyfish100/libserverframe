@@ -36,6 +36,9 @@ typedef int (*sf_sharding_htable_insert_callback)
 typedef void *(*sf_sharding_htable_find_callback)
     (struct sf_sharding_hash_entry *entry, void *arg);
 
+typedef bool (*sf_sharding_htable_delete_callback)
+    (struct sf_sharding_hash_entry *entry, void *arg);
+
 typedef bool (*sf_sharding_htable_accept_reclaim_callback)
     (struct sf_sharding_hash_entry *entry);
 
@@ -90,6 +93,7 @@ typedef struct sf_htable_sharding_context {
         int64_t max_ttl_ms;
         double elt_ttl_ms;
         int elt_water_mark;  //trigger reclaim when elements exceeds water mark
+        bool enabled;
     } sharding_reclaim;
 
     struct {
@@ -100,6 +104,7 @@ typedef struct sf_htable_sharding_context {
     SFShardingHtableKeyType key_type;  //id count in the hash entry
     sf_sharding_htable_insert_callback insert_callback;
     sf_sharding_htable_find_callback find_callback;
+    sf_sharding_htable_delete_callback delete_callback;
     sf_sharding_htable_accept_reclaim_callback accept_reclaim_callback;
     SFHtableShardingArray sharding_array;
 } SFHtableShardingContext;
@@ -112,6 +117,7 @@ extern "C" {
             const SFShardingHtableKeyType key_type,
             sf_sharding_htable_insert_callback insert_callback,
             sf_sharding_htable_find_callback find_callback,
+            sf_sharding_htable_delete_callback delete_callback,
             sf_sharding_htable_accept_reclaim_callback reclaim_callback,
             const int sharding_count, const int64_t htable_capacity,
             const int allocator_count, const int element_size,
@@ -122,6 +128,7 @@ extern "C" {
             *sharding_ctx, const SFShardingHtableKeyType key_type,
             sf_sharding_htable_insert_callback insert_callback,
             sf_sharding_htable_find_callback find_callback,
+            sf_sharding_htable_delete_callback delete_callback,
             sf_sharding_htable_accept_reclaim_callback reclaim_callback,
             const int sharding_count, const int64_t htable_capacity,
             const int allocator_count, const int element_size,
@@ -130,16 +137,19 @@ extern "C" {
     {
         const double low_water_mark_ratio = 0.10;
         return sf_sharding_htable_init_ex(sharding_ctx, key_type,
-                insert_callback, find_callback, reclaim_callback,
-                sharding_count, htable_capacity, allocator_count,
-                element_size, element_limit, min_ttl_ms, max_ttl_ms,
-                low_water_mark_ratio);
+                insert_callback, find_callback, delete_callback,
+                reclaim_callback, sharding_count, htable_capacity,
+                allocator_count, element_size, element_limit,
+                min_ttl_ms, max_ttl_ms, low_water_mark_ratio);
     }
 
     int sf_sharding_htable_insert(SFHtableShardingContext
             *sharding_ctx, const SFTwoIdsHashKey *key, void *arg);
 
     void *sf_sharding_htable_find(SFHtableShardingContext
+            *sharding_ctx, const SFTwoIdsHashKey *key, void *arg);
+
+    int sf_sharding_htable_delete(SFHtableShardingContext
             *sharding_ctx, const SFTwoIdsHashKey *key, void *arg);
 
 #ifdef __cplusplus
