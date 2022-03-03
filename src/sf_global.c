@@ -352,15 +352,17 @@ int sf_load_global_config_ex(const char *server_name,
     ini_ctx->section_name = old_section_name;
 
     load_log_level(ini_ctx->context);
-    if ((result=log_set_prefix(SF_G_BASE_PATH_STR, server_name)) != 0) {
-        return result;
+    if (server_name != NULL) {
+        if ((result=log_set_prefix(SF_G_BASE_PATH_STR, server_name)) != 0) {
+            return result;
+        }
     }
 
     return 0;
 }
 
-int sf_load_config_ex(const char *server_name,
-        SFContextIniConfig *config, const int task_buffer_extra_size)
+int sf_load_config_ex(const char *server_name, SFContextIniConfig
+        *config, const int task_buffer_extra_size)
 {
     int result;
     if ((result=sf_load_global_config_ex(server_name, &config->ini_ctx,

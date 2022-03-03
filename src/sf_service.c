@@ -169,6 +169,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         return ENOMEM;
     }
 
+    g_current_time = time(NULL);
     sf_context->thread_count = 0;
     data_end = sf_context->thread_data + sf_context->work_threads;
     for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
@@ -198,9 +199,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
                 2 * g_sf_global_vars.network_timeout, g_current_time);
         if (result != 0) {
             logError("file: "__FILE__", line: %d, "
-                "fast_timer_init fail, "
-                "errno: %d, error info: %s",
-                __LINE__, result, strerror(result));
+                    "fast_timer_init fail, errno: %d, error info: %s",
+                    __LINE__, result, strerror(result));
             return result;
         }
 
