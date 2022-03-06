@@ -5,7 +5,7 @@ TARGET_PREFIX=$DESTDIR/usr
 TARGET_CONF_PATH=$DESTDIR/etc
 
 LIB_VERSION=lib64
-DEBUG_FLAG=1
+DEBUG_FLAG=0
 
 if [ -f /usr/include/fastcommon/_os_define.h ]; then
   OS_BITS=$(fgrep OS_BITS /usr/include/fastcommon/_os_define.h | awk '{print $NF;}')
@@ -31,7 +31,7 @@ CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE"
 if [ "$DEBUG_FLAG" = "1" ]; then
   CFLAGS="$CFLAGS -g -O1 -DDEBUG_FLAG"
 else
-  CFLAGS="$CFLAGS -O3"
+  CFLAGS="$CFLAGS -g -O3"
 fi
 
 LIBS=''
