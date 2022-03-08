@@ -117,6 +117,9 @@ static inline const char *sf_file_writer_get_filename(
     return filename;
 }
 
+const char *sf_file_writer_get_index_filename(const char *data_path,
+        const char *subdir_name, char *filename, const int size);
+
 int sf_file_writer_set_binlog_index(SFFileWriterInfo *writer,
         const int binlog_index);
 

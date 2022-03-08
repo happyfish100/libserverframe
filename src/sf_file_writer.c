@@ -40,33 +40,43 @@
 #define BINLOG_INDEX_ITEM_CURRENT_COMPRESS  "current_compress"
 
 #define GET_BINLOG_FILENAME(writer) \
-    sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,  \
+    sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT, \
             writer->cfg.data_path, writer->cfg.subdir_name, \
             SF_BINLOG_FILE_PREFIX, writer->binlog.index)
 
+#define GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name, filename, size) \
+    snprintf(filename, size, "%s/%s/%s", data_path, \
+            subdir_name, BINLOG_INDEX_FILENAME)
+
+#define GET_BINLOG_INDEX_FILENAME(writer, filename, size) \
+    GET_BINLOG_INDEX_FILENAME_EX(writer->cfg.data_path,   \
+            writer->cfg.subdir_name, filename, size)
+
+const char *sf_file_writer_get_index_filename(const char *data_path,
+        const char *subdir_name, char *filename, const int size)
+{
+    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name, filename, size);
+    return filename;
+}
+
 static int write_to_binlog_index_file(SFFileWriterInfo *writer)
 {
-    char full_filename[PATH_MAX];
+    char filename[PATH_MAX];
     char buff[256];
     int result;
     int len;
 
-    snprintf(full_filename, sizeof(full_filename), "%s/%s/%s",
-            writer->cfg.data_path, writer->cfg.subdir_name,
-            BINLOG_INDEX_FILENAME);
-
+    GET_BINLOG_INDEX_FILENAME(writer, filename, sizeof(filename));
     len = sprintf(buff, "%s=%d\n"
             "%s=%d\n",
             BINLOG_INDEX_ITEM_CURRENT_WRITE,
             writer->binlog.index,
             BINLOG_INDEX_ITEM_CURRENT_COMPRESS,
             writer->binlog.compress_index);
-    if ((result=safeWriteToFile(full_filename, buff, len)) != 0) {
+    if ((result=safeWriteToFile(filename, buff, len)) != 0) {
         logError("file: "__FILE__", line: %d, "
-            "write to file \"%s\" fail, "
-            "errno: %d, error info: %s",
-            __LINE__, full_filename,
-            result, STRERROR(result));
+                "write to file \"%s\" fail, errno: %d, error info: %s",
+                __LINE__, filename, result, STRERROR(result));
     }
 
     return result;
