@@ -1,4 +1,23 @@
-libserverframe (1.1.12-1) UNRELEASED; urgency=medium
+libserverframe (1.1.13-1) unstable; urgency=medium
+
+  * add files: sf_iov.[hc]
+  * iova_slice error detect
+  * sf_iova_memset impl.
+  * sf_iova_memset_ex for iov and iovcnt
+  * sf_iova_memset_ex: add const modifier
+  * sf_iov.[hc] add function sf_iova_memcpy_ex
+  * simple_hash rename to fc_simple_hash
+  * change log level to debug
+  * add function sf_load_global_base_path
+  * support function sf_sharding_htable_delete
+  * sf_load_global_config_ex: server_name can be NULL
+  * upgrade version to 1.1.13
+  * make.sh: change DEBUG_FLAG to 0
+  * add function sf_binlog_writer_get_index_filename
+
+ -- YuQing <384681@qq.com>  Sun, 13 Mar 2022 16:46:17 +0800
+
+libserverframe (1.1.12-1) unstable; urgency=medium
 
   * upgrade version to 1.1.12
 
