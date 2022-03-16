@@ -31,3 +31,4 @@ src/Makefile
 
 # other
 *.swp
+*.swo

@@ -9,7 +9,7 @@ TOP_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
               sf_func.h sf_util.h sf_configs.h sf_proto.h sf_binlog_writer.h \
               sf_cluster_cfg.h sf_sharding_htable.h sf_connection_manager.h  \
               sf_serializer.h sf_binlog_index.h sf_file_writer.h \
-              sf_ordered_writer.h sf_iov.h
+              sf_ordered_writer.h sf_buffered_writer.h sf_iov.h
 
 IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
                       idempotency/server/server_channel.h  \
