@@ -63,9 +63,11 @@ typedef struct sf_file_writer_info {
 extern "C" {
 #endif
 
-int sf_file_writer_init_normal(SFFileWriterInfo *writer,
+int sf_file_writer_init(SFFileWriterInfo *writer,
         const char *data_path, const char *subdir_name,
         const int buffer_size);
+
+void sf_file_writer_destroy(SFFileWriterInfo *writer);
 
 int sf_file_writer_deal_buffer(SFFileWriterInfo *writer,
         BufferInfo *buffer, const int64_t version);

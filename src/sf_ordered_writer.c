@@ -239,7 +239,7 @@ int sf_ordered_writer_init(SFOrderedWriterContext *context,
         const int buffer_size, const int max_record_size)
 {
     int result;
-    if ((result=sf_file_writer_init_normal(&context->writer.fw,
+    if ((result=sf_file_writer_init(&context->writer.fw,
                     data_path, subdir_name, buffer_size)) != 0)
     {
         return result;

@@ -298,7 +298,7 @@ int sf_file_writer_deal_buffer(SFFileWriterInfo *writer,
     return 0;
 }
 
-int sf_file_writer_init_normal(SFFileWriterInfo *writer,
+int sf_file_writer_init(SFFileWriterInfo *writer,
         const char *data_path, const char *subdir_name,
         const int buffer_size)
 {
@@ -345,6 +345,19 @@ int sf_file_writer_init_normal(SFFileWriterInfo *writer,
     }
 
     return 0;
+}
+
+void sf_file_writer_destroy(SFFileWriterInfo *writer)
+{
+    if (writer->file.fd >= 0) {
+        close(writer->file.fd);
+        writer->file.fd = -1;
+    }
+    if (writer->file.name != NULL) {
+        free(writer->file.name);
+        writer->file.name = NULL;
+    }
+    sf_binlog_buffer_destroy(&writer->binlog_buffer);
 }
 
 int sf_file_writer_set_binlog_index(SFFileWriterInfo *writer,

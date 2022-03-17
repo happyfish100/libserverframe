@@ -257,6 +257,10 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
     int count;
 
     if (writer->fw.file.name != NULL) {
+        while (!fc_queue_empty(&writer->thread->queue)) {
+            fc_sleep_ms(10);
+        }
+
         fc_queue_terminate(&writer->thread->queue);
 
         count = 0;
@@ -341,13 +345,22 @@ static int binlog_wbuffer_alloc_init(void *element, void *args)
     return 0;
 }
 
+static void binlog_wbuffer_destroy_func(void *element, void *args)
+{
+    SFBinlogWriterBuffer *wbuffer;
+    wbuffer = (SFBinlogWriterBuffer *)element;
+    if (wbuffer->bf.buff != NULL) {
+        free(wbuffer->bf.buff);
+    }
+}
+
 int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
         const int buffer_size)
 {
-    writer->flush.in_queue = false;
-    return sf_file_writer_init_normal(&writer->fw,
-            data_path, subdir_name, buffer_size);
+    memset(writer, 0, sizeof(*writer));
+    return sf_file_writer_init(&writer->fw, data_path,
+            subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
@@ -369,8 +382,9 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
     writer->version_ctx.change_count = 0;
 
     binlog_writer_set_next_version(writer, next_version);
-    return sf_binlog_writer_init_normal(writer,
-            data_path, subdir_name, buffer_size);
+    writer->flush.in_queue = false;
+    return sf_file_writer_init(&writer->fw, data_path,
+            subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
@@ -379,9 +393,10 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const int writer_count, const bool use_fixed_buffer_size)
 {
     const int alloc_elements_once = 1024;
+    int result;
     int element_size;
     pthread_t tid;
-    int result;
+    struct fast_mblock_object_callbacks callbacks;
 
     snprintf(thread->name, sizeof(thread->name), "%s", name);
     thread->order_mode = order_mode;
@@ -390,13 +405,18 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
 
+    callbacks.init_func = binlog_wbuffer_alloc_init;
+    callbacks.args = writer;
     element_size = sizeof(SFBinlogWriterBuffer);
     if (use_fixed_buffer_size) {
         element_size += max_record_size;
+        callbacks.destroy_func = NULL;
+    } else {
+        callbacks.destroy_func = binlog_wbuffer_destroy_func;
     }
-    if ((result=fast_mblock_init_ex1(&thread->mblock, "binlog-wbuffer",
+    if ((result=fast_mblock_init_ex2(&thread->mblock, "binlog-wbuffer",
                      element_size, alloc_elements_once, 0,
-                     binlog_wbuffer_alloc_init, writer, true)) != 0)
+                     &callbacks, true, NULL)) != 0)
     {
         return result;
     }

@@ -132,6 +132,33 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
             max_record_size);
 }
 
+void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
+
+static inline void sf_binlog_writer_destroy_writer(
+        SFBinlogWriterInfo *writer)
+{
+    sf_file_writer_destroy(&writer->fw);
+    if (writer->version_ctx.ring.slots != NULL) {
+        free(writer->version_ctx.ring.slots);
+        writer->version_ctx.ring.slots = NULL;
+    }
+}
+
+static inline void sf_binlog_writer_destroy_thread(
+        SFBinlogWriterThread *thread)
+{
+    fast_mblock_destroy(&thread->mblock);
+    fc_queue_destroy(&thread->queue);
+}
+
+static inline void sf_binlog_writer_destroy(
+        SFBinlogWriterContext *context)
+{
+    sf_binlog_writer_finish(&context->writer);
+    sf_binlog_writer_destroy_writer(&context->writer);
+    sf_binlog_writer_destroy_thread(&context->thread);
+}
+
 int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         const short order_by);
 
@@ -143,8 +170,6 @@ int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
 
 #define sf_binlog_writer_get_last_version(writer) \
     sf_file_writer_get_last_version(&(writer)->fw)
-
-void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
 #define sf_binlog_get_current_write_index(writer) \
     sf_file_writer_get_current_index(&(writer)->fw)
