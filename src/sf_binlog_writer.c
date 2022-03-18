@@ -34,6 +34,8 @@
 #include "sf_func.h"
 #include "sf_binlog_writer.h"
 
+#define ERRNO_THREAD_EXIT  -1000
+
 static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
         const uint64_t next_version)
 {
@@ -194,7 +196,9 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 fast_mblock_free_object(&current->writer->
                         thread->mblock, current);
                 break;
-
+            case SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT:
+                flush_writer_files(thread);
+                return ERRNO_THREAD_EXIT;
             case SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION:
                 if (thread->order_by != SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
                     logWarning("file: "__FILE__", line: %d, "
@@ -260,8 +264,7 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
         while (!fc_queue_empty(&writer->thread->queue)) {
             fc_sleep_ms(10);
         }
-
-        fc_queue_terminate(&writer->thread->queue);
+        sf_binlog_writer_notify_exit(writer);
 
         count = 0;
         while (writer->thread->running && ++count < 300) {
@@ -294,6 +297,7 @@ static void *binlog_writer_func(void *arg)
 {
     SFBinlogWriterThread *thread;
     SFBinlogWriterBuffer *wb_head;
+    int result;
 
     thread = (SFBinlogWriterThread *)arg;
 
@@ -313,11 +317,14 @@ static void *binlog_writer_func(void *arg)
             continue;
         }
 
-        if (deal_binlog_records(thread, wb_head) != 0) {
-            logCrit("file: "__FILE__", line: %d, "
-                    "deal_binlog_records fail, "
-                    "program exit!", __LINE__);
-            sf_terminate_myself();
+        if ((result=deal_binlog_records(thread, wb_head)) != 0) {
+            if (result != ERRNO_THREAD_EXIT) {
+                logCrit("file: "__FILE__", line: %d, "
+                        "deal_binlog_records fail, "
+                        "program exit!", __LINE__);
+                sf_terminate_myself();
+            }
+            break;
         }
     }
 
@@ -467,17 +474,31 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
     return 0;
 }
 
-int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
-        const int64_t next_version)
+static inline int sf_binlog_writer_push_directive(SFBinlogWriterInfo *writer,
+        const int buffer_type, const int64_t version)
 {
     SFBinlogWriterBuffer *buffer;
 
-    if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, next_version,
-                    next_version, SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION)) == NULL)
+    if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer,
+                    version, version, buffer_type)) == NULL)
     {
         return ENOMEM;
     }
 
     fc_queue_push(&writer->thread->queue, buffer);
     return 0;
+}
+
+int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
+        const int64_t next_version)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION,
+            next_version);
+}
+
+int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT, 0);
 }

@@ -31,6 +31,7 @@
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
 #define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
+#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       3
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -164,6 +165,8 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
+
+int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 
 #define sf_binlog_writer_set_flags(writer, flags) \
     sf_file_writer_set_flags(&(writer)->fw, flags)

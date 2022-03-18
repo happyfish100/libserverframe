@@ -94,6 +94,7 @@ static int get_binlog_index_from_file(SFFileWriterInfo *writer)
     if (access(full_filename, F_OK) != 0) {
         if (errno == ENOENT) {
             writer->binlog.index = 0;
+            writer->binlog.compress_index = 0;
             return write_to_binlog_index_file(writer);
         }
     }
