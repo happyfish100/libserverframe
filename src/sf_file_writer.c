@@ -82,21 +82,18 @@ static int write_to_binlog_index_file(SFFileWriterInfo *writer)
     return result;
 }
 
-static int get_binlog_index_from_file(SFFileWriterInfo *writer)
+static int get_binlog_info_from_file(const char *data_path,
+        const char *subdir_name, int *write_index,
+        int *compress_index)
 {
     char full_filename[PATH_MAX];
     IniContext ini_context;
     int result;
 
     snprintf(full_filename, sizeof(full_filename), "%s/%s/%s",
-            writer->cfg.data_path, writer->cfg.subdir_name,
-            BINLOG_INDEX_FILENAME);
+            data_path, subdir_name, BINLOG_INDEX_FILENAME);
     if (access(full_filename, F_OK) != 0) {
-        if (errno == ENOENT) {
-            writer->binlog.index = 0;
-            writer->binlog.compress_index = 0;
-            return write_to_binlog_index_file(writer);
-        }
+        return errno != 0 ? errno : EPERM;
     }
 
     if ((result=iniLoadFromFile(full_filename, &ini_context)) != 0) {
@@ -106,13 +103,38 @@ static int get_binlog_index_from_file(SFFileWriterInfo *writer)
         return result;
     }
 
-    writer->binlog.index = iniGetIntValue(NULL,
-            BINLOG_INDEX_ITEM_CURRENT_WRITE, &ini_context, 0);
-    writer->binlog.compress_index = iniGetIntValue(NULL,
-            BINLOG_INDEX_ITEM_CURRENT_COMPRESS, &ini_context, 0);
+    *write_index = iniGetIntValue(NULL,
+            BINLOG_INDEX_ITEM_CURRENT_WRITE,
+            &ini_context, 0);
+    *compress_index = iniGetIntValue(NULL,
+            BINLOG_INDEX_ITEM_CURRENT_COMPRESS,
+            &ini_context, 0);
 
     iniFreeContext(&ini_context);
     return 0;
+}
+
+int sf_file_writer_get_binlog_index(const char *data_path,
+        const char *subdir_name, int *write_index)
+{
+    int compress_index;
+    return get_binlog_info_from_file(data_path, subdir_name,
+            write_index, &compress_index);
+}
+
+static inline int get_binlog_index_from_file(SFFileWriterInfo *writer)
+{
+    int result;
+
+    result = get_binlog_info_from_file(writer->cfg.data_path,
+            writer->cfg.subdir_name, &writer->binlog.index,
+            &writer->binlog.compress_index);
+    if (result == ENOENT) {
+        writer->binlog.index = 0;
+        writer->binlog.compress_index = 0;
+        return write_to_binlog_index_file(writer);
+    }
+    return result;
 }
 
 static int open_writable_binlog(SFFileWriterInfo *writer)

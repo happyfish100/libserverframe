@@ -39,7 +39,7 @@ typedef struct sf_file_writer_info {
     } cfg;
 
     struct {
-        int index;
+        int index;   //current write index
         int compress_index;
     } binlog;
 
@@ -92,6 +92,9 @@ static inline int64_t sf_file_writer_get_last_version(
         return -1;
     }
 }
+
+int sf_file_writer_get_binlog_index(const char *data_path,
+        const char *subdir_name, int *write_index);
 
 int sf_file_writer_get_current_index(SFFileWriterInfo *writer);
 
