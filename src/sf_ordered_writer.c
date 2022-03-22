@@ -35,7 +35,7 @@
 #include "sf_ordered_writer.h"
 
 #define deal_binlog_one_record(writer, wb) \
-    sf_file_writer_deal_buffer(&(writer)->fw, &wb->bf, wb->version)
+    sf_file_writer_deal_versioned_buffer(&(writer)->fw, &wb->bf, wb->version)
 
 static inline int flush_writer_files(SFOrderedWriterInfo *writer)
 {

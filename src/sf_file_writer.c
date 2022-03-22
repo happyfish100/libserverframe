@@ -276,7 +276,7 @@ int sf_file_writer_get_current_index(SFFileWriterInfo *writer)
     return writer->binlog.index;
 }
 
-int sf_file_writer_deal_buffer(SFFileWriterInfo *writer,
+int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
         BufferInfo *buffer, const int64_t version)
 {
     int result;

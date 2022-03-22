@@ -46,7 +46,8 @@ static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
 }
 
 #define deal_binlog_one_record(wb) \
-    sf_file_writer_deal_buffer(&wb->writer->fw, &wb->bf, wb->version.last)
+    sf_file_writer_deal_versioned_buffer(&wb->writer->fw, \
+            &wb->bf, wb->version.last)
 
 #define GET_WBUFFER_VERSION_COUNT(wb)  \
         (((wb)->version.last - (wb)->version.first) + 1)

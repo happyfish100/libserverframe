@@ -69,8 +69,11 @@ int sf_file_writer_init(SFFileWriterInfo *writer,
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
 
-int sf_file_writer_deal_buffer(SFFileWriterInfo *writer,
+int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
         BufferInfo *buffer, const int64_t version);
+
+#define sf_file_writer_deal_buffer(writer, buffer) \
+    sf_file_writer_deal_versioned_buffer(writer, buffer, 0)
 
 int sf_file_writer_flush(SFFileWriterInfo *writer);
 
