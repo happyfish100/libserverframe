@@ -19,6 +19,7 @@
 #define _SF_BUFFERED_WRITER_H_
 
 #include "sf_types.h"
+#include "sf_func.h"
 
 typedef struct {
     int fd;
