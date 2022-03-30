@@ -67,7 +67,7 @@ static inline int sf_calc_next_retry_interval(SFNetRetryIntervalContext *ctx)
     return ctx->interval_ms;
 }
 
-void sf_load_read_rule_config_ex(SFDataReadRule *rule,
+int sf_load_read_rule_config_ex(SFDataReadRule *rule,
         IniFullContext *ini_ctx, const SFDataReadRule def_rule);
 
 static inline const char *sf_get_read_rule_caption(
@@ -85,8 +85,27 @@ static inline const char *sf_get_read_rule_caption(
     }
 }
 
+int sf_load_quorum_config_ex(SFElectionQuorum *quorum,
+        IniFullContext *ini_ctx, const SFElectionQuorum def_quorum);
+
+static inline const char *sf_get_quorum_caption(
+        const SFElectionQuorum quorum)
+{
+    switch (quorum) {
+        case sf_election_quorum_any:
+            return "any";
+        case sf_election_quorum_majority:
+            return "majority";
+        default:
+            return "unknown";
+    }
+}
+
 #define sf_load_read_rule_config(rule, ini_ctx) \
     sf_load_read_rule_config_ex(rule, ini_ctx, sf_data_read_rule_master_only)
+
+#define sf_load_quorum_config(quorum, ini_ctx) \
+    sf_load_quorum_config_ex(quorum, ini_ctx, sf_election_quorum_majority)
 
 #define SF_NET_RETRY_FINISHED(retry_times, counter, result)  \
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \

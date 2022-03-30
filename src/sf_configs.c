@@ -94,13 +94,14 @@ void sf_net_retry_config_to_string(SFNetRetryConfig *net_retry_cfg,
             net_retry_cfg->network.interval_ms);
 }
 
-void sf_load_read_rule_config_ex(SFDataReadRule *rule,
+int sf_load_read_rule_config_ex(SFDataReadRule *rule,
         IniFullContext *ini_ctx, const SFDataReadRule def_rule)
 {
     char *read_rule;
+
     read_rule = iniGetStrValueEx(ini_ctx->section_name,
             "read_rule", ini_ctx->context, true);
-    if (read_rule == NULL || *read_rule == '\0') {
+    if (read_rule == NULL) {
         *rule = def_rule;
     } else if (strncasecmp(read_rule, "any", 3) == 0) {
         *rule = sf_data_read_rule_any_available;
@@ -110,8 +111,33 @@ void sf_load_read_rule_config_ex(SFDataReadRule *rule,
         *rule = sf_data_read_rule_master_only;
     } else {
         logError("file: "__FILE__", line: %d, "
-                "config file: %s, unkown read_rule: %s, set to any",
+                "config file: %s, unkown read_rule: %s",
                 __LINE__, ini_ctx->filename, read_rule);
-        *rule = sf_data_read_rule_any_available;
+        return EINVAL;
     }
+
+    return 0;
+}
+
+int sf_load_quorum_config_ex(SFElectionQuorum *quorum,
+        IniFullContext *ini_ctx, const SFElectionQuorum def_quorum)
+{
+    char *str;
+
+    str = iniGetStrValue(ini_ctx->section_name,
+            "quorum", ini_ctx->context);
+    if (str == NULL) {
+        *quorum = def_quorum;
+    } else if (strncasecmp(str, "any", 3) == 0) {
+        *quorum = sf_election_quorum_any;
+    } else if (strncasecmp(str, "majority", 8) == 0) {
+        *quorum = sf_election_quorum_majority;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, unkown quorum: %s",
+                __LINE__, ini_ctx->filename, str);
+        return EINVAL;
+    }
+
+    return 0;
 }

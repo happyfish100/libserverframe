@@ -244,4 +244,9 @@ typedef struct sf_synchronize_context {
     };
 } SFSynchronizeContext;
 
+typedef enum sf_election_quorum {
+    sf_election_quorum_any = 1,
+    sf_election_quorum_majority
+} SFElectionQuorum;
+
 #endif
