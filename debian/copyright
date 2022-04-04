@@ -2,45 +2,7 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: libserverframe
 Source: https://github.com/happyfish100/libserverframe
 
-Files:     src/idempotency/client/client_channel.c
-           src/idempotency/client/client_channel.h
-           src/idempotency/client/client_types.h
-           src/idempotency/client/receipt_handler.c
-           src/idempotency/client/receipt_handler.h
-           src/idempotency/client/rpc_wrapper.h
-           src/idempotency/server/channel_htable.c
-           src/idempotency/server/channel_htable.h
-           src/idempotency/server/request_htable.c
-           src/idempotency/server/request_htable.h
-           src/idempotency/server/server_channel.c
-           src/idempotency/server/server_channel.h
-           src/idempotency/server/server_handler.c
-           src/idempotency/server/server_handler.h
-           src/idempotency/server/server_types.h
-           src/sf_binlog_writer.c
-           src/sf_binlog_writer.h
-           src/sf_cluster_cfg.c
-           src/sf_cluster_cfg.h
-           src/sf_configs.c
-           src/sf_configs.h
-           src/sf_connection_manager.c
-           src/sf_connection_manager.h
-           src/sf_define.h
-           src/sf_func.c
-           src/sf_func.h
-           src/sf_global.c
-           src/sf_global.h
-           src/sf_nio.c
-           src/sf_nio.h
-           src/sf_proto.c
-           src/sf_proto.h
-           src/sf_service.c
-           src/sf_service.h
-           src/sf_sharding_htable.c
-           src/sf_sharding_htable.h
-           src/sf_types.h
-           src/sf_util.c
-           src/sf_util.h
+Files:     *
 Copyright: 2020 YuQing <384681@qq.com>
 License:   AGPL-3.0+
  This program is free software: you can use, redistribute, and/or modify
@@ -54,39 +16,6 @@ License:   AGPL-3.0+
  You should have received a copy of the GNU Affero General Public License
  along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-Files:     .gitignore
-           README.md
-           libserverframe.spec
-           make.sh
-           sample.conf
-           src/Makefile
-           src/Makefile.in
-           src/idempotency/client/client_channel.lo
-           src/idempotency/client/receipt_handler.lo
-           src/idempotency/server/channel_htable.lo
-           src/idempotency/server/request_htable.lo
-           src/idempotency/server/server_channel.lo
-           src/idempotency/server/server_handler.lo
-           src/libserverframe.so
-           src/sf_binlog_writer.lo
-           src/sf_cluster_cfg.lo
-           src/sf_configs.lo
-           src/sf_connection_manager.lo
-           src/sf_func.lo
-           src/sf_global.lo
-           src/sf_nio.lo
-           src/sf_proto.lo
-           src/sf_service.lo
-           src/sf_sharding_htable.lo
-           src/sf_util.lo
-Copyright: __NO_COPYRIGHT_NOR_LICENSE__
-License:   __NO_COPYRIGHT_NOR_LICENSE__
-
-#----------------------------------------------------------------------------
-# Files marked as NO_LICENSE_TEXT_FOUND may be covered by the following
-# license/copyright files.
-
-#----------------------------------------------------------------------------
 # License file: LICENSE
                      GNU AFFERO GENERAL PUBLIC LICENSE
                         Version 3, 19 November 2007

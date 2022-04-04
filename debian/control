@@ -12,7 +12,7 @@ Section: net
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, libserverframe (= ${binary:Version})
+Depends: ${misc:Depends}, libserverframe (= ${binary:Version})
 Description: libserverframe (development files)
   This package contains header files.
 
@@ -21,5 +21,5 @@ Section: net
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, libfastcommon (>= 1.0.56)
+Depends: ${misc:Depends}, ${shlibs:Depends}, libfastcommon (${libfastcommon:Version})
 Description: this network service framework library extract from FastDFS

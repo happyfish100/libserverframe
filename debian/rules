@@ -11,3 +11,7 @@ override_dh_auto_build:
 override_dh_auto_install:
 	./make.sh install
 	dh_auto_install
+
+.PHONY: override_dh_gencontrol
+override_dh_gencontrol:
+	dh_gencontrol -- -Tdebian/substvars
