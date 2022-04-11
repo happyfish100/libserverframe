@@ -168,6 +168,7 @@ static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
         __sync_bool_compare_and_swap(&group->master, master, NULL);
     }
 
+    *err_no = SF_RETRIABLE_ERROR_NO_SERVER;
     return NULL;
 }
 
@@ -273,13 +274,13 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
     SFCMConnGroupEntry *group;
     ConnectionInfo *conn;
     SFNetRetryIntervalContext net_retry_ctx;
-    int i;
+    int retry_count;
 
     group = cm->groups.entries + group_index;
     sf_init_net_retry_interval_context(&net_retry_ctx,
             &cm->common_cfg->net_retry_cfg.interval_mm,
             &cm->common_cfg->net_retry_cfg.connect);
-    i = 0;
+    retry_count = 0;
     while (1) {
         if ((conn=make_master_connection(cm, group, err_no)) != NULL) {
             return conn;
@@ -291,12 +292,12 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
         }
         SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx,
                 cm->common_cfg->net_retry_cfg.
-                connect.times, ++i, *err_no);
+                connect.times, ++retry_count, *err_no);
     }
 
     logError("file: "__FILE__", line: %d, "
-            "get_master_connection fail, errno: %d",
-            __LINE__, *err_no);
+            "get_master_connection fail, retry count: %d, errno: %d",
+            __LINE__, retry_count, *err_no);
     return NULL;
 }
 
@@ -308,7 +309,7 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
     ConnectionInfo *conn;
     SFNetRetryIntervalContext net_retry_ctx;
     uint32_t index;
-    int i;
+    int retry_count;
 
     group = cm->groups.entries + group_index;
     if ((cm->common_cfg->read_rule == sf_data_read_rule_master_only) ||
@@ -320,7 +321,7 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
     sf_init_net_retry_interval_context(&net_retry_ctx,
             &cm->common_cfg->net_retry_cfg.interval_mm,
             &cm->common_cfg->net_retry_cfg.connect);
-    i = 0;
+    retry_count = 0;
     while (1) {
         alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
         if (alives->count > 0) {
@@ -344,12 +345,12 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
         }
         SF_NET_RETRY_CHECK_AND_SLEEP(net_retry_ctx,
                 cm->common_cfg->net_retry_cfg.
-                connect.times, ++i, *err_no);
+                connect.times, ++retry_count, *err_no);
     }
 
     logError("file: "__FILE__", line: %d, "
-            "get_readable_connection fail, errno: %d",
-            __LINE__, *err_no);
+            "get_readable_connection fail, retry count: %d, errno: %d",
+            __LINE__, retry_count, *err_no);
     return NULL;
 }
 
