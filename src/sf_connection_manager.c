@@ -144,34 +144,6 @@ static inline void set_connection_params(ConnectionInfo *conn,
     cparam->cm.old_alives = old_alives;
 }
 
-static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
-        SFCMConnGroupEntry *group, int *err_no)
-{
-    SFCMServerEntry *master;
-    ConnectionInfo *conn;
-
-    master = (SFCMServerEntry *)FC_ATOMIC_GET(group->master);
-    if (master != NULL) {
-        if ((conn=make_connection(cm, master->addr_array,
-                        err_no)) != NULL)
-        {
-            if (cm->common_cfg->read_rule == sf_data_read_rule_master_only) {
-                set_connection_params(conn, master, NULL);
-            } else {
-                SFCMServerPtrArray *alives;
-                alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
-                set_connection_params(conn, master, alives);
-            }
-            return conn;
-        }
-
-        __sync_bool_compare_and_swap(&group->master, master, NULL);
-    }
-
-    *err_no = SF_RETRIABLE_ERROR_NO_SERVER;
-    return NULL;
-}
-
 static inline int push_to_detect_queue(SFConnectionManager *cm,
         SFCMConnGroupEntry *group, SFCMServerPtrArray *alives)
 {
@@ -251,6 +223,34 @@ static int remove_from_alives(SFConnectionManager *cm,
     return 0;
 }
 
+static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
+        SFCMConnGroupEntry *group, int *err_no)
+{
+    SFCMServerEntry *master;
+    ConnectionInfo *conn;
+    SFCMServerPtrArray *alives;
+
+    master = (SFCMServerEntry *)FC_ATOMIC_GET(group->master);
+    if (master != NULL) {
+        if ((conn=make_connection(cm, master->addr_array,
+                        err_no)) != NULL)
+        {
+            alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
+            set_connection_params(conn, master, alives);
+            return conn;
+        } else {
+            alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
+            if (alives != NULL) {
+                remove_from_alives(cm, group, alives, master);
+            }
+            __sync_bool_compare_and_swap(&group->master, master, NULL);
+        }
+    }
+
+    *err_no = SF_RETRIABLE_ERROR_NO_SERVER;
+    return NULL;
+}
+
 static inline ConnectionInfo *make_readable_connection(SFConnectionManager *cm,
         SFCMConnGroupEntry *group, SFCMServerPtrArray *alives,
         const int index, int *err_no)
@@ -286,6 +286,15 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
             return conn;
         }
 
+        /*
+        logInfo("file: "__FILE__", line: %d, "
+                "retry_count: %d, interval_ms: %d, data group id: %d, "
+                "master: %p, alive count: %d, all count: %d", __LINE__,
+                retry_count, net_retry_ctx.interval_ms, group->id,
+                FC_ATOMIC_GET(group->master), ((SFCMServerPtrArray *)
+                    FC_ATOMIC_GET(group->alives))->count, group->all.count);
+         */
+
         *err_no = get_group_servers(cm, group);
         if (*err_no == 0) {
             *err_no = SF_RETRIABLE_ERROR_NO_SERVER;  //for try again
@@ -296,8 +305,8 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
     }
 
     logError("file: "__FILE__", line: %d, "
-            "get_master_connection fail, retry count: %d, errno: %d",
-            __LINE__, retry_count, *err_no);
+            "get_master_connection fail, group id: %d, retry count: %d, "
+            "errno: %d", __LINE__, group->id, retry_count, *err_no);
     return NULL;
 }
 
@@ -377,12 +386,11 @@ static void close_connection(SFConnectionManager *cm, ConnectionInfo *conn)
     if (cparam->cm.sentry != NULL) {
         server = cparam->cm.sentry;
         group = cm->groups.entries + server->group_index;
-        if (cparam->cm.old_alives == NULL) {
-            __sync_bool_compare_and_swap(&group->master, server, NULL);
-        } else {
+        if (cparam->cm.old_alives != NULL) {
             remove_from_alives(cm, group, cparam->cm.old_alives, server);
             cparam->cm.old_alives = NULL;
         }
+        __sync_bool_compare_and_swap(&group->master, server, NULL);
         cparam->cm.sentry = NULL;
     }
 
@@ -422,7 +430,7 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                 return conn;
             }
             release_connection(cm, conn);
-            if ((conn=get_spec_connection(cm,&leader.conn,
+            if ((conn=get_spec_connection(cm, &leader.conn,
                             err_no)) == NULL)
             {
                 break;

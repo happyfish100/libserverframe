@@ -25,10 +25,10 @@
 #include "fastcommon/logger.h"
 #include "sf_configs.h"
 
-#define DEFAULT_RETRY_MAX_INTERVAL_MS      5000
-#define DEFAULT_CONNECT_RETRY_TIMES          10
+#define DEFAULT_RETRY_MAX_INTERVAL_MS      3000
+#define DEFAULT_CONNECT_RETRY_TIMES         200
 #define DEFAULT_CONNECT_RETRY_INTERVAL_MS   100
-#define DEFAULT_NETWORK_RETRY_TIMES          10
+#define DEFAULT_NETWORK_RETRY_TIMES         200
 #define DEFAULT_NETWORK_RETRY_INTERVAL_MS   100
 
 int sf_load_net_retry_config(SFNetRetryConfig *net_retry_cfg,
