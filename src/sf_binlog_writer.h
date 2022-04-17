@@ -25,8 +25,8 @@
 #define SF_BINLOG_THREAD_ORDER_MODE_FIXED       0
 #define SF_BINLOG_THREAD_ORDER_MODE_VARY        1
 
-#define SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE     0
-#define SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION  1
+#define SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE     0
+#define SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION  1
 
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
@@ -65,7 +65,6 @@ typedef struct binlog_writer_thread {
     volatile bool running;
     bool use_fixed_buffer_size;
     short order_mode;
-    short order_by;
     struct {
         struct sf_binlog_writer_info *head;
         struct sf_binlog_writer_info *tail;
@@ -82,6 +81,7 @@ typedef struct sf_binlog_writer_info {
     } version_ctx;
     SFBinlogWriterThread *thread;
 
+    short order_by;
     struct {
         bool in_queue;
         struct sf_binlog_writer_info *next;
@@ -108,14 +108,13 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const short order_by, const int max_record_size,
-        const int writer_count, const bool use_fixed_buffer_size);
+        const int max_record_size, const int writer_count,
+        const bool use_fixed_buffer_size);
 
-#define sf_binlog_writer_init_thread(thread, name, \
-        writer, order_by, max_record_size)   \
+#define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
-            SF_BINLOG_THREAD_ORDER_MODE_FIXED,      \
-            order_by, max_record_size, 1, true)
+            SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
+            max_record_size, 1, true)
 
 static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
@@ -128,9 +127,8 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         return result;
     }
 
-    return sf_binlog_writer_init_thread(&context->thread, subdir_name,
-            &context->writer, SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE,
-            max_record_size);
+    return sf_binlog_writer_init_thread(&context->thread,
+            subdir_name, &context->writer, max_record_size);
 }
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
