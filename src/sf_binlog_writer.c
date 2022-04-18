@@ -471,6 +471,15 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         return EINVAL;
     }
 
+    if (order_by == SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION) {
+        if (writer->version_ctx.ring.slots == NULL) {
+            logError("file: "__FILE__", line: %d, "
+                    "the writer is NOT versioned writer, can't "
+                    "set order by to %d!", __LINE__, order_by);
+            return EINVAL;
+        }
+    }
+
     if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, order_by,
                     order_by, SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE)) == NULL)
     {
