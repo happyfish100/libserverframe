@@ -92,6 +92,8 @@ static inline const char *sf_get_quorum_caption(
         const SFElectionQuorum quorum)
 {
     switch (quorum) {
+        case sf_election_quorum_auto:
+            return "auto";
         case sf_election_quorum_any:
             return "any";
         case sf_election_quorum_majority:
@@ -101,11 +103,31 @@ static inline const char *sf_get_quorum_caption(
     }
 }
 
+static inline bool sf_election_quorum_check(const SFElectionQuorum quorum,
+        const int total_count, const int active_count)
+{
+    switch (quorum) {
+        case sf_election_quorum_any:
+            return active_count > 0;
+        case sf_election_quorum_auto:
+            if (total_count % 2 == 0) {  //same as sf_election_quorum_any
+                return active_count > 0;
+            }
+            //continue
+        case sf_election_quorum_majority:
+            if (active_count == total_count) {
+                return true;
+            } else {
+                return active_count > total_count / 2;
+            }
+    }
+}
+
 #define sf_load_read_rule_config(rule, ini_ctx) \
     sf_load_read_rule_config_ex(rule, ini_ctx, sf_data_read_rule_master_only)
 
 #define sf_load_quorum_config(quorum, ini_ctx) \
-    sf_load_quorum_config_ex(quorum, ini_ctx, sf_election_quorum_majority)
+    sf_load_quorum_config_ex(quorum, ini_ctx, sf_election_quorum_auto)
 
 #define SF_NET_RETRY_FINISHED(retry_times, counter, result)  \
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \

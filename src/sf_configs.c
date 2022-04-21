@@ -128,6 +128,8 @@ int sf_load_quorum_config_ex(SFElectionQuorum *quorum,
             "quorum", ini_ctx->context);
     if (str == NULL) {
         *quorum = def_quorum;
+    } else if (strncasecmp(str, "auto", 4) == 0) {
+        *quorum = sf_election_quorum_auto;
     } else if (strncasecmp(str, "any", 3) == 0) {
         *quorum = sf_election_quorum_any;
     } else if (strncasecmp(str, "majority", 8) == 0) {
