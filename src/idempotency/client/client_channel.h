@@ -80,7 +80,19 @@ static inline int idempotency_client_channel_check_wait_ex(
 
     idempotency_client_channel_check_reconnect(channel);
     lcp_timedwait_sec(&channel->lc_pair, timeout);
-    return __sync_add_and_fetch(&channel->established, 0) ? 0 : ETIMEDOUT;
+    if (__sync_add_and_fetch(&channel->established, 0)) {
+        return 0;
+    } else {
+        /*
+        logInfo("file: "__FILE__", line: %d, "
+                "channel_check fail, server %s:%u, in_ioevent: %d, "
+                "canceled: %d, req count: %"PRId64, __LINE__, channel->task->server_ip,
+                channel->task->port, __sync_add_and_fetch(&channel->
+                    in_ioevent, 0), __sync_add_and_fetch(&channel->
+                        task->canceled, 0), channel->task->req_count);
+         */
+        return ETIMEDOUT;
+    }
 }
 
 #ifdef __cplusplus

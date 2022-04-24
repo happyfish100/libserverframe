@@ -25,12 +25,13 @@
 #define SF_BINLOG_THREAD_ORDER_MODE_FIXED       0
 #define SF_BINLOG_THREAD_ORDER_MODE_VARY        1
 
-#define SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE     0
-#define SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION  1
+#define SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE     0
+#define SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION  1
 
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
 #define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
+#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       3
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -64,7 +65,6 @@ typedef struct binlog_writer_thread {
     volatile bool running;
     bool use_fixed_buffer_size;
     short order_mode;
-    short order_by;
     struct {
         struct sf_binlog_writer_info *head;
         struct sf_binlog_writer_info *tail;
@@ -81,6 +81,7 @@ typedef struct sf_binlog_writer_info {
     } version_ctx;
     SFBinlogWriterThread *thread;
 
+    short order_by;
     struct {
         bool in_queue;
         struct sf_binlog_writer_info *next;
@@ -107,14 +108,13 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const short order_by, const int max_record_size,
-        const int writer_count, const bool use_fixed_buffer_size);
+        const int max_record_size, const int writer_count,
+        const bool use_fixed_buffer_size);
 
-#define sf_binlog_writer_init_thread(thread, name, \
-        writer, order_by, max_record_size)   \
+#define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
-            SF_BINLOG_THREAD_ORDER_MODE_FIXED,      \
-            order_by, max_record_size, 1, true)
+            SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
+            max_record_size, 1, true)
 
 static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
@@ -127,9 +127,35 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
         return result;
     }
 
-    return sf_binlog_writer_init_thread(&context->thread, subdir_name,
-            &context->writer, SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE,
-            max_record_size);
+    return sf_binlog_writer_init_thread(&context->thread,
+            subdir_name, &context->writer, max_record_size);
+}
+
+void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
+
+static inline void sf_binlog_writer_destroy_writer(
+        SFBinlogWriterInfo *writer)
+{
+    sf_file_writer_destroy(&writer->fw);
+    if (writer->version_ctx.ring.slots != NULL) {
+        free(writer->version_ctx.ring.slots);
+        writer->version_ctx.ring.slots = NULL;
+    }
+}
+
+static inline void sf_binlog_writer_destroy_thread(
+        SFBinlogWriterThread *thread)
+{
+    fast_mblock_destroy(&thread->mblock);
+    fc_queue_destroy(&thread->queue);
+}
+
+static inline void sf_binlog_writer_destroy(
+        SFBinlogWriterContext *context)
+{
+    sf_binlog_writer_finish(&context->writer);
+    sf_binlog_writer_destroy_writer(&context->writer);
+    sf_binlog_writer_destroy_thread(&context->thread);
 }
 
 int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
@@ -138,13 +164,13 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
 
+int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
+
 #define sf_binlog_writer_set_flags(writer, flags) \
     sf_file_writer_set_flags(&(writer)->fw, flags)
 
 #define sf_binlog_writer_get_last_version(writer) \
     sf_file_writer_get_last_version(&(writer)->fw)
-
-void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
 #define sf_binlog_get_current_write_index(writer) \
     sf_file_writer_get_current_index(&(writer)->fw)
@@ -195,6 +221,11 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
         subdir_name, filename, size) \
         sf_file_writer_get_index_filename(data_path, \
                 subdir_name, filename, size)
+
+#define sf_binlog_writer_get_binlog_index(data_path, \
+        subdir_name, write_index) \
+        sf_file_writer_get_binlog_index(data_path, \
+                subdir_name, write_index)
 
 #define sf_binlog_writer_set_binlog_index(writer, binlog_index) \
     sf_file_writer_set_binlog_index(&(writer)->fw, binlog_index)

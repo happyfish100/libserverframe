@@ -68,8 +68,10 @@ static int receipt_recv_timeout_callback(struct fast_task_info *task)
                 __LINE__, task->server_ip, task->port);
     } else {
         logError("file: "__FILE__", line: %d, "
-                "communication with server %s:%u timeout",
-                __LINE__, task->server_ip, task->port);
+                "communication with server %s:%u timeout, "
+                "channel established: %d", __LINE__,
+                task->server_ip, task->port,
+                FC_ATOMIC_GET(channel->established));
     }
 
     return ETIMEDOUT;
@@ -85,8 +87,11 @@ static void receipt_task_finish_cleanup(struct fast_task_info *task)
         task->event.fd = -1;
     }
 
-    channel = (IdempotencyClientChannel *)task->arg;
+    task->length = 0;
+    task->offset = 0;
+    task->req_count = 0;
 
+    channel = (IdempotencyClientChannel *)task->arg;
     fc_list_del_init(&channel->dlink);
     __sync_bool_compare_and_swap(&channel->established, 1, 0);
     __sync_bool_compare_and_swap(&channel->in_ioevent, 1, 0);
@@ -334,12 +339,15 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
             setup_channel_request(task);
             result = 0;
             break;
-        } else if (stage == SF_NIO_STAGE_CONTINUE && task->length == 0) {
-            if (((IdempotencyClientChannel *)task->arg)->established) {
-                report_req_receipt_request(task, true);
-            } else {
-                sf_set_read_event(task);  //trigger read event
+        } else if (stage == SF_NIO_STAGE_CONTINUE) {
+            if (task->length == 0 && task->offset == 0) {
+                if (((IdempotencyClientChannel *)task->arg)->established) {
+                    report_req_receipt_request(task, true);
+                } else if (task->req_count > 0) {
+                    sf_set_read_event(task);  //trigger read event
+                }
             }
+
             result = 0;
             break;
         }

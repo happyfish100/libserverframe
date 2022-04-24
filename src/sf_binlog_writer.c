@@ -34,6 +34,8 @@
 #include "sf_func.h"
 #include "sf_binlog_writer.h"
 
+#define ERRNO_THREAD_EXIT  -1000
+
 static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
         const uint64_t next_version)
 {
@@ -44,7 +46,8 @@ static inline void binlog_writer_set_next_version(SFBinlogWriterInfo *writer,
 }
 
 #define deal_binlog_one_record(wb) \
-    sf_file_writer_deal_buffer(&wb->writer->fw, &wb->bf, wb->version.last)
+    sf_file_writer_deal_versioned_buffer(&wb->writer->fw, \
+            &wb->bf, wb->version.last)
 
 #define GET_WBUFFER_VERSION_COUNT(wb)  \
         (((wb)->version.last - (wb)->version.first) + 1)
@@ -190,18 +193,23 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
 
         switch (current->type) {
             case SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE:
-                thread->order_by = current->version.first;
+                current->writer->order_by = current->version.first;
                 fast_mblock_free_object(&current->writer->
                         thread->mblock, current);
                 break;
-
+            case SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT:
+                flush_writer_files(thread);
+                return ERRNO_THREAD_EXIT;
             case SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION:
-                if (thread->order_by != SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
+                if (current->writer->order_by !=
+                        SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION)
+                {
                     logWarning("file: "__FILE__", line: %d, "
                             "subdir_name: %s, invalid order by: %d != %d, "
                             "maybe some mistake happen", __LINE__,
-                            current->writer->fw.cfg.subdir_name, thread->order_by,
-                            SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION);
+                            current->writer->fw.cfg.subdir_name,
+                            current->writer->order_by,
+                            SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION);
                 }
 
                 if (current->writer->version_ctx.ring.waiting_count != 0) {
@@ -231,7 +239,9 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 current->writer->fw.total_count++;
                 add_to_flush_writer_queue(thread, current->writer);
 
-                if (thread->order_by == SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION) {
+                if (current->writer->order_by ==
+                        SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION)
+                {
                     /* NOTE: current maybe be released in the deal function */
                     if ((result=deal_record_by_version(current)) != 0) {
                         return result;
@@ -257,7 +267,10 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
     int count;
 
     if (writer->fw.file.name != NULL) {
-        fc_queue_terminate(&writer->thread->queue);
+        while (!fc_queue_empty(&writer->thread->queue)) {
+            fc_sleep_ms(10);
+        }
+        sf_binlog_writer_notify_exit(writer);
 
         count = 0;
         while (writer->thread->running && ++count < 300) {
@@ -290,6 +303,7 @@ static void *binlog_writer_func(void *arg)
 {
     SFBinlogWriterThread *thread;
     SFBinlogWriterBuffer *wb_head;
+    int result;
 
     thread = (SFBinlogWriterThread *)arg;
 
@@ -309,11 +323,14 @@ static void *binlog_writer_func(void *arg)
             continue;
         }
 
-        if (deal_binlog_records(thread, wb_head) != 0) {
-            logCrit("file: "__FILE__", line: %d, "
-                    "deal_binlog_records fail, "
-                    "program exit!", __LINE__);
-            sf_terminate_myself();
+        if ((result=deal_binlog_records(thread, wb_head)) != 0) {
+            if (result != ERRNO_THREAD_EXIT) {
+                logCrit("file: "__FILE__", line: %d, "
+                        "deal_binlog_records fail, "
+                        "program exit!", __LINE__);
+                sf_terminate_myself();
+            }
+            break;
         }
     }
 
@@ -341,13 +358,23 @@ static int binlog_wbuffer_alloc_init(void *element, void *args)
     return 0;
 }
 
+static void binlog_wbuffer_destroy_func(void *element, void *args)
+{
+    SFBinlogWriterBuffer *wbuffer;
+    wbuffer = (SFBinlogWriterBuffer *)element;
+    if (wbuffer->bf.buff != NULL) {
+        free(wbuffer->bf.buff);
+    }
+}
+
 int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
         const int buffer_size)
 {
-    writer->flush.in_queue = false;
-    return sf_file_writer_init_normal(&writer->fw,
-            data_path, subdir_name, buffer_size);
+    memset(writer, 0, sizeof(*writer));
+    writer->order_by = SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE;
+    return sf_file_writer_init(&writer->fw, data_path,
+            subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
@@ -367,36 +394,43 @@ int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
     writer->version_ctx.ring.waiting_count = 0;
     writer->version_ctx.ring.max_waitings = 0;
     writer->version_ctx.change_count = 0;
+    writer->order_by = SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION;
 
     binlog_writer_set_next_version(writer, next_version);
-    return sf_binlog_writer_init_normal(writer,
-            data_path, subdir_name, buffer_size);
+    writer->flush.in_queue = false;
+    return sf_file_writer_init(&writer->fw, data_path,
+            subdir_name, buffer_size);
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const short order_by, const int max_record_size,
-        const int writer_count, const bool use_fixed_buffer_size)
+        const int max_record_size, const int writer_count,
+        const bool use_fixed_buffer_size)
 {
     const int alloc_elements_once = 1024;
+    int result;
     int element_size;
     pthread_t tid;
-    int result;
+    struct fast_mblock_object_callbacks callbacks;
 
     snprintf(thread->name, sizeof(thread->name), "%s", name);
     thread->order_mode = order_mode;
-    thread->order_by = order_by;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
 
+    callbacks.init_func = binlog_wbuffer_alloc_init;
+    callbacks.args = writer;
     element_size = sizeof(SFBinlogWriterBuffer);
     if (use_fixed_buffer_size) {
         element_size += max_record_size;
+        callbacks.destroy_func = NULL;
+    } else {
+        callbacks.destroy_func = binlog_wbuffer_destroy_func;
     }
-    if ((result=fast_mblock_init_ex1(&thread->mblock, "binlog-wbuffer",
+    if ((result=fast_mblock_init_ex2(&thread->mblock, "binlog-wbuffer",
                      element_size, alloc_elements_once, 0,
-                     binlog_wbuffer_alloc_init, writer, true)) != 0)
+                     &callbacks, true, NULL)) != 0)
     {
         return result;
     }
@@ -417,12 +451,12 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 {
     SFBinlogWriterBuffer *buffer;
 
-    if (writer->thread->order_by == order_by) {
+    if (writer->order_by == order_by) {
         return 0;
     }
 
-    if (!(order_by == SF_BINLOG_THREAD_TYPE_ORDER_BY_NONE ||
-                order_by == SF_BINLOG_THREAD_TYPE_ORDER_BY_VERSION))
+    if (!(order_by == SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE ||
+                order_by == SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION))
     {
         logError("file: "__FILE__", line: %d, "
                 "invalid order by: %d!", __LINE__, order_by);
@@ -437,8 +471,32 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         return EINVAL;
     }
 
+    if (order_by == SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION) {
+        if (writer->version_ctx.ring.slots == NULL) {
+            logError("file: "__FILE__", line: %d, "
+                    "the writer is NOT versioned writer, can't "
+                    "set order by to %d!", __LINE__, order_by);
+            return EINVAL;
+        }
+    }
+
     if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, order_by,
                     order_by, SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE)) == NULL)
+    {
+        return ENOMEM;
+    }
+
+    fc_queue_push(&writer->thread->queue, buffer);
+    return 0;
+}
+
+static inline int sf_binlog_writer_push_directive(SFBinlogWriterInfo *writer,
+        const int buffer_type, const int64_t version)
+{
+    SFBinlogWriterBuffer *buffer;
+
+    if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer,
+                    version, version, buffer_type)) == NULL)
     {
         return ENOMEM;
     }
@@ -450,14 +508,13 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version)
 {
-    SFBinlogWriterBuffer *buffer;
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION,
+            next_version);
+}
 
-    if ((buffer=sf_binlog_writer_alloc_versioned_buffer_ex(writer, next_version,
-                    next_version, SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION)) == NULL)
-    {
-        return ENOMEM;
-    }
-
-    fc_queue_push(&writer->thread->queue, buffer);
-    return 0;
+int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT, 0);
 }

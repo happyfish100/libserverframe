@@ -35,7 +35,7 @@
 #include "sf_ordered_writer.h"
 
 #define deal_binlog_one_record(writer, wb) \
-    sf_file_writer_deal_buffer(&(writer)->fw, &wb->bf, wb->version)
+    sf_file_writer_deal_versioned_buffer(&(writer)->fw, &wb->bf, wb->version)
 
 static inline int flush_writer_files(SFOrderedWriterInfo *writer)
 {
@@ -239,7 +239,7 @@ int sf_ordered_writer_init(SFOrderedWriterContext *context,
         const int buffer_size, const int max_record_size)
 {
     int result;
-    if ((result=sf_file_writer_init_normal(&context->writer.fw,
+    if ((result=sf_file_writer_init(&context->writer.fw,
                     data_path, subdir_name, buffer_size)) != 0)
     {
         return result;
