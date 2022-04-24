@@ -267,13 +267,17 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
     int count;
 
     if (writer->fw.file.name != NULL) {
-        while (!fc_queue_empty(&writer->thread->queue)) {
+        while (writer->thread->running && !fc_queue_empty(
+                    &writer->thread->queue))
+        {
             fc_sleep_ms(10);
         }
-        sf_binlog_writer_notify_exit(writer);
+        if (writer->thread->running) {
+            sf_binlog_writer_notify_exit(writer);
+        }
 
         count = 0;
-        while (writer->thread->running && ++count < 300) {
+        while (writer->thread->running && ++count < 500) {
             fc_sleep_ms(10);
         }
         
