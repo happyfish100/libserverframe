@@ -48,6 +48,9 @@
 #define SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ   125
 #define SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP  126
 
+#define SF_CLUSTER_PROTO_GET_SERVER_STATUS_REQ    201
+#define SF_CLUSTER_PROTO_GET_SERVER_STATUS_RESP   202
+
 #define SF_PROTO_MAGIC_CHAR        '@'
 #define SF_PROTO_SET_MAGIC(m)   \
     m[0] = m[1] = m[2] = m[3] = SF_PROTO_MAGIC_CHAR
@@ -189,6 +192,22 @@ typedef struct sf_proto_report_req_receipt_header {
 typedef struct sf_proto_report_req_receipt_body {
     char req_id[8];
 } SFProtoReportReqReceiptBody;
+
+typedef struct {
+    unsigned char servers[SF_CLUSTER_CONFIG_SIGN_LEN];
+    unsigned char cluster[SF_CLUSTER_CONFIG_SIGN_LEN];
+} SFProtoConfigSigns;
+
+typedef struct sf_proto_get_server_status_req {
+    SFProtoConfigSigns config_signs;
+    char server_id[4];  //my server id
+    char service_id[2];
+    union {
+        char is_leader;
+        char is_master;
+    };
+    char padding[1];
+} SFProtoGetServerStatusReq;
 
 typedef struct sf_group_server_info {
     int id;
@@ -539,6 +558,26 @@ int sf_proto_get_leader(ConnectionInfo *conn,
         const int network_timeout,
         SFClientServerEntry *leader);
 
+
+static inline void sf_proto_get_server_status_pack(const int server_id,
+        const int service_id, const bool is_leader,
+        const unsigned char *servers_sign,
+        const unsigned char *cluster_sign,
+        SFProtoGetServerStatusReq *req)
+{
+    int2buff(server_id, req->server_id);
+    short2buff(service_id, req->service_id);
+    req->is_leader = (is_leader ? 1 : 0);
+    memcpy(req->config_signs.servers, servers_sign,
+            SF_CLUSTER_CONFIG_SIGN_LEN);
+    if (cluster_sign != NULL) {
+        memcpy(req->config_signs.cluster, cluster_sign,
+                SF_CLUSTER_CONFIG_SIGN_LEN);
+    } else {
+        memset(req->config_signs.cluster, 0,
+                SF_CLUSTER_CONFIG_SIGN_LEN);
+    }
+}
 
 #define SF_CLIENT_RELEASE_CONNECTION(cm, conn, result) \
     do { \

@@ -411,6 +411,10 @@ const char *sf_get_cmd_caption(const int cmd)
             return "GET_LEADER_REQ";
         case SF_SERVICE_PROTO_GET_LEADER_RESP:
             return "GET_LEADER_RESP";
+        case SF_CLUSTER_PROTO_GET_SERVER_STATUS_REQ:
+            return "GET_SERVER_STATUS_REQ";
+        case SF_CLUSTER_PROTO_GET_SERVER_STATUS_RESP:
+            return "GET_SERVER_STATUS_RESP";
         default:
             return "UNKOWN";
     }
