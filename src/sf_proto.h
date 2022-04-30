@@ -201,12 +201,11 @@ typedef struct {
 typedef struct sf_proto_get_server_status_req {
     SFProtoConfigSigns config_signs;
     char server_id[4];  //my server id
-    char service_id[2];
     union {
         char is_leader;
         char is_master;
     };
-    char padding[1];
+    char padding[3];
 } SFProtoGetServerStatusReq;
 
 typedef struct sf_group_server_info {
@@ -558,15 +557,13 @@ int sf_proto_get_leader(ConnectionInfo *conn,
         const int network_timeout,
         SFClientServerEntry *leader);
 
-
-static inline void sf_proto_get_server_status_pack(const int server_id,
-        const int service_id, const bool is_leader,
+static inline void sf_proto_get_server_status_pack(
+        const int server_id, const bool is_leader,
         const unsigned char *servers_sign,
         const unsigned char *cluster_sign,
         SFProtoGetServerStatusReq *req)
 {
     int2buff(server_id, req->server_id);
-    short2buff(service_id, req->service_id);
     req->is_leader = (is_leader ? 1 : 0);
     memcpy(req->config_signs.servers, servers_sign,
             SF_CLUSTER_CONFIG_SIGN_LEN);
