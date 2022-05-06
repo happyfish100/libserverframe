@@ -116,22 +116,22 @@ int sf_load_cluster_config_by_file(SFClusterConfig *cluster,
     return 0;
 }
 
-int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
-        *ini_ctx, const int default_port, char *full_cluster_filename,
-        const int size)
+int sf_load_cluster_config_ex1(SFClusterConfig *cluster,
+        IniFullContext *ini_ctx, const char *cluster_config_item_name,
+        const int default_port, char *full_cluster_filename, const int size)
 {
     const bool share_between_groups = true;
     char *cluster_config_filename;
-    
+
     cluster_config_filename = iniGetStrValue(ini_ctx->section_name,
-            "cluster_config_filename", ini_ctx->context);
+            cluster_config_item_name, ini_ctx->context);
     if (cluster_config_filename == NULL || *cluster_config_filename == '\0') {
         logError("file: "__FILE__", line: %d, "
-                "config file: %s, item \"cluster_config_filename\" "
-                "not exist or empty", __LINE__, ini_ctx->filename);
+                "config file: %s, item \"%s\" not exist or empty",
+                __LINE__, cluster_config_item_name, ini_ctx->filename);
         return ENOENT;
     }
-    
+
     resolve_path(ini_ctx->filename, cluster_config_filename,
             full_cluster_filename, size);
     return sf_load_cluster_config_by_file(cluster, full_cluster_filename,

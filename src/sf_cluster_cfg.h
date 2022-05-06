@@ -23,9 +23,29 @@
 extern "C" {
 #endif
 
-int sf_load_cluster_config_ex(SFClusterConfig *cluster, IniFullContext
-        *ini_ctx, const int default_port, char *full_cluster_filename,
-        const int size);
+int sf_load_cluster_config_ex1(SFClusterConfig *cluster,
+        IniFullContext *ini_ctx, const char *cluster_config_item_name,
+        const int default_port, char *full_cluster_filename, const int size);
+
+static inline int sf_load_cluster_config_ex(SFClusterConfig *cluster,
+        IniFullContext *ini_ctx, const int default_port,
+        char *full_cluster_filename, const int size)
+{
+    const char *cluster_config_item_name = "cluster_config_filename";
+    return sf_load_cluster_config_ex1(cluster, ini_ctx,
+            cluster_config_item_name, default_port,
+            full_cluster_filename, PATH_MAX);
+}
+
+static inline int sf_load_cluster_config1(SFClusterConfig *cluster,
+        IniFullContext *ini_ctx, const char *cluster_config_item_name,
+        const int default_port)
+{
+    char full_cluster_filename[PATH_MAX];
+    return sf_load_cluster_config_ex1(cluster, ini_ctx,
+            cluster_config_item_name, default_port,
+            full_cluster_filename, PATH_MAX);
+}
 
 static inline int sf_load_cluster_config(SFClusterConfig *cluster,
         IniFullContext *ini_ctx, const int default_port)
