@@ -297,41 +297,45 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
 }
 
 static inline void sf_log_network_error_ex1(SFResponseInfo *response,
-        const ConnectionInfo *conn, const int result,
-        const int log_level, const char *file, const int line)
+        const ConnectionInfo *conn, const char *service_name,
+        const int result, const int log_level,
+        const char *file, const int line)
 {
     if (response->error.length > 0) {
-        log_it_ex(&g_log_context, log_level,
-                "file: %s, line: %d, "
-                "server %s:%u response message: %s",
-                file, line, conn->ip_addr, conn->port,
+        log_it_ex(&g_log_context, log_level, "file: %s, line: %d, "
+                "%s%sserver %s:%u response message: %s", file, line,
+                (service_name != NULL ? service_name : ""),
+                (service_name != NULL ? " ": ""),
+                conn->ip_addr, conn->port,
                 response->error.message);
     } else {
-        log_it_ex(&g_log_context, log_level,
-                "file: %s, line: %d, "
-                "communicate with server %s:%u fail, "
+        log_it_ex(&g_log_context, log_level, "file: %s, line: %d, "
+                "communicate with %s%sserver %s:%u fail, "
                 "errno: %d, error info: %s", file, line,
+                (service_name != NULL ? service_name : ""),
+                (service_name != NULL ? " ": ""),
                 conn->ip_addr, conn->port,
                 result, STRERROR(result));
     }
 }
 
-#define sf_log_network_error_ex(response, conn, result, log_level) \
-    sf_log_network_error_ex1(response, conn, result, \
-            log_level, __FILE__, __LINE__)
+#define sf_log_network_error_ex(response, conn, \
+        service_name, result, log_level) \
+    sf_log_network_error_ex1(response, conn, service_name, \
+            result, log_level, __FILE__, __LINE__)
 
-#define sf_log_network_error(response, conn, result) \
-    sf_log_network_error_ex1(response, conn, result, \
+#define sf_log_network_error(response, conn, service_name, result) \
+    sf_log_network_error_ex1(response, conn, service_name, result, \
             LOG_ERR, __FILE__, __LINE__)
 
-#define sf_log_network_error_for_update(response, conn, result)  \
-        sf_log_network_error_ex(response, conn, result,         \
+#define sf_log_network_error_for_update(response, conn, service_name, result) \
+        sf_log_network_error_ex(response, conn, service_name, result,         \
                 (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
                 LOG_DEBUG : LOG_ERR)
 
-#define sf_log_network_error_for_delete(response, \
-        conn, result, enoent_log_level)  \
-        sf_log_network_error_ex(response, conn, result,          \
+#define sf_log_network_error_for_delete(response, conn, \
+        service_name, result, enoent_log_level)  \
+        sf_log_network_error_ex(response, conn, service_name, result,  \
                 (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
                 LOG_DEBUG : ((result == ENOENT || result == ENODATA) ? \
                     enoent_log_level : LOG_ERR))
@@ -558,15 +562,15 @@ int sf_proto_deal_ack(struct fast_task_info *task,
         SFRequestInfo *request, SFResponseInfo *response);
 
 int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
-        const uint32_t channel_id, const int key, const int network_timeout);
+        const char *service_name, const uint32_t channel_id,
+        const int key, const int network_timeout);
 
 int sf_proto_get_group_servers(ConnectionInfo *conn,
-        const int network_timeout, const int group_id,
-        SFGroupServerArray *sarray);
+        const char *service_name, const int network_timeout,
+        const int group_id, SFGroupServerArray *sarray);
 
-int sf_proto_get_leader(ConnectionInfo *conn,
-        const int network_timeout,
-        SFClientServerEntry *leader);
+int sf_proto_get_leader(ConnectionInfo *conn, const char *service_name,
+        const int network_timeout, SFClientServerEntry *leader);
 
 static inline void sf_proto_get_server_status_pack(
         const SFGetServerStatusRequest *r,

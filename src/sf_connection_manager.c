@@ -37,7 +37,8 @@ static int get_group_servers(SFConnectionManager *cm,
 static ConnectionInfo *get_spec_connection(SFConnectionManager *cm,
         const ConnectionInfo *target, int *err_no)
 {
-    return conn_pool_get_connection(&cm->cpool, target, err_no);
+    return conn_pool_get_connection_ex(&cm->cpool,
+            target, cm->module_name, err_no);
 }
 
 static ConnectionInfo *make_connection(SFConnectionManager *cm,
@@ -419,8 +420,8 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                 break;
             }
 
-            if ((*err_no=sf_proto_get_leader(conn, cm->common_cfg->
-                    network_timeout, &leader)) != 0)
+            if ((*err_no=sf_proto_get_leader(conn, cm->module_name, cm->
+                            common_cfg->network_timeout, &leader)) != 0)
             {
                 close_connection(cm, conn);
                 break;
@@ -472,7 +473,7 @@ int sf_cm_validate_connection_callback(ConnectionInfo *conn, void *args)
     if ((result=sf_active_test(conn, &response, cm->common_cfg->
                     network_timeout)) != 0)
     {
-        sf_log_network_error(&response, conn, result);
+        sf_log_network_error(&response, conn, cm->module_name, result);
     }
 
     return result;
@@ -696,8 +697,8 @@ static int do_get_group_servers(SFConnectionManager *cm,
     sarray.alloc = MAX_GROUP_SERVER_COUNT;
     sarray.count = 0;
     sarray.servers = fixed_servers;
-    if ((result=sf_proto_get_group_servers(conn, cm->common_cfg->
-                    network_timeout, group->id, &sarray)) != 0)
+    if ((result=sf_proto_get_group_servers(conn, cm->module_name, cm->
+                    common_cfg->network_timeout, group->id, &sarray)) != 0)
     {
         return result;
     }

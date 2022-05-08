@@ -458,7 +458,8 @@ int sf_proto_deal_ack(struct fast_task_info *task,
 }
 
 int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
-        const uint32_t channel_id, const int key, const int network_timeout)
+        const char *service_name, const uint32_t channel_id,
+        const int key, const int network_timeout)
 {
     char out_buff[sizeof(SFCommonProtoHeader) +
         sizeof(SFProtoRebindChannelReq)];
@@ -478,15 +479,15 @@ int sf_proto_rebind_idempotency_channel(ConnectionInfo *conn,
                     sizeof(out_buff), &response, network_timeout,
                     SF_SERVICE_PROTO_REBIND_CHANNEL_RESP)) != 0)
     {
-        sf_log_network_error(&response, conn, result);
+        sf_log_network_error(&response, conn, service_name, result);
     }
 
     return result;
 }
 
 int sf_proto_get_group_servers(ConnectionInfo *conn,
-        const int network_timeout, const int group_id,
-        SFGroupServerArray *sarray)
+        const char *service_name, const int network_timeout,
+        const int group_id, SFGroupServerArray *sarray)
 {
     char out_buff[sizeof(SFCommonProtoHeader) +
         sizeof(SFProtoGetGroupServersReq)];
@@ -513,7 +514,7 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
                     SF_SERVICE_PROTO_GET_GROUP_SERVERS_RESP, in_buff,
                     sizeof(in_buff), &body_len)) != 0)
     {
-        sf_log_network_error(&response, conn, result);
+        sf_log_network_error(&response, conn, service_name, result);
         return result;
     }
 
@@ -553,9 +554,8 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     return 0;
 }
 
-int sf_proto_get_leader(ConnectionInfo *conn,
-        const int network_timeout,
-        SFClientServerEntry *leader)
+int sf_proto_get_leader(ConnectionInfo *conn, const char *service_name,
+        const int network_timeout, SFClientServerEntry *leader)
 {
     int result;
     SFCommonProtoHeader *header;
@@ -571,7 +571,7 @@ int sf_proto_get_leader(ConnectionInfo *conn,
                     SF_SERVICE_PROTO_GET_LEADER_RESP, (char *)&server_resp,
                     sizeof(SFProtoGetServerResp))) != 0)
     {
-        sf_log_network_error(&response, conn, result);
+        sf_log_network_error(&response, conn, service_name, result);
     } else {
         leader->server_id = buff2int(server_resp.server_id);
         memcpy(leader->conn.ip_addr, server_resp.ip_addr, IP_ADDRESS_SIZE);

@@ -79,8 +79,9 @@
                             connection_params->channel) == 0) \
                 { \
                     if ((conn_result=sf_proto_rebind_idempotency_channel( \
-                                conn, connection_params->channel->id, \
-                                connection_params->channel->key,      \
+                                conn, (conn_manager)->module_name, \
+                                connection_params->channel->id,  \
+                                connection_params->channel->key, \
                                 client_ctx->common_cfg.network_timeout)) == 0)   \
                     { \
                         continue; \

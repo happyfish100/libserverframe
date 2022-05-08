@@ -104,14 +104,15 @@ static inline const char *sf_get_quorum_caption(
 }
 
 static inline bool sf_election_quorum_check(const SFElectionQuorum quorum,
-        const int total_count, const int active_count)
+        const bool vote_node_enabled, const int total_count,
+        const int active_count)
 {
     switch (quorum) {
         case sf_election_quorum_any:
             return active_count > 0;
         case sf_election_quorum_auto:
-            if (total_count % 2 == 0) {  //same as sf_election_quorum_any
-                return active_count > 0;
+            if (total_count % 2 == 0 && !vote_node_enabled) {
+                return active_count > 0;  //same as sf_election_quorum_any
             }
             //continue
         case sf_election_quorum_majority:
