@@ -130,6 +130,18 @@ static inline bool sf_election_quorum_check(const SFElectionQuorum quorum,
 #define sf_load_quorum_config(quorum, ini_ctx) \
     sf_load_quorum_config_ex(quorum, ini_ctx, sf_election_quorum_auto)
 
+
+#define SF_QUORUM_NEED_REQUEST_VOTE_NODE(quorum, vote_node_enabled, \
+        server_count, active_count) \
+    (active_count < server_count && vote_node_enabled && \
+     quorum != sf_election_quorum_any && server_count % 2 == 0)
+
+#define SF_QUORUM_NEED_CHECK_VOTE_NODE(quorum, \
+        vote_node_enabled, server_count) \
+    (vote_node_enabled && quorum != sf_election_quorum_any \
+     && server_count % 2 == 0)
+
+
 #define SF_NET_RETRY_FINISHED(retry_times, counter, result)  \
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \
                     counter <= retry_times) || (retry_times < 0))))
