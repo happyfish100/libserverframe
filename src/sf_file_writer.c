@@ -271,17 +271,26 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
     return result;
 }
 
-int sf_file_writer_get_current_index(SFFileWriterInfo *writer)
+int sf_file_writer_get_indexes(SFFileWriterInfo *writer,
+        int *start_index, int *last_index)
 {
+    int result;
+
     if (writer == NULL) {   //for data recovery
+        *start_index = *last_index = 0;
         return 0;
     }
 
     if (writer->binlog.last_index < 0) {
-        get_binlog_index_from_file(writer);
+        if ((result=get_binlog_index_from_file(writer)) != 0) {
+            *start_index = *last_index = -1;
+            return result;
+        }
     }
 
-    return writer->binlog.last_index;
+    *start_index = writer->binlog.start_index;
+    *last_index = writer->binlog.last_index;
+    return 0;
 }
 
 int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,

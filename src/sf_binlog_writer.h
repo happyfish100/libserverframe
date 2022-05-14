@@ -175,8 +175,17 @@ int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 #define sf_binlog_writer_get_last_version(writer) \
     sf_file_writer_get_last_version(&(writer)->fw)
 
+#define sf_binlog_get_indexes(writer, start_index, last_index) \
+    sf_file_writer_get_indexes(&(writer)->fw, start_index, last_index)
+
+#define sf_binlog_get_start_index(writer) \
+    sf_file_writer_get_start_index(&(writer)->fw)
+
+#define sf_binlog_get_last_index(writer) \
+    sf_file_writer_get_last_index(&(writer)->fw)
+
 #define sf_binlog_get_current_write_index(writer) \
-    sf_file_writer_get_current_index(&(writer)->fw)
+    sf_file_writer_get_current_write_index(&(writer)->fw)
 
 #define sf_binlog_get_current_write_position(writer, position) \
     sf_file_writer_get_current_position(&(writer)->fw, position)
@@ -225,13 +234,15 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
         sf_file_writer_get_index_filename(data_path, \
                 subdir_name, filename, size)
 
-#define sf_binlog_writer_get_binlog_index(data_path, \
-        subdir_name, write_index) \
-        sf_file_writer_get_binlog_index(data_path, \
-                subdir_name, write_index)
+#define sf_binlog_writer_get_binlog_start_index(data_path, \
+        subdir_name, start_index) \
+        sf_file_writer_get_binlog_start_index(data_path, \
+                subdir_name, start_index)
 
-#define sf_binlog_writer_set_binlog_index(writer, binlog_index) \
-    sf_file_writer_set_binlog_last_index(&(writer)->fw, binlog_index)
+#define sf_binlog_writer_get_binlog_last_index(data_path, \
+        subdir_name, last_index) \
+        sf_file_writer_get_binlog_last_index(data_path, \
+                subdir_name, last_index)
 
 #define sf_binlog_writer_set_binlog_start_index(writer, start_index) \
     sf_file_writer_set_binlog_start_index(&(writer)->fw, start_index)

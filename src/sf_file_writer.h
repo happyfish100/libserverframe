@@ -100,15 +100,47 @@ static inline int64_t sf_file_writer_get_last_version(
 int sf_file_writer_get_binlog_indexes(const char *data_path,
         const char *subdir_name, int *start_index, int *last_index);
 
-static inline int sf_file_writer_get_binlog_index(const char *data_path,
-        const char *subdir_name, int *last_index)
+static inline int sf_file_writer_get_binlog_start_index(
+        const char *data_path, const char *subdir_name,
+        int *start_index)
+{
+    int last_index;
+    return sf_file_writer_get_binlog_indexes(data_path,
+            subdir_name, start_index, &last_index);
+}
+
+static inline int sf_file_writer_get_binlog_last_index(
+        const char *data_path, const char *subdir_name,
+        int *last_index)
 {
     int start_index;
     return sf_file_writer_get_binlog_indexes(data_path,
             subdir_name, &start_index, last_index);
 }
 
-int sf_file_writer_get_current_index(SFFileWriterInfo *writer);
+int sf_file_writer_get_indexes(SFFileWriterInfo *writer,
+        int *start_index, int *last_index);
+
+static inline int sf_file_writer_get_start_index(SFFileWriterInfo *writer)
+{
+    int start_index;
+    int last_index;
+
+    sf_file_writer_get_indexes(writer, &start_index, &last_index);
+    return start_index;
+}
+
+static inline int sf_file_writer_get_last_index(SFFileWriterInfo *writer)
+{
+    int start_index;
+    int last_index;
+
+    sf_file_writer_get_indexes(writer, &start_index, &last_index);
+    return last_index;
+}
+
+#define sf_file_writer_get_current_write_index(writer) \
+    sf_file_writer_get_last_index(writer)
 
 static inline void sf_file_writer_get_current_position(
         SFFileWriterInfo *writer, SFBinlogFilePosition *position)
