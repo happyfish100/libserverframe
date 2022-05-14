@@ -31,7 +31,8 @@
 #define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
 #define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
 #define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
-#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       3
+#define SF_BINLOG_BUFFER_TYPE_ROTATE_FILE       3
+#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       4
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -164,6 +165,8 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
 
+int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer);
+
 int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 
 #define sf_binlog_writer_set_flags(writer, flags) \
@@ -228,7 +231,13 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
                 subdir_name, write_index)
 
 #define sf_binlog_writer_set_binlog_index(writer, binlog_index) \
-    sf_file_writer_set_binlog_index(&(writer)->fw, binlog_index)
+    sf_file_writer_set_binlog_last_index(&(writer)->fw, binlog_index)
+
+#define sf_binlog_writer_set_binlog_start_index(writer, start_index) \
+    sf_file_writer_set_binlog_start_index(&(writer)->fw, start_index)
+
+#define sf_binlog_writer_set_binlog_last_index(writer, last_index) \
+    sf_file_writer_set_binlog_last_index(&(writer)->fw, last_index)
 
 #define sf_push_to_binlog_thread_queue(thread, buffer) \
     fc_queue_push(&(thread)->queue, buffer)

@@ -39,7 +39,8 @@ typedef struct sf_file_writer_info {
     } cfg;
 
     struct {
-        int index;   //current write index
+        int start_index;  //for read only
+        int last_index;   //for write
         int compress_index;
     } binlog;
 
@@ -96,15 +97,23 @@ static inline int64_t sf_file_writer_get_last_version(
     }
 }
 
-int sf_file_writer_get_binlog_index(const char *data_path,
-        const char *subdir_name, int *write_index);
+int sf_file_writer_get_binlog_indexes(const char *data_path,
+        const char *subdir_name, int *start_index, int *last_index);
+
+static inline int sf_file_writer_get_binlog_index(const char *data_path,
+        const char *subdir_name, int *last_index)
+{
+    int start_index;
+    return sf_file_writer_get_binlog_indexes(data_path,
+            subdir_name, &start_index, last_index);
+}
 
 int sf_file_writer_get_current_index(SFFileWriterInfo *writer);
 
 static inline void sf_file_writer_get_current_position(
         SFFileWriterInfo *writer, SFBinlogFilePosition *position)
 {
-    position->index = writer->binlog.index;
+    position->index = writer->binlog.last_index;
     position->offset = writer->file.size;
 }
 
@@ -128,8 +137,11 @@ static inline const char *sf_file_writer_get_filename(
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size);
 
-int sf_file_writer_set_binlog_index(SFFileWriterInfo *writer,
-        const int binlog_index);
+int sf_file_writer_set_binlog_start_index(SFFileWriterInfo *writer,
+        const int start_index);
+
+int sf_file_writer_set_binlog_last_index(SFFileWriterInfo *writer,
+        const int last_index);
 
 int sf_file_writer_get_last_lines(const char *data_path,
         const char *subdir_name, const int current_write_index,
