@@ -311,6 +311,8 @@ ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
 const char *sf_strerror(const int errnum)
 {
     switch (errnum) {
+        case SF_CLUSTER_ERROR_BINLOG_MISSED:
+            return "binlog missed";
         case SF_CLUSTER_ERROR_BINLOG_INCONSISTENT:
             return "binlog inconsistent";
         case SF_CLUSTER_ERROR_LEADER_INCONSISTENT:
