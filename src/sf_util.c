@@ -331,6 +331,8 @@ const char *sf_strerror(const int errnum)
             return STRERROR(EINVAL);
         case SF_ERROR_EAGAIN:
             return STRERROR(EAGAIN);
+        case SF_ERROR_EINPROGRESS:
+            return STRERROR(EINPROGRESS);
         case SF_ERROR_EOVERFLOW:
             return STRERROR(EOVERFLOW);
         case SF_ERROR_ENODATA:

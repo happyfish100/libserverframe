@@ -117,6 +117,8 @@ static inline int sf_unify_errno(const int errnum)
             return SF_ERROR_EINVAL;
         case EAGAIN:
             return SF_ERROR_EAGAIN;
+        case EINPROGRESS:
+            return SF_ERROR_EINPROGRESS;
         case EOVERFLOW:
             return SF_ERROR_EOVERFLOW;
         case EOPNOTSUPP:
@@ -141,6 +143,8 @@ static inline int sf_localize_errno(int errnum)
             return EINVAL;
         case SF_ERROR_EAGAIN:
             return EAGAIN;
+        case SF_ERROR_EINPROGRESS:
+            return EINPROGRESS;
         case SF_ERROR_EOVERFLOW:
             return EOVERFLOW;
         case SF_ERROR_EOPNOTSUPP:
