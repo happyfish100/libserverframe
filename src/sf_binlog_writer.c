@@ -205,6 +205,13 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                     return result;
                 }
                 break;
+            case SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX:
+                if ((result=sf_file_writer_set_binlog_last_index(&current->
+                                writer->fw, current->version.first)) != 0)
+                {
+                    return result;
+                }
+                break;
             case SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT:
                 flush_writer_files(thread);
                 return ERRNO_THREAD_EXIT;
@@ -523,6 +530,13 @@ int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
     return sf_binlog_writer_push_directive(writer,
             SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION,
             next_version);
+}
+
+int sf_binlog_writer_change_write_index(SFBinlogWriterInfo *writer,
+        const int write_index)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX, write_index);
 }
 
 int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer)
