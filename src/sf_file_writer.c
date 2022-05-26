@@ -400,6 +400,24 @@ void sf_file_writer_destroy(SFFileWriterInfo *writer)
     sf_binlog_buffer_destroy(&writer->binlog_buffer);
 }
 
+int sf_file_writer_set_indexes(SFFileWriterInfo *writer,
+        const int start_index, const int last_index)
+{
+    int result;
+
+    if (writer->binlog.start_index != start_index ||
+            writer->binlog.last_index != last_index)
+    {
+        writer->binlog.start_index = start_index;
+        writer->binlog.last_index = last_index;
+        if ((result=write_to_binlog_index_file(writer)) != 0) {
+            return result;
+        }
+    }
+
+    return 0;
+}
+
 int sf_file_writer_set_binlog_start_index(SFFileWriterInfo *writer,
         const int start_index)
 {
@@ -415,7 +433,7 @@ int sf_file_writer_set_binlog_start_index(SFFileWriterInfo *writer,
     return 0;
 }
 
-int sf_file_writer_set_binlog_last_index(SFFileWriterInfo *writer,
+int sf_file_writer_set_binlog_write_index(SFFileWriterInfo *writer,
         const int last_index)
 {
     int result;
@@ -449,8 +467,20 @@ int sf_file_writer_get_last_lines(const char *data_path,
         current_count = remain_count;
         sf_file_writer_get_filename(data_path, subdir_name,
                 current_index, filename, sizeof(filename));
-        result = fc_get_last_lines(filename, buff + *length,
-                buff_size - *length, &lines, &current_count);
+        if (access(filename, F_OK) == 0) {
+            result = fc_get_last_lines(filename, buff + *length,
+                    buff_size - *length, &lines, &current_count);
+        } else {
+            result = errno != 0 ? errno : EPERM;
+            if (result != ENOENT) {
+                logError("file: "__FILE__", line: %d, "
+                        "stat file %s fail, errno: %d, error info: %s",
+                        __LINE__, filename, result, STRERROR(result));
+                *count = 0;
+                return result;
+            }
+        }
+
         if (result == 0) {
             memmove(buff + *length, lines.str, lines.len);
             *length += lines.len;

@@ -198,7 +198,7 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                         thread->mblock, current);
                 break;
             case SF_BINLOG_BUFFER_TYPE_ROTATE_FILE:
-                if ((result=sf_file_writer_set_binlog_last_index(&current->
+                if ((result=sf_file_writer_set_binlog_write_index(&current->
                                 writer->fw, current->writer->fw.binlog.
                                 last_index + 1)) != 0)
                 {
@@ -206,7 +206,7 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 }
                 break;
             case SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX:
-                if ((result=sf_file_writer_set_binlog_last_index(&current->
+                if ((result=sf_file_writer_set_binlog_write_index(&current->
                                 writer->fw, current->version.first)) != 0)
                 {
                     return result;

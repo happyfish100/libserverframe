@@ -118,6 +118,9 @@ static inline int sf_file_writer_get_binlog_last_index(
             subdir_name, &start_index, last_index);
 }
 
+int sf_file_writer_set_indexes(SFFileWriterInfo *writer,
+        const int start_index, const int last_index);
+
 int sf_file_writer_get_indexes(SFFileWriterInfo *writer,
         int *start_index, int *last_index);
 
@@ -172,7 +175,7 @@ const char *sf_file_writer_get_index_filename(const char *data_path,
 int sf_file_writer_set_binlog_start_index(SFFileWriterInfo *writer,
         const int start_index);
 
-int sf_file_writer_set_binlog_last_index(SFFileWriterInfo *writer,
+int sf_file_writer_set_binlog_write_index(SFFileWriterInfo *writer,
         const int last_index);
 
 int sf_file_writer_get_last_lines(const char *data_path,
