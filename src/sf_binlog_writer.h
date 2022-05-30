@@ -99,19 +99,30 @@ typedef struct sf_binlog_writer_context {
 extern "C" {
 #endif
 
-int sf_binlog_writer_init_normal(SFBinlogWriterInfo *writer,
+int sf_binlog_writer_init_normal_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const int buffer_size);
+        const int buffer_size, const int64_t file_rotate_size);
 
-int sf_binlog_writer_init_by_version(SFBinlogWriterInfo *writer,
+int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
         const uint64_t next_version, const int buffer_size,
-        const int ring_size);
+        const int ring_size, const int64_t file_rotate_size);
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
         const int max_record_size, const int writer_count,
         const bool use_fixed_buffer_size);
+
+#define sf_binlog_writer_init_normal(writer,  \
+        data_path, subdir_name, buffer_size)  \
+    sf_binlog_writer_init_normal_ex(writer, data_path, subdir_name, \
+            buffer_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
+
+#define sf_binlog_writer_init_by_version(writer, data_path, \
+        subdir_name, next_version, buffer_size, ring_size)  \
+    sf_binlog_writer_init_by_version_ex(writer, data_path,  \
+            subdir_name, next_version, buffer_size,   \
+            ring_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
 
 #define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
@@ -225,8 +236,8 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
     return buffer;
 }
 
-#define sf_binlog_writer_get_filepath(data_path, subdir_name, filename, size) \
-    sf_file_writer_get_filepath(data_path, subdir_name, filename, size)
+#define sf_binlog_writer_get_filepath(data_path, subdir_name, filepath, size) \
+    sf_file_writer_get_filepath(data_path, subdir_name, filepath, size)
 
 #define sf_binlog_writer_get_filename(data_path, \
         subdir_name, binlog_index, filename, size) \

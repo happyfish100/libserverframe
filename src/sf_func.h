@@ -76,6 +76,11 @@ static inline int sf_synchronize_ctx_init(SFSynchronizeContext *sctx)
     return init_pthread_lock_cond_pair(&sctx->lcp);
 }
 
+static inline void sf_synchronize_ctx_destroy(SFSynchronizeContext *sctx)
+{
+    destroy_pthread_lock_cond_pair(&sctx->lcp);
+}
+
 static inline void sf_synchronize_counter_add(
         SFSynchronizeContext *sctx, const int count)
 {

@@ -24,7 +24,8 @@
 #define SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION  1
 
 #define SF_BINLOG_SUBDIR_NAME_SIZE 128
-#define SF_BINLOG_FILE_MAX_SIZE   (1024 * 1024 * 1024)  //for binlog rotating by size
+#define SF_BINLOG_DEFAULT_ROTATE_SIZE  (1024 * 1024 * 1024)
+#define SF_BINLOG_NEVER_ROTATE_FILE    0
 #define SF_BINLOG_FILE_PREFIX     "binlog"
 #define SF_BINLOG_FILE_EXT_FMT    ".%06d"
 
@@ -35,6 +36,7 @@ typedef struct sf_file_writer_info {
     struct {
         const char *data_path;
         char subdir_name[SF_BINLOG_SUBDIR_NAME_SIZE];
+        int64_t file_rotate_size;
         int max_record_size;
     } cfg;
 
@@ -66,7 +68,7 @@ extern "C" {
 
 int sf_file_writer_init(SFFileWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const int buffer_size);
+        const int buffer_size, const int64_t file_rotate_size);
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
 
@@ -154,10 +156,10 @@ static inline void sf_file_writer_get_current_position(
 
 static inline const char *sf_file_writer_get_filepath(
         const char *data_path, const char *subdir_name,
-        char *filename, const int size)
+        char *filepath, const int size)
 {
-    snprintf(filename, size, "%s/%s", data_path, subdir_name);
-    return filename;
+    snprintf(filepath, size, "%s/%s", data_path, subdir_name);
+    return filepath;
 }
 
 static inline const char *sf_file_writer_get_filename(

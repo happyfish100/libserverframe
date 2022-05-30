@@ -237,7 +237,9 @@ static int check_write_to_file(SFFileWriterInfo *writer,
 {
     int result;
 
-    if (writer->file.size + len <= SF_BINLOG_FILE_MAX_SIZE) {
+    if ((writer->cfg.file_rotate_size > 0) && (writer->file.size
+                + len <= writer->cfg.file_rotate_size))
+    {
         return do_write_to_file(writer, buff, len);
     }
 
@@ -315,8 +317,9 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
         return result;
     }
 
-    if (writer->file.size + SF_BINLOG_BUFFER_LENGTH(writer->
-                binlog_buffer) + buffer->length > SF_BINLOG_FILE_MAX_SIZE)
+    if (writer->cfg.file_rotate_size > 0 && writer->file.size +
+            SF_BINLOG_BUFFER_LENGTH(writer->binlog_buffer) +
+            buffer->length > writer->cfg.file_rotate_size)
     {
         if ((result=sf_file_writer_flush(writer)) != 0) {
             return result;
@@ -340,7 +343,7 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
 
 int sf_file_writer_init(SFFileWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const int buffer_size)
+        const int buffer_size, const int64_t file_rotate_size)
 {
     int result;
     int path_len;
@@ -357,6 +360,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer,
         return result;
     }
 
+    writer->cfg.file_rotate_size = file_rotate_size;
     writer->cfg.data_path = data_path;
     path_len = snprintf(filepath, sizeof(filepath),
             "%s/%s", data_path, subdir_name);
