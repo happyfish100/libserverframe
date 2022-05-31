@@ -6,9 +6,9 @@ LIB_PATH = $(LIBS) -lfastcommon
 TARGET_LIB = $(TARGET_PREFIX)/$(LIB_VERSION)
 
 TOP_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
-              sf_func.h sf_util.h sf_configs.h sf_proto.h sf_binlog_writer.h \
-              sf_cluster_cfg.h sf_sharding_htable.h sf_connection_manager.h  \
-              sf_serializer.h sf_binlog_index.h sf_file_writer.h \
+              sf_func.h sf_util.h sf_configs.h sf_proto.h sf_cluster_cfg.h \
+              sf_sharding_htable.h sf_connection_manager.h sf_serializer.h \
+              sf_binlog_index.h sf_file_writer.h sf_binlog_writer.h \
               sf_ordered_writer.h sf_buffered_writer.h sf_iov.h
 
 IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
@@ -26,10 +26,10 @@ ALL_HEADERS  = $(TOP_HEADERS) $(IDEMP_SERVER_HEADER) $(IDEMP_CLIENT_HEADER)
 
 SHARED_OBJS = sf_nio.lo sf_iov.lo sf_service.lo sf_global.lo \
         sf_func.lo sf_util.lo sf_configs.lo sf_proto.lo \
-        sf_binlog_writer.lo sf_sharding_htable.lo  \
-        sf_cluster_cfg.lo sf_connection_manager.lo \
-        sf_serializer.lo  sf_binlog_index.lo   \
-        sf_file_writer.lo sf_ordered_writer.lo \
+        sf_sharding_htable.lo sf_cluster_cfg.lo   \
+        sf_connection_manager.lo sf_serializer.lo \
+        sf_binlog_index.lo sf_file_writer.lo  \
+        sf_binlog_writer.lo sf_ordered_writer.lo \
         idempotency/server/server_channel.lo  \
         idempotency/server/request_htable.lo  \
         idempotency/server/channel_htable.lo  \

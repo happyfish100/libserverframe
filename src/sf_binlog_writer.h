@@ -101,12 +101,14 @@ extern "C" {
 
 int sf_binlog_writer_init_normal_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const int buffer_size, const int64_t file_rotate_size);
+        const char *file_prefix, const int buffer_size,
+        const int64_t file_rotate_size);
 
 int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const uint64_t next_version, const int buffer_size,
-        const int ring_size, const int64_t file_rotate_size);
+        const char *file_prefix, const uint64_t next_version,
+        const int buffer_size, const int ring_size,
+        const int64_t file_rotate_size);
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
@@ -116,12 +118,12 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
 #define sf_binlog_writer_init_normal(writer,  \
         data_path, subdir_name, buffer_size)  \
     sf_binlog_writer_init_normal_ex(writer, data_path, subdir_name, \
-            buffer_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
+            SF_BINLOG_FILE_PREFIX, buffer_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
 
-#define sf_binlog_writer_init_by_version(writer, data_path, \
-        subdir_name, next_version, buffer_size, ring_size)  \
-    sf_binlog_writer_init_by_version_ex(writer, data_path,  \
-            subdir_name, next_version, buffer_size,   \
+#define sf_binlog_writer_init_by_version(writer, data_path,   \
+        subdir_name, next_version, buffer_size, ring_size)    \
+    sf_binlog_writer_init_by_version_ex(writer, data_path, subdir_name, \
+            SF_BINLOG_FILE_PREFIX, next_version, buffer_size, \
             ring_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
 
 #define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
@@ -129,13 +131,15 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
             SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
             max_record_size, 1, true)
 
-static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
+static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
-        const int buffer_size, const int max_record_size)
+        const char *file_prefix, const int buffer_size,
+        const int max_record_size)
 {
     int result;
-    if ((result=sf_binlog_writer_init_normal(&context->writer,
-                    data_path, subdir_name, buffer_size)) != 0)
+    if ((result=sf_binlog_writer_init_normal_ex(&context->writer,
+                    data_path, subdir_name, file_prefix, buffer_size,
+                    SF_BINLOG_DEFAULT_ROTATE_SIZE)) != 0)
     {
         return result;
     }
@@ -143,6 +147,11 @@ static inline int sf_binlog_writer_init(SFBinlogWriterContext *context,
     return sf_binlog_writer_init_thread(&context->thread,
             subdir_name, &context->writer, max_record_size);
 }
+
+#define sf_binlog_writer_init(context, data_path,  \
+        subdir_name, buffer_size, max_record_size) \
+    sf_binlog_writer_init_ex(context, data_path, subdir_name, \
+            SF_BINLOG_FILE_PREFIX, buffer_size, max_record_size)
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
@@ -238,6 +247,11 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
 
 #define sf_binlog_writer_get_filepath(data_path, subdir_name, filepath, size) \
     sf_file_writer_get_filepath(data_path, subdir_name, filepath, size)
+
+#define sf_binlog_writer_get_filename_ex(data_path, subdir_name, \
+        file_prefix, binlog_index, filename, size) \
+        sf_file_writer_get_filename_ex(data_path, subdir_name, \
+                file_prefix, binlog_index, filename, size)
 
 #define sf_binlog_writer_get_filename(data_path, \
         subdir_name, binlog_index, filename, size) \

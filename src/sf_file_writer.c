@@ -34,8 +34,6 @@
 #include "sf_func.h"
 #include "sf_file_writer.h"
 
-#define BINLOG_INDEX_FILENAME  SF_BINLOG_FILE_PREFIX"_index.dat"
-
 #define BINLOG_INDEX_ITEM_START_INDEX       "start_index"
 #define BINLOG_INDEX_ITEM_CURRENT_WRITE     "current_write"
 #define BINLOG_INDEX_ITEM_CURRENT_COMPRESS  "current_compress"
@@ -43,20 +41,22 @@
 #define GET_BINLOG_FILENAME(writer) \
     sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT, \
             writer->cfg.data_path, writer->cfg.subdir_name, \
-            SF_BINLOG_FILE_PREFIX, writer->binlog.last_index)
+            writer->cfg.file_prefix, writer->binlog.last_index)
 
-#define GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name, filename, size) \
-    snprintf(filename, size, "%s/%s/%s", data_path, \
-            subdir_name, BINLOG_INDEX_FILENAME)
+#define GET_BINLOG_INDEX_FILENAME_EX(data_path,    \
+        subdir_name, file_prefix, filename, size)  \
+    snprintf(filename, size, "%s/%s/%s_index.dat", \
+            data_path, subdir_name, file_prefix)
 
 #define GET_BINLOG_INDEX_FILENAME(writer, filename, size) \
     GET_BINLOG_INDEX_FILENAME_EX(writer->cfg.data_path,   \
-            writer->cfg.subdir_name, filename, size)
+            writer->cfg.subdir_name, writer->cfg.file_prefix, filename, size)
 
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size)
 {
-    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name, filename, size);
+    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name,
+            SF_BINLOG_FILE_PREFIX, filename, size);
     return filename;
 }
 
@@ -94,8 +94,9 @@ static int get_binlog_info_from_file(const char *data_path,
     IniContext ini_context;
     int result;
 
-    snprintf(full_filename, sizeof(full_filename), "%s/%s/%s",
-            data_path, subdir_name, BINLOG_INDEX_FILENAME);
+    GET_BINLOG_INDEX_FILENAME_EX(data_path,
+            subdir_name, SF_BINLOG_FILE_PREFIX,
+            full_filename, sizeof(full_filename));
     if (access(full_filename, F_OK) != 0) {
         return errno != 0 ? errno : EPERM;
     }
@@ -140,7 +141,11 @@ static inline int get_binlog_index_from_file(SFFileWriterInfo *writer)
         writer->binlog.start_index = 0;
         writer->binlog.last_index = 0;
         writer->binlog.compress_index = 0;
-        return write_to_binlog_index_file(writer);
+        if (writer->cfg.file_rotate_size > 0) {
+            return write_to_binlog_index_file(writer);
+        } else {
+            return 0;
+        }
     }
     return result;
 }
@@ -237,7 +242,7 @@ static int check_write_to_file(SFFileWriterInfo *writer,
 {
     int result;
 
-    if ((writer->cfg.file_rotate_size > 0) && (writer->file.size
+    if ((writer->cfg.file_rotate_size <= 0) || (writer->file.size
                 + len <= writer->cfg.file_rotate_size))
     {
         return do_write_to_file(writer, buff, len);
@@ -341,8 +346,8 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     return 0;
 }
 
-int sf_file_writer_init(SFFileWriterInfo *writer,
-        const char *data_path, const char *subdir_name,
+int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
+        const char *subdir_name, const char *file_prefix,
         const int buffer_size, const int64_t file_rotate_size)
 {
     int result;
@@ -375,6 +380,9 @@ int sf_file_writer_init(SFFileWriterInfo *writer,
     snprintf(writer->cfg.subdir_name,
             sizeof(writer->cfg.subdir_name),
             "%s", subdir_name);
+    snprintf(writer->cfg.file_prefix,
+            sizeof(writer->cfg.file_prefix),
+            "%s", file_prefix);
     writer->file.name = (char *)fc_malloc(path_len + 32);
     if (writer->file.name == NULL) {
         return ENOMEM;

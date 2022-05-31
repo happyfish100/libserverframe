@@ -23,11 +23,12 @@
 
 #define SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION  1
 
-#define SF_BINLOG_SUBDIR_NAME_SIZE 128
+#define SF_BINLOG_SUBDIR_NAME_SIZE     128
+#define SF_BINLOG_FILE_PREFIX_SIZE      64
 #define SF_BINLOG_DEFAULT_ROTATE_SIZE  (1024 * 1024 * 1024)
 #define SF_BINLOG_NEVER_ROTATE_FILE    0
-#define SF_BINLOG_FILE_PREFIX     "binlog"
-#define SF_BINLOG_FILE_EXT_FMT    ".%06d"
+#define SF_BINLOG_FILE_PREFIX          "binlog"
+#define SF_BINLOG_FILE_EXT_FMT         ".%06d"
 
 #define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).end - (buffer).buff)
 #define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
@@ -36,6 +37,7 @@ typedef struct sf_file_writer_info {
     struct {
         const char *data_path;
         char subdir_name[SF_BINLOG_SUBDIR_NAME_SIZE];
+        char file_prefix[SF_BINLOG_FILE_PREFIX_SIZE];
         int64_t file_rotate_size;
         int max_record_size;
     } cfg;
@@ -66,8 +68,8 @@ typedef struct sf_file_writer_info {
 extern "C" {
 #endif
 
-int sf_file_writer_init(SFFileWriterInfo *writer,
-        const char *data_path, const char *subdir_name,
+int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
+        const char *subdir_name, const char *file_prefix,
         const int buffer_size, const int64_t file_rotate_size);
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
@@ -162,14 +164,20 @@ static inline const char *sf_file_writer_get_filepath(
     return filepath;
 }
 
-static inline const char *sf_file_writer_get_filename(
+static inline const char *sf_file_writer_get_filename_ex(
         const char *data_path, const char *subdir_name,
-        const int binlog_index, char *filename, const int size)
+        const char *file_prefix, const int binlog_index,
+        char *filename, const int size)
 {
-    snprintf(filename, size, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT, data_path,
-            subdir_name, SF_BINLOG_FILE_PREFIX, binlog_index);
+    snprintf(filename, size, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
+            data_path, subdir_name, file_prefix, binlog_index);
     return filename;
 }
+
+#define sf_file_writer_get_filename(data_path, subdir_name, \
+        binlog_index, filename, size) \
+    sf_file_writer_get_filename_ex(data_path, subdir_name, \
+        SF_BINLOG_FILE_PREFIX, binlog_index, filename, size)
 
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size);
