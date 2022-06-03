@@ -263,6 +263,11 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
         sf_file_writer_get_index_filename(data_path, \
                 subdir_name, filename, size)
 
+#define sf_binlog_writer_get_binlog_indexes(data_path, \
+        subdir_name, start_index, last_index) \
+        sf_file_writer_get_binlog_indexes(data_path, \
+                subdir_name, start_index, last_index)
+
 #define sf_binlog_writer_get_binlog_start_index(data_path, \
         subdir_name, start_index) \
         sf_file_writer_get_binlog_start_index(data_path, \

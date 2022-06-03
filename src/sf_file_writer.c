@@ -125,9 +125,17 @@ static int get_binlog_info_from_file(const char *data_path,
 int sf_file_writer_get_binlog_indexes(const char *data_path,
         const char *subdir_name, int *start_index, int *last_index)
 {
+    int result;
     int compress_index;
-    return get_binlog_info_from_file(data_path, subdir_name,
+
+    result = get_binlog_info_from_file(data_path, subdir_name,
             start_index, last_index, &compress_index);
+    if (result == ENOENT) {
+        *start_index = *last_index = 0;
+        return 0;
+    } else {
+        return result;
+    }
 }
 
 static inline int get_binlog_index_from_file(SFFileWriterInfo *writer)
@@ -146,8 +154,9 @@ static inline int get_binlog_index_from_file(SFFileWriterInfo *writer)
         } else {
             return 0;
         }
+    } else {
+        return result;
     }
-    return result;
 }
 
 static int open_writable_binlog(SFFileWriterInfo *writer)
