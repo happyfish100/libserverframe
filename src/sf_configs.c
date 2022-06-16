@@ -119,7 +119,7 @@ int sf_load_read_rule_config_ex(SFDataReadRule *rule,
     return 0;
 }
 
-int sf_load_quorum_config_ex(SFElectionQuorum *quorum,
+int sf_load_election_quorum_config_ex(SFElectionQuorum *quorum,
         IniFullContext *ini_ctx, const SFElectionQuorum def_quorum)
 {
     char *str;
@@ -134,6 +134,31 @@ int sf_load_quorum_config_ex(SFElectionQuorum *quorum,
         *quorum = sf_election_quorum_any;
     } else if (strncasecmp(str, "majority", 8) == 0) {
         *quorum = sf_election_quorum_majority;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, unkown quorum: %s",
+                __LINE__, ini_ctx->filename, str);
+        return EINVAL;
+    }
+
+    return 0;
+}
+
+int sf_load_replication_quorum_config_ex(SFReplicationQuorum *quorum,
+        IniFullContext *ini_ctx, const SFReplicationQuorum def_quorum)
+{
+    char *str;
+
+    str = iniGetStrValue(ini_ctx->section_name,
+            "quorum", ini_ctx->context);
+    if (str == NULL) {
+        *quorum = def_quorum;
+    } else if (strncasecmp(str, "auto", 4) == 0) {
+        *quorum = sf_replication_quorum_auto;
+    } else if (strncasecmp(str, "any", 3) == 0) {
+        *quorum = sf_replication_quorum_any;
+    } else if (strncasecmp(str, "majority", 8) == 0) {
+        *quorum = sf_replication_quorum_majority;
     } else {
         logError("file: "__FILE__", line: %d, "
                 "config file: %s, unkown quorum: %s",

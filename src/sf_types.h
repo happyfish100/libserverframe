@@ -250,4 +250,10 @@ typedef enum sf_election_quorum {
     sf_election_quorum_majority,
 } SFElectionQuorum;
 
+typedef enum sf_replication_quorum {
+    sf_replication_quorum_auto,
+    sf_replication_quorum_any,
+    sf_replication_quorum_majority,
+} SFReplicationQuorum;
+
 #endif
