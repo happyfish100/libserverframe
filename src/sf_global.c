@@ -157,9 +157,9 @@ int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
     }
 
     log_cfg->rotate_everyday = iniGetBoolValueEx(ini_ctx->section_name,
-            "log_file_rotate_everyday", ini_ctx->context, false, true);
+            "log_file_rotate_everyday", ini_ctx->context, true, true);
     log_cfg->keep_days = iniGetIntValueEx(ini_ctx->section_name,
-            "log_file_keep_days", ini_ctx->context, 0, true);
+            "log_file_keep_days", ini_ctx->context, 15, true);
     log_cfg->compress_old = iniGetBoolValueEx(ini_ctx->section_name,
             "log_file_compress_old", ini_ctx->context, false, true);
     log_cfg->compress_days_before = iniGetIntValueEx(ini_ctx->section_name,
