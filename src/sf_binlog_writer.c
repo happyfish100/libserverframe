@@ -217,11 +217,13 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 return ERRNO_THREAD_EXIT;
             case SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION:
                 if (current->writer->order_by !=
-                        SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION)
+                        SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION &&
+                        current->writer->thread->order_mode !=
+                        SF_BINLOG_THREAD_ORDER_MODE_VARY)
                 {
                     logWarning("file: "__FILE__", line: %d, "
-                            "subdir_name: %s, invalid order by: %d != %d, "
-                            "maybe some mistake happen", __LINE__,
+                            "subdir_name: %s, order by: %d != %d, "
+                            "maybe some mistake happen?", __LINE__,
                             current->writer->fw.cfg.subdir_name,
                             current->writer->order_by,
                             SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION);
@@ -239,8 +241,10 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                         __LINE__, current->writer->fw.cfg.subdir_name,
                         current->version.first);
 
-                if (current->writer->version_ctx.next !=
-                        current->version.first)
+                if ((current->writer->order_by ==
+                            SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE) ||
+                        (current->writer->version_ctx.next !=
+                         current->version.first))
                 {
                     binlog_writer_set_next_version(current->writer,
                             current->version.first);

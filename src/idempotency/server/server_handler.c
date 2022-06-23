@@ -189,7 +189,7 @@ IdempotencyRequest *sf_server_update_prepare_and_check(
     }
 
     adheader = (SFProtoIdempotencyAdditionalHeader *)req->body;
-    request = (IdempotencyRequest *)fast_mblock_alloc_object(request_allocator);
+    request = fast_mblock_alloc_object(request_allocator);
     if (request == NULL) {
         *result = ENOMEM;
         return NULL;
