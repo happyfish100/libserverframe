@@ -11,6 +11,8 @@ TOP_HEADERS = sf_types.h sf_global.h sf_define.h sf_nio.h sf_service.h \
               sf_binlog_index.h sf_file_writer.h sf_binlog_writer.h \
               sf_ordered_writer.h sf_buffered_writer.h sf_iov.h
 
+IDEMP_COMMON_HEADER = idempotency/common/idempotency_types.h
+
 IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
                       idempotency/server/server_channel.h  \
                       idempotency/server/request_htable.h  \
@@ -55,11 +57,13 @@ libserverframe.so: $(SHARED_OBJS)
 install:
 	mkdir -p $(TARGET_LIB)
 	mkdir -p $(TARGET_PREFIX)/lib
+	mkdir -p $(TARGET_PREFIX)/include/sf/idempotency/common
 	mkdir -p $(TARGET_PREFIX)/include/sf/idempotency/server
 	mkdir -p $(TARGET_PREFIX)/include/sf/idempotency/client
 
 	install -m 755 $(ALL_LIBS) $(TARGET_LIB)
 	cp -f $(TOP_HEADERS) $(TARGET_PREFIX)/include/sf
+	cp -f $(IDEMP_COMMON_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/common
 	cp -f $(IDEMP_SERVER_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/server
 	cp -f $(IDEMP_CLIENT_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/client
 

@@ -175,7 +175,9 @@ static int save(SFBinlogIndexContext *ctx, const char *filename)
     int i;
     int result;
 
-    if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0) {
+    if ((fd=open(filename, O_WRONLY | O_CREAT | O_TRUNC |
+                    O_CLOEXEC, 0644)) < 0)
+    {
         result = errno != 0 ? errno : EIO;
         logError("file: "__FILE__", line: %d, "
                 "open file %s fail, errno: %d, error info: %s",

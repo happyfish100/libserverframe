@@ -332,11 +332,11 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
         return result;
     }
 
-    if ((result=tcpsetserveropt(*sock, g_sf_global_vars.network_timeout)) != 0) {
+    if ((result=tcpsetserveropt(*sock, SF_G_NETWORK_TIMEOUT)) != 0) {
         return result;
     }
 
-    return 0;
+    return fd_set_cloexec(*sock);
 }
 
 int sf_socket_server_ex(SFContext *sf_context)

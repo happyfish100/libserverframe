@@ -166,8 +166,8 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
     }
 
     GET_BINLOG_FILENAME(writer);
-    writer->file.fd = open(writer->file.name,
-            O_WRONLY | O_CREAT | O_APPEND, 0644);
+    writer->file.fd = open(writer->file.name, O_WRONLY |
+            O_CREAT | O_APPEND | O_CLOEXEC, 0644);
     if (writer->file.fd < 0) {
         logError("file: "__FILE__", line: %d, "
                 "open file \"%s\" fail, "

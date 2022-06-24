@@ -43,7 +43,8 @@ extern "C" {
         int result;
 
         writer->filename = filename;
-        writer->fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        writer->fd = open(filename, O_WRONLY | O_CREAT |
+                O_TRUNC | O_CLOEXEC, 0644);
         if (writer->fd < 0) {
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
