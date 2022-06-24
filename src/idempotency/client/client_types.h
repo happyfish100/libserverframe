@@ -21,6 +21,7 @@
 #include "fastcommon/fast_mblock.h"
 #include "fastcommon/fc_list.h"
 #include "fastcommon/fc_queue.h"
+#include "sf/idempotency/common/idempotency_types.h"
 
 typedef struct idempotency_client_config {
     bool enabled;
@@ -40,11 +41,12 @@ typedef struct idempotency_client_channel {
     volatile char in_ioevent;
     volatile char established;
     int buffer_size;  //the min task size of the server and mine
+    uint32_t server_id;
+    volatile uint32_t next_seq;
     time_t last_connect_time;  //for connect frequency control
     time_t last_pkg_time;      //last communication time
     time_t last_report_time;   //last report time for rpc receipt
     pthread_lock_cond_pair_t lc_pair;  //for channel valid check and notify
-    volatile uint64_t next_req_id;
     struct fast_mblock_man receipt_allocator;
     struct fast_task_info *task;
     struct fc_queue queue;

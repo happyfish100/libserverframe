@@ -46,7 +46,8 @@ struct idempotency_client_channel *idempotency_client_channel_get(
 static inline uint64_t idempotency_client_channel_next_seq_id(
         struct idempotency_client_channel *channel)
 {
-    return __sync_add_and_fetch(&channel->next_req_id, 1);
+    return SF_IDEMPOTENCY_NEXT_REQ_ID(channel->server_id,
+            channel->id, FC_ATOMIC_INC(channel->next_seq));
 }
 
 int idempotency_client_channel_push(struct idempotency_client_channel *channel,

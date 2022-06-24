@@ -271,10 +271,12 @@ static int deal_setup_channel_response(struct fast_task_info *task)
         return 0;
     }
 
-    resp = (SFProtoSetupChannelResp *)(task->data + sizeof(SFCommonProtoHeader));
+    resp = (SFProtoSetupChannelResp *)(task->data +
+            sizeof(SFCommonProtoHeader));
     channel_id = buff2int(resp->channel_id);
     channel_key = buff2int(resp->key);
     buffer_size = buff2int(resp->buffer_size);
+    channel->server_id = buff2int(resp->server_id);
     idempotency_client_channel_set_id_key(channel, channel_id, channel_key);
     if (__sync_bool_compare_and_swap(&channel->established, 0, 1)) {
         thread_ctx = (IdempotencyReceiptThreadContext *)task->thread_data->arg;

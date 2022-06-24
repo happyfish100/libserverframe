@@ -41,8 +41,8 @@
     (task->length - sizeof(SFCommonProtoHeader))
 
 int sf_server_deal_setup_channel(struct fast_task_info *task,
-        int *task_type, IdempotencyChannel **channel,
-        SFResponseInfo *response)
+        int *task_type, const int server_id, IdempotencyChannel
+        **channel, SFResponseInfo *response)
 {
     int result;
     SFProtoSetupChannelReq *req;
@@ -74,13 +74,13 @@ int sf_server_deal_setup_channel(struct fast_task_info *task,
                 "alloc channel fail, hint channel id: %d", channel_id);
         return ENOMEM;
     }
-
     *task_type = SF_SERVER_TASK_TYPE_CHANNEL_HOLDER;
 
     resp = (SFProtoSetupChannelResp *)(task->data +
             sizeof(SFCommonProtoHeader));
     int2buff((*channel)->id, resp->channel_id);
     int2buff((*channel)->key, resp->key);
+    int2buff(server_id, resp->server_id);
     int2buff(task->size, resp->buffer_size);
     response->header.body_len = sizeof(SFProtoSetupChannelResp);
     return 0;
