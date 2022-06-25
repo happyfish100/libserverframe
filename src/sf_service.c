@@ -204,11 +204,14 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             return result;
         }
 
-        if ((result=init_pthread_lock(&thread_data->waiting_queue.lock)) != 0) {
+        if ((result=init_pthread_lock(&thread_data->
+                        waiting_queue.lock)) != 0)
+        {
             return result;
         }
 #if defined(OS_LINUX)
-        FC_NOTIFY_READ_FD(thread_data) = eventfd(0, EFD_NONBLOCK);
+        FC_NOTIFY_READ_FD(thread_data) = eventfd(0,
+                EFD_NONBLOCK | EFD_CLOEXEC);
         if (FC_NOTIFY_READ_FD(thread_data) < 0) {
             result = errno != 0 ? errno : EPERM;
             logError("file: "__FILE__", line: %d, "
@@ -228,10 +231,11 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             break;
         }
         if ((result=fd_add_flags(FC_NOTIFY_READ_FD(thread_data),
-                O_NONBLOCK)) != 0)
+                O_NONBLOCK | FD_CLOEXEC)) != 0)
         {
             break;
         }
+        fd_set_cloexec(FC_NOTIFY_WRITE_FD(thread_data));
 #endif
 
         thread_ctx->sf_context = sf_context;

@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fastcommon/fast_task_queue.h"
+#include "fastcommon/ioevent_loop.h"
 #include "sf_define.h"
 #include "sf_types.h"
 
@@ -97,6 +98,16 @@ static inline int sf_nio_forward_request(struct fast_task_info *task,
 static inline bool sf_client_sock_in_read_stage(struct fast_task_info *task)
 {
     return (task->event.callback == (IOEventCallback)sf_client_sock_read);
+}
+
+static inline void sf_nio_add_to_deleted_list(struct nio_thread_data
+        *thread_data, struct fast_task_info *task)
+{
+    if (task->thread_data == thread_data) {
+        ioevent_add_to_deleted_list(task);
+    } else {
+        sf_nio_notify(task, SF_NIO_STAGE_CLOSE);
+    }
 }
 
 #ifdef __cplusplus
