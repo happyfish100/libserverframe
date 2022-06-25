@@ -45,6 +45,7 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
         *sock = -1;
         return result;
     }
+    FC_SET_CLOEXEC(*sock);
 
     if ((result=connectserverbyip_nb(*sock, ip_addr, port,
                     g_sf_global_vars.connect_timeout)) != 0)

@@ -231,11 +231,12 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             break;
         }
         if ((result=fd_add_flags(FC_NOTIFY_READ_FD(thread_data),
-                O_NONBLOCK | FD_CLOEXEC)) != 0)
+                O_NONBLOCK)) != 0)
         {
             break;
         }
-        fd_set_cloexec(FC_NOTIFY_WRITE_FD(thread_data));
+        FC_SET_CLOEXEC(FC_NOTIFY_READ_FD(thread_data));
+        FC_SET_CLOEXEC(FC_NOTIFY_WRITE_FD(thread_data));
 #endif
 
         thread_ctx->sf_context = sf_context;
@@ -340,7 +341,7 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
         return result;
     }
 
-    return fd_set_cloexec(*sock);
+    return 0;
 }
 
 int sf_socket_server_ex(SFContext *sf_context)
@@ -409,6 +410,7 @@ static void accept_run(struct accept_thread_context *accept_context)
             close(incomesock);
             continue;
         }
+        FC_SET_CLOEXEC(incomesock);
 
         if ((task=sf_alloc_init_task(accept_context->
                         sf_context, incomesock)) == NULL)
