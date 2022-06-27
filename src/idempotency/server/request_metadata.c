@@ -33,8 +33,7 @@ static struct {
 
 #define CHECK_MASTER_METADATA(meta) \
     (meta != NULL && g_current_time - meta->enqueue_time > \
-     g_request_metadata.master_side_timeout && \
-     FC_ATOMIC_GET(meta->reffer_count) == 0)
+     g_request_metadata.master_side_timeout)
 
 static void process_master_side(IdempotencyRequestMetadataContext *ctx)
 {
@@ -69,8 +68,7 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
 }
 
 #define CHECK_SLAVE_METADATA(meta, dv) \
-    (meta != NULL && meta->data_version <= dv && \
-     FC_ATOMIC_GET(meta->reffer_count) == 0)
+    (meta != NULL && meta->data_version <= dv)
 
 static void process_slave_side(IdempotencyRequestMetadataContext *ctx,
         const int64_t data_version)
@@ -152,6 +150,7 @@ int idempotency_request_metadata_init(
     ctx->is_master_callback.arg = arg;
     ctx->list.head = ctx->list.tail = NULL;
 
+    ctx->next = NULL;
     if (g_request_metadata.list.head == NULL) {
         g_request_metadata.list.head = ctx;
     } else {
@@ -193,7 +192,7 @@ int idempotency_request_metadata_start(const int process_interval_ms,
             SF_G_THREAD_STACK_SIZE);
 }
 
-IdempotencyRequestMetadata *idempotency_request_metadata_add(
+int idempotency_request_metadata_add(
         IdempotencyRequestMetadataContext *ctx,
         SFRequestMetadata *metadata)
 {
@@ -208,9 +207,7 @@ IdempotencyRequestMetadata *idempotency_request_metadata_add(
         idemp_meta->req_id = metadata->req_id;
         idemp_meta->data_version = metadata->data_version;
         idemp_meta->enqueue_time = g_current_time;
-        idemp_meta->result = SF_IDEMPOTENCY_REQUEST_PENDING_RESULT;
         idemp_meta->next = NULL;
-        FC_ATOMIC_INC(idemp_meta->reffer_count);
 
         if (ctx->list.head == NULL) {
             ctx->list.head = idemp_meta;
@@ -221,12 +218,15 @@ IdempotencyRequestMetadata *idempotency_request_metadata_add(
     } while (0);
     PTHREAD_MUTEX_UNLOCK(&ctx->lock);
 
-    return idemp_meta;
+    logInfo("add req_id: %"PRId64", data_version: %"PRId64,
+            metadata->req_id, metadata->data_version);
+
+    return (idemp_meta != NULL ? 0 : ENOMEM);
 }
 
 int idempotency_request_metadata_get(
         IdempotencyRequestMetadataContext *ctx,
-        const int64_t req_id, int *err_no)
+        const int64_t req_id, int64_t *data_version)
 {
     int result;
     IdempotencyRequestMetadata *meta;
@@ -237,7 +237,7 @@ int idempotency_request_metadata_get(
     while (meta != NULL) {
         if (req_id == meta->req_id) {
             result = 0;
-            *err_no = FC_ATOMIC_GET(meta->result);
+            *data_version = meta->data_version;
             break;
         }
         meta = meta->next;

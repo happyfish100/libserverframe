@@ -19,16 +19,12 @@
 
 #include "server_types.h"
 
-#define SF_IDEMPOTENCY_REQUEST_PENDING_RESULT   -1
-
 typedef bool (*sf_is_master_callback)(void *arg, int64_t *data_version);
 
 typedef struct idempotency_request_metadata {
     int64_t req_id;
     int64_t data_version;
     time_t enqueue_time;
-    volatile int result;
-    volatile int reffer_count;
     struct idempotency_request_metadata *next;
 } IdempotencyRequestMetadata;
 
@@ -57,21 +53,13 @@ extern "C" {
     int idempotency_request_metadata_start(const int process_interval_ms,
             const int master_side_timeout);
 
-    IdempotencyRequestMetadata *idempotency_request_metadata_add(
+    int idempotency_request_metadata_add(
             IdempotencyRequestMetadataContext *ctx,
             SFRequestMetadata *metadata);
 
-    static inline void idempotency_request_metadata_set_result(
-            IdempotencyRequestMetadata *meta, const int result)
-    {
-        __sync_bool_compare_and_swap(&meta->result,
-                SF_IDEMPOTENCY_REQUEST_PENDING_RESULT, result);
-        FC_ATOMIC_DEC(meta->reffer_count);
-    }
-
     int idempotency_request_metadata_get(
             IdempotencyRequestMetadataContext *ctx,
-            const int64_t req_id, int *err_no);
+            const int64_t req_id, int64_t *data_version);
 
 #ifdef __cplusplus
 }
