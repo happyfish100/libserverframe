@@ -57,6 +57,17 @@ typedef struct idempotency_channel {
     struct idempotency_channel *next;
 } IdempotencyChannel;
 
+typedef struct sf_request_metadata {
+    int64_t req_id;
+    int64_t data_version;
+} SFRequestMetadata;
+
+typedef struct sf_request_metadata_array {
+    SFRequestMetadata *elts;
+    int count;
+    int alloc;
+} SFRequestMetadataArray;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

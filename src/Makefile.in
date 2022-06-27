@@ -17,7 +17,8 @@ IDEMP_SERVER_HEADER = idempotency/server/server_types.h \
                       idempotency/server/server_channel.h  \
                       idempotency/server/request_htable.h  \
                       idempotency/server/channel_htable.h  \
-                      idempotency/server/server_handler.h
+                      idempotency/server/server_handler.h  \
+                      idempotency/server/request_metadata.h
 
 IDEMP_CLIENT_HEADER = idempotency/client/client_types.h    \
                       idempotency/client/receipt_handler.h \
@@ -32,11 +33,12 @@ SHARED_OBJS = sf_nio.lo sf_iov.lo sf_service.lo sf_global.lo \
         sf_connection_manager.lo sf_serializer.lo \
         sf_binlog_index.lo sf_file_writer.lo  \
         sf_binlog_writer.lo sf_ordered_writer.lo \
-        idempotency/server/server_channel.lo  \
-        idempotency/server/request_htable.lo  \
-        idempotency/server/channel_htable.lo  \
-        idempotency/server/server_handler.lo  \
-        idempotency/client/receipt_handler.lo \
+        idempotency/server/server_channel.lo   \
+        idempotency/server/request_htable.lo   \
+        idempotency/server/channel_htable.lo   \
+        idempotency/server/server_handler.lo   \
+        idempotency/server/request_metadata.lo \
+        idempotency/client/receipt_handler.lo  \
         idempotency/client/client_channel.lo
 
 ALL_OBJS = $(SHARED_OBJS)
