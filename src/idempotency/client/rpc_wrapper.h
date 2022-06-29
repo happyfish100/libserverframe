@@ -44,14 +44,14 @@
             &client_ctx->common_cfg.net_retry_cfg.interval_mm,    \
             &client_ctx->common_cfg.net_retry_cfg.network);       \
     \
-    while (1) {  \
-        if (idempotency_enabled) {   \
-            req_id = idempotency_client_channel_next_seq_id(  \
-                    connection_params->channel); \
-        } else {  \
-            req_id = 0;  \
-        }  \
+    if (idempotency_enabled) {   \
+        req_id = idempotency_client_channel_next_seq_id(  \
+                connection_params->channel); \
+    } else {  \
+        req_id = 0;  \
+    }  \
     \
+    while (1) {  \
         old_channel = connection_params != NULL ? \
              connection_params->channel : NULL;   \
         i = 0; \
