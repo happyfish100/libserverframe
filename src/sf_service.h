@@ -142,7 +142,6 @@ static inline struct fast_task_info *sf_alloc_init_task(
 
 static inline void sf_release_task(struct fast_task_info *task)
 {
-    //int reffer_count;
     if (__sync_sub_and_fetch(&task->reffer_count, 1) == 0) {
         /*
         int free_count = free_queue_count();
@@ -153,12 +152,6 @@ static inline void sf_release_task(struct fast_task_info *task)
                 alloc_count, alloc_count - free_count, free_count);
                 */
         free_queue_push(task);
-    } else {
-        /*
-        logInfo("file: "__FILE__", line: %d, "
-                "release task %p, current reffer: %d",
-                __LINE__, task, reffer_count);
-                */
     }
 }
 

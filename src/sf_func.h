@@ -37,7 +37,7 @@ static inline void sf_terminate_myself_ex(const char *file,
 {
     g_sf_global_vars.continue_flag = false;
     if (kill(getpid(), SIGQUIT) == 0) { //signal myself to quit
-        logInfo("file: "__FILE__", line: %d, "
+        logWarning("file: "__FILE__", line: %d, "
                 "kill myself from caller {file: %s, line: %d, func: %s}",
                 __LINE__, file, line, func);
     } else {

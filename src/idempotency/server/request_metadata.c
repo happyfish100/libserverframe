@@ -218,9 +218,6 @@ int idempotency_request_metadata_add(
     } while (0);
     PTHREAD_MUTEX_UNLOCK(&ctx->lock);
 
-    logInfo("add req_id: %"PRId64", data_version: %"PRId64,
-            metadata->req_id, metadata->data_version);
-
     return (idemp_meta != NULL ? 0 : ENOMEM);
 }
 
