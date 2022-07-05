@@ -237,9 +237,9 @@ typedef struct sf_cluster_config {
 
 typedef struct sf_synchronize_context {
     pthread_lock_cond_pair_t lcp;
+    int result;
     union {
         bool finished;
-        int result;
         int waiting_count;
     };
 } SFSynchronizeContext;

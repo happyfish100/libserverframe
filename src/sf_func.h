@@ -117,23 +117,32 @@ static inline void sf_synchronize_counter_wait(SFSynchronizeContext *sctx)
     PTHREAD_MUTEX_UNLOCK(&sctx->lcp.lock);
 }
 
+#define sf_synchronize_finished_notify_no_lock(sctx, err_no) \
+    (sctx)->finished = true;  \
+    (sctx)->result = err_no;  \
+    pthread_cond_signal(&(sctx)->lcp.cond)
+
 static inline void sf_synchronize_finished_notify(
-        SFSynchronizeContext *sctx)
+        SFSynchronizeContext *sctx, const int result)
 {
     PTHREAD_MUTEX_LOCK(&sctx->lcp.lock);
-    sctx->finished = true;
-    pthread_cond_signal(&sctx->lcp.cond);
+    sf_synchronize_finished_notify_no_lock(sctx, result);
     PTHREAD_MUTEX_UNLOCK(&sctx->lcp.lock);
 }
 
-static inline void sf_synchronize_finished_wait(SFSynchronizeContext *sctx)
+static inline int sf_synchronize_finished_wait(SFSynchronizeContext *sctx)
 {
+    int result;
+
     PTHREAD_MUTEX_LOCK(&sctx->lcp.lock);
     while (!sctx->finished && SF_G_CONTINUE_FLAG) {
         pthread_cond_wait(&sctx->lcp.cond, &sctx->lcp.lock);
     }
+    result = sctx->result;
     sctx->finished = false;  //for next notify
     PTHREAD_MUTEX_UNLOCK(&sctx->lcp.lock);
+
+    return result;
 }
 
 #ifdef __cplusplus
