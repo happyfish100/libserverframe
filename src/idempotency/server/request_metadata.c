@@ -32,13 +32,14 @@ static struct {
 
 
 #define CHECK_MASTER_METADATA(meta) \
-    (meta != NULL && g_current_time - meta->enqueue_time > \
+    (meta != NULL && g_current_time - (long)meta->enqueue_time > \
      g_request_metadata.master_side_timeout)
 
 static void process_master_side(IdempotencyRequestMetadataContext *ctx)
 {
     struct fast_mblock_chain chain;
     struct fast_mblock_node *node;
+    int count = 0;
 
     chain.head = chain.tail = NULL;
     PTHREAD_MUTEX_LOCK(&ctx->lock);
@@ -52,6 +53,7 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
             }
             chain.tail = node;
 
+            ++count;
             ctx->list.head = ctx->list.head->next;
         } while (CHECK_MASTER_METADATA(ctx->list.head));
 
@@ -65,6 +67,10 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
         fast_mblock_batch_free(&ctx->allocator, &chain);
     }
     PTHREAD_MUTEX_UNLOCK(&ctx->lock);
+
+    if (count > 0) {
+        logInfo("#######func: %s, deal count: %d", __FUNCTION__, count);
+    }
 }
 
 #define CHECK_SLAVE_METADATA(meta, dv) \
@@ -129,9 +135,8 @@ static void *thread_run(void *arg)
     return NULL;
 }
 
-int idempotency_request_metadata_init(
-        IdempotencyRequestMetadataContext *ctx,
-        sf_is_master_callback is_master_callback, void *arg)
+int idempotency_request_metadata_init(IdempotencyRequestMetadataContext
+        *ctx, sf_is_master_callback is_master_callback, void *arg)
 {
     int result;
 
@@ -192,9 +197,8 @@ int idempotency_request_metadata_start(const int process_interval_ms,
             SF_G_THREAD_STACK_SIZE);
 }
 
-int idempotency_request_metadata_add(
-        IdempotencyRequestMetadataContext *ctx,
-        SFRequestMetadata *metadata)
+int idempotency_request_metadata_add(IdempotencyRequestMetadataContext
+        *ctx, const SFRequestMetadata *metadata, const int n)
 {
     IdempotencyRequestMetadata *idemp_meta;
 
@@ -206,6 +210,7 @@ int idempotency_request_metadata_add(
 
         idemp_meta->req_id = metadata->req_id;
         idemp_meta->data_version = metadata->data_version;
+        idemp_meta->n = n;
         idemp_meta->enqueue_time = g_current_time;
         idemp_meta->next = NULL;
 
@@ -221,9 +226,8 @@ int idempotency_request_metadata_add(
     return (idemp_meta != NULL ? 0 : ENOMEM);
 }
 
-int idempotency_request_metadata_get(
-        IdempotencyRequestMetadataContext *ctx,
-        const int64_t req_id, int64_t *data_version)
+int idempotency_request_metadata_get(IdempotencyRequestMetadataContext
+        *ctx, const int64_t req_id, int64_t *data_version, int *n)
 {
     int result;
     IdempotencyRequestMetadata *meta;
@@ -235,6 +239,9 @@ int idempotency_request_metadata_get(
         if (req_id == meta->req_id) {
             result = 0;
             *data_version = meta->data_version;
+            if (n != NULL) {
+                *n = meta->n;
+            }
             break;
         }
         meta = meta->next;

@@ -24,7 +24,8 @@ typedef bool (*sf_is_master_callback)(void *arg, int64_t *data_version);
 typedef struct idempotency_request_metadata {
     int64_t req_id;
     int64_t data_version;
-    time_t enqueue_time;
+    int n;  //integer argument
+    uint32_t enqueue_time;
     struct idempotency_request_metadata *next;
 } IdempotencyRequestMetadata;
 
@@ -46,20 +47,17 @@ typedef struct idempotency_request_metadata_context {
 extern "C" {
 #endif
 
-    int idempotency_request_metadata_init(
-            IdempotencyRequestMetadataContext *ctx,
-            sf_is_master_callback is_master_callback, void *arg);
+    int idempotency_request_metadata_init(IdempotencyRequestMetadataContext
+            *ctx, sf_is_master_callback is_master_callback, void *arg);
 
     int idempotency_request_metadata_start(const int process_interval_ms,
             const int master_side_timeout);
 
-    int idempotency_request_metadata_add(
-            IdempotencyRequestMetadataContext *ctx,
-            SFRequestMetadata *metadata);
+    int idempotency_request_metadata_add(IdempotencyRequestMetadataContext
+            *ctx, const SFRequestMetadata *metadata, const int n);
 
-    int idempotency_request_metadata_get(
-            IdempotencyRequestMetadataContext *ctx,
-            const int64_t req_id, int64_t *data_version);
+    int idempotency_request_metadata_get(IdempotencyRequestMetadataContext
+            *ctx, const int64_t req_id, int64_t *data_version, int *n);
 
 #ifdef __cplusplus
 }
