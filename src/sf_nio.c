@@ -324,7 +324,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
             if (task->continue_callback != NULL) {
                 return task->continue_callback(task);
             } else {
-                logWarning("file: "__FILE__", line: %d, "
+                logDebug("file: "__FILE__", line: %d, "
                         "task %p, continue_callback is NULL",
                         __LINE__, task);
                 return 0;

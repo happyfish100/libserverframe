@@ -122,7 +122,7 @@ static void *thread_run(void *arg)
                     arg, &data_version))
         {
             process_master_side(ctx);
-        } else {
+        } else if (data_version > 0) {
             process_slave_side(ctx, data_version);
         }
 
