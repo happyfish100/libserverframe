@@ -474,52 +474,89 @@ int sf_file_writer_get_last_lines(const char *data_path,
         char *buff, const int buff_size, int *count, int *length)
 {
     int result;
-    int remain_count;
-    int current_count;
-    int current_index;
-    int i;
+    int target_count;
+    int count1;
     char filename[PATH_MAX];
     string_t lines;
 
-    current_index = current_write_index;
-    *length = 0;
-    remain_count = *count;
-    for (i=0; i<2; i++) {
-        current_count = remain_count;
-        sf_file_writer_get_filename(data_path, subdir_name,
-                current_index, filename, sizeof(filename));
-        if (access(filename, F_OK) == 0) {
-            result = fc_get_last_lines(filename, buff + *length,
-                    buff_size - *length, &lines, &current_count);
-        } else {
-            result = errno != 0 ? errno : EPERM;
+    target_count = *count;
+    sf_file_writer_get_filename(data_path, subdir_name,
+            current_write_index, filename, sizeof(filename));
+    if (access(filename, F_OK) == 0) {
+        if ((result=fc_get_last_lines(filename, buff, buff_size,
+                        &lines, count)) != 0)
+        {
             if (result != ENOENT) {
-                logError("file: "__FILE__", line: %d, "
-                        "stat file %s fail, errno: %d, error info: %s",
-                        __LINE__, filename, result, STRERROR(result));
-                *count = 0;
                 return result;
             }
         }
 
-        if (result == 0) {
-            memmove(buff + *length, lines.str, lines.len);
-            *length += lines.len;
-            remain_count -= current_count;
-            if (remain_count == 0) {
-                break;
-            }
-        } else if (result != ENOENT) {
+        if (*count >= target_count || current_write_index == 0) {
+            memmove(buff, lines.str, lines.len);
+            *length = lines.len;
+            return 0;
+        }
+    } else {
+        result = errno != 0 ? errno : EPERM;
+        if (result == ENOENT) {
             *count = 0;
+            *length = 0;
+            return 0;
+        } else {
+            logError("file: "__FILE__", line: %d, "
+                    "stat file %s fail, errno: %d, error info: %s",
+                    __LINE__, filename, result, STRERROR(result));
+            *count = 0;
+            *length = 0;
             return result;
         }
-        if (current_index == 0) {
-            break;
-        }
-
-        --current_index;  //try previous binlog file
     }
 
-    *count -= remain_count;
+    sf_file_writer_get_filename(data_path, subdir_name,
+            current_write_index - 1, filename, sizeof(filename));
+    if (access(filename, F_OK) != 0) {
+        result = errno != 0 ? errno : EPERM;
+        if (result == ENOENT) {
+            memmove(buff, lines.str, lines.len);
+            *length = lines.len;
+            return 0;
+        } else {
+            logError("file: "__FILE__", line: %d, "
+                    "stat file %s fail, errno: %d, error info: %s",
+                    __LINE__, filename, result, STRERROR(result));
+            *count = 0;
+            *length = 0;
+            return result;
+        }
+    }
+
+    count1 = target_count - *count;
+    if ((result=fc_get_last_lines(filename, buff,
+                    buff_size, &lines, &count1)) != 0)
+    {
+        *count = 0;
+        *length = 0;
+        return result;
+    }
+
+    memmove(buff, lines.str, lines.len);
+    *length = lines.len;
+    if (*count == 0) {
+        *count = count1;
+    } else {
+        sf_file_writer_get_filename(data_path, subdir_name,
+                current_write_index, filename, sizeof(filename));
+        if ((result=fc_get_first_lines(filename, buff + (*length),
+                        buff_size - (*length), &lines, count)) != 0)
+        {
+            *count = 0;
+            *length = 0;
+            return result;
+        }
+
+        *count += count1;
+        *length += lines.len;
+    }
+
     return 0;
 }
