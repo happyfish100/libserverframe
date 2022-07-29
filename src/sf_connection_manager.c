@@ -91,8 +91,8 @@ static ConnectionInfo *get_server_connection(SFConnectionManager *cm,
     addr_array = &server->group_addrs[cm->server_group_index].address_array;
     if ((conn=make_connection(cm, addr_array, err_no)) == NULL) {
         logError("file: "__FILE__", line: %d, "
-                "server id: %d, get_server_connection fail",
-                __LINE__, server->id);
+                "%s server id: %d, get_server_connection fail",
+                __LINE__, cm->module_name, server->id);
     }
     return conn;
 }
@@ -130,8 +130,8 @@ static ConnectionInfo *get_connection(SFConnectionManager *cm,
     }
 
     logError("file: "__FILE__", line: %d, "
-            "data group index: %d, get_connection fail, "
-            "configured server count: %d", __LINE__,
+            "%s data group index: %d, get_connection fail, "
+            "configured server count: %d", __LINE__, cm->module_name,
             group_index, server_array->count);
     return NULL;
 }
@@ -306,8 +306,9 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
     }
 
     logError("file: "__FILE__", line: %d, "
-            "get_master_connection fail, group id: %d, retry count: %d, "
-            "errno: %d", __LINE__, group->id, retry_count, *err_no);
+            "%s get_master_connection fail, group id: %d, "
+            "retry count: %d, " "errno: %d", __LINE__,
+            cm->module_name, group->id, retry_count, *err_no);
     return NULL;
 }
 
@@ -359,8 +360,8 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
     }
 
     logError("file: "__FILE__", line: %d, "
-            "get_readable_connection fail, retry count: %d, errno: %d",
-            __LINE__, retry_count, *err_no);
+            "%s get_readable_connection fail, retry count: %d, errno: %d",
+            __LINE__, cm->module_name, retry_count, *err_no);
     return NULL;
 }
 
@@ -450,10 +451,11 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
     }
 
     logWarning("file: "__FILE__", line: %d, "
-            "get_leader_connection fail, server id: %d, %s:%u, errno: %d",
-            __LINE__, server->id, server->group_addrs[cm->server_group_index].
-            address_array.addrs[0]->conn.ip_addr, server->group_addrs[cm->
-            server_group_index].address_array.addrs[0]->conn.port, *err_no);
+            "%s get_leader_connection fail, server id: %d, %s:%u, errno: %d",
+            __LINE__, cm->module_name, server->id, server->group_addrs
+            [cm->server_group_index].  address_array.addrs[0]->conn.ip_addr,
+            server->group_addrs[cm->server_group_index].address_array.
+            addrs[0]->conn.port, *err_no);
     return NULL;
 }
 
