@@ -159,6 +159,8 @@ int sf_load_replication_quorum_config_ex(SFReplicationQuorum *quorum,
         *quorum = sf_replication_quorum_any;
     } else if (strncasecmp(str, "majority", 8) == 0) {
         *quorum = sf_replication_quorum_majority;
+    } else if (strncasecmp(str, "smart", 5) == 0) {
+        *quorum = sf_replication_quorum_smart;
     } else {
         logError("file: "__FILE__", line: %d, "
                 "config file: %s, unkown quorum: %s",

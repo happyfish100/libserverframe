@@ -137,6 +137,8 @@ static inline const char *sf_get_replication_quorum_caption(
             return "any";
         case sf_replication_quorum_majority:
             return "majority";
+        case sf_replication_quorum_smart:
+            return "smart";
         default:
             return "unknown";
     }
@@ -156,6 +158,7 @@ static inline bool sf_replication_quorum_check(const SFReplicationQuorum
                 return true;  //same as sf_replication_quorum_any
             }
             //continue
+        case sf_replication_quorum_smart:
         case sf_replication_quorum_majority:
             return SF_REPLICATION_QUORUM_MAJORITY(
                     server_count, success_count);
@@ -183,10 +186,11 @@ static inline bool sf_replication_quorum_check(const SFReplicationQuorum
      && server_count % 2 == 0)
 
 #define SF_REPLICATION_QUORUM_NEED_MAJORITY(quorum, server_count) \
-    (server_count > 1 && (quorum == sf_replication_quorum_majority || \
-                          (quorum == sf_replication_quorum_auto && \
-                           server_count % 2 == 1)))
+    (server_count > 1 && (quorum != sf_replication_quorum_any))
 
+#define SF_REPLICATION_QUORUM_NEED_DETECT(quorum, server_count)  \
+    (server_count % 2 == 0 && (quorum == sf_replication_quorum_smart || \
+                               quorum == sf_replication_quorum_auto))
 
 #define SF_NET_RETRY_FINISHED(retry_times, counter, result)  \
         !((SF_IS_RETRIABLE_ERROR(result) && ((retry_times > 0 &&  \
