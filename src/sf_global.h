@@ -205,12 +205,13 @@ void sf_log_config_ex(const char *other_config);
 #define sf_log_config_to_string(log_cfg, caption, output, size)  \
     sf_log_config_to_string_ex(log_cfg, caption, NULL, output, size)
 
+int sf_get_base_path_from_conf_file(const char *config_filename);
 int sf_load_global_base_path(IniFullContext *ini_ctx);
 
 static inline void sf_set_global_base_path(const char *base_path)
 {
-    snprintf(SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR),
-            "%s", base_path);
+    normalize_path(NULL, base_path, SF_G_BASE_PATH_STR,
+            sizeof(SF_G_BASE_PATH_STR));
     SF_G_BASE_PATH_INITED = true;
 }
 

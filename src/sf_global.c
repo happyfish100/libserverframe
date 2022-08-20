@@ -28,6 +28,7 @@
 #include <pwd.h>
 #include "fastcommon/common_define.h"
 #include "fastcommon/shared_func.h"
+#include "fastcommon/process_ctrl.h"
 #include "fastcommon/logger.h"
 #include "sf_nio.h"
 #include "sf_global.h"
@@ -219,13 +220,30 @@ int sf_load_slow_log_config_ex(IniFullContext *ini_ctx, LogContext *log_ctx,
     return 0;
 }
 
+int sf_get_base_path_from_conf_file(const char *config_filename)
+{
+    int result;
+
+    if (SF_G_BASE_PATH_INITED) {
+        return 0;
+    }
+
+    result = get_base_path_from_conf_file(config_filename,
+            SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR));
+    if (result == 0) {
+        SF_G_BASE_PATH_INITED = true;
+    }
+
+    return result;
+}
+
 int sf_load_global_base_path(IniFullContext *ini_ctx)
 {
     char *pBasePath;
 
-    if (!g_sf_global_vars.base_path.inited) {
+    if (!SF_G_BASE_PATH_INITED) {
         pBasePath = iniGetStrValue(NULL, "base_path", ini_ctx->context);
-        if (pBasePath == NULL) {
+        if (pBasePath == NULL || *pBasePath == '\0') {
             logError("file: "__FILE__", line: %d, "
                     "conf file \"%s\" must have item "
                     "\"base_path\"!", __LINE__, ini_ctx->filename);
