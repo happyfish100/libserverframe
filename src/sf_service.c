@@ -121,6 +121,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         ThreadLoopCallback thread_loop_callback,
         sf_accept_done_callback accept_done_callback,
         sf_set_body_length_callback set_body_length_func,
+        sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_arg_size,
@@ -141,8 +142,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
                     min_buff_size < g_sf_global_vars.max_buff_size;
     sf_context->accept_done_func = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size,
-            set_body_length_func, deal_func, task_cleanup_func,
-            timeout_callback, release_buffer_callback);
+            set_body_length_func, alloc_recv_buffer_func,
+            deal_func, task_cleanup_func, timeout_callback,
+            release_buffer_callback);
 
     if ((result=sf_init_free_queues(task_arg_size, init_callback)) != 0) {
         return result;

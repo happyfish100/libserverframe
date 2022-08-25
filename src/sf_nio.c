@@ -45,12 +45,14 @@
 
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
+        sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
         release_buffer_callback)
 {
     sf_context->header_size = header_size;
     sf_context->set_body_length = set_body_length_func;
+    sf_context->alloc_recv_buffer = alloc_recv_buffer_func;
     sf_context->deal_task = deal_func;
     sf_context->task_cleanup_func = cleanup_func;
     sf_context->timeout_callback = timeout_callback;
@@ -525,11 +527,13 @@ int sf_client_sock_read(int sock, short event, void *arg)
             task->network_timeout);
         if (task->length == 0) { //recv header
             recv_bytes = SF_CTX->header_size - task->offset;
+            bytes = read(sock, task->data + task->offset, recv_bytes);
         } else {
             recv_bytes = task->length - task->offset;
+            bytes = read(sock, task->recv_body + (task->offset -
+                        SF_CTX->header_size), recv_bytes);
         }
 
-        bytes = read(sock, task->data + task->offset, recv_bytes);
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 break;
@@ -609,35 +613,44 @@ int sf_client_sock_read(int sock, short event, void *arg)
                 return -1;
             }
 
-            if (task->length > task->size) {
-                int old_size;
-
-                if (!SF_CTX->realloc_task_buffer) {
-                    logError("file: "__FILE__", line: %d, "
-                            "client ip: %s, pkg length: %d exceeds "
-                            "task size: %d, but realloc buffer disabled",
-                            __LINE__, task->client_ip, task->size,
-                            task->length);
-
+            if (SF_CTX->alloc_recv_buffer != NULL) {
+                if ((task->recv_body=SF_CTX->alloc_recv_buffer(task)) == NULL) {
                     ioevent_add_to_deleted_list(task);
                     return -1;
                 }
+            } else {
+                if (task->length > task->size) {
+                    int old_size;
 
-                old_size = task->size;
-                if (free_queue_realloc_buffer(task, task->length) != 0) {
-                    logError("file: "__FILE__", line: %d, "
-                            "client ip: %s, realloc buffer size "
-                            "from %d to %d fail", __LINE__,
-                            task->client_ip, task->size, task->length);
+                    if (!SF_CTX->realloc_task_buffer) {
+                        logError("file: "__FILE__", line: %d, "
+                                "client ip: %s, pkg length: %d exceeds "
+                                "task size: %d, but realloc buffer disabled",
+                                __LINE__, task->client_ip, task->size,
+                                task->length);
 
-                    ioevent_add_to_deleted_list(task);
-                    return -1;
+                        ioevent_add_to_deleted_list(task);
+                        return -1;
+                    }
+
+                    old_size = task->size;
+                    if (free_queue_realloc_buffer(task, task->length) != 0) {
+                        logError("file: "__FILE__", line: %d, "
+                                "client ip: %s, realloc buffer size "
+                                "from %d to %d fail", __LINE__,
+                                task->client_ip, task->size, task->length);
+
+                        ioevent_add_to_deleted_list(task);
+                        return -1;
+                    }
+
+                    logDebug("file: "__FILE__", line: %d, "
+                            "client ip: %s, task length: %d, realloc buffer "
+                            "size from %d to %d", __LINE__, task->client_ip,
+                            task->length, old_size, task->size);
                 }
 
-                logDebug("file: "__FILE__", line: %d, "
-                        "client ip: %s, task length: %d, realloc buffer size "
-                        "from %d to %d", __LINE__, task->client_ip,
-                        task->length, old_size, task->size);
+                task->recv_body = task->data + SF_CTX->header_size;
             }
         }
 

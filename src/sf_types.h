@@ -37,6 +37,7 @@
 typedef void (*sf_accept_done_callback)(struct fast_task_info *task,
         const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
+typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task);
 typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 
@@ -65,6 +66,7 @@ typedef struct sf_context {
     bool realloc_task_buffer;
     sf_deal_task_func deal_task;
     sf_set_body_length_callback set_body_length;
+    sf_alloc_recv_buffer_callback alloc_recv_buffer;
     sf_accept_done_callback accept_done_func;
     TaskCleanUpCallback task_cleanup_func;
     sf_recv_timeout_callback timeout_callback;
