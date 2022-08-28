@@ -37,7 +37,8 @@
 typedef void (*sf_accept_done_callback)(struct fast_task_info *task,
         const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
-typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task);
+typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
+        const int buff_size, bool *new_alloc);
 typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 

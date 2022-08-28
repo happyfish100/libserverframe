@@ -16,9 +16,11 @@
 #ifndef _SF_SHARED_MBUFFER_H__
 #define _SF_SHARED_MBUFFER_H__
 
-#include "fastcommon/fast_allocator.h"
+#include "fastcommon/fc_list.h"
+#include "fastcommon/fast_task_queue.h"
 #include "fastcommon/shared_func.h"
 #include "fastcommon/logger.h"
+#include "fastcommon/fast_allocator.h"
 
 typedef struct sf_shared_mbuffer_context {
     struct fast_allocator_context allocator;
@@ -68,6 +70,10 @@ static inline SFSharedMBuffer *sf_shared_mbuffer_alloc_ex(
         fc_sleep_ms(sleep_ms);
     }
 
+    logInfo("file: "__FILE__", line: %d, "
+            "alloc shared buffer: %p, buff: %p",
+            __LINE__, buffer, buffer->buff);
+
     if (init_reffer_count > 0) {
         __sync_add_and_fetch(&buffer->reffer_count, init_reffer_count);
     }
@@ -82,12 +88,18 @@ static inline void sf_shared_mbuffer_hold(SFSharedMBuffer *buffer)
 static inline void sf_shared_mbuffer_release(SFSharedMBuffer *buffer)
 {
     if (__sync_sub_and_fetch(&buffer->reffer_count, 1) == 0) {
-        /*
-        logDebug("file: "__FILE__", line: %d, "
+        logInfo("file: "__FILE__", line: %d, "
                 "free shared buffer: %p", __LINE__, buffer);
-                */
         fast_allocator_free(&buffer->ctx->allocator, buffer);
     }
+}
+
+static inline void sf_release_task_shared_mbuffer(struct fast_task_info *task)
+{
+    SFSharedMBuffer *mbuffer;
+    mbuffer = fc_list_entry(task->recv_body, SFSharedMBuffer, buff);
+    sf_shared_mbuffer_release(mbuffer);
+    task->recv_body = NULL;
 }
 
 #ifdef __cplusplus

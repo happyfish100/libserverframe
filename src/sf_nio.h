@@ -26,6 +26,8 @@
 #include "sf_define.h"
 #include "sf_types.h"
 
+#define SF_CTX  ((SFContext *)(task->ctx))
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -293,7 +293,11 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     ctx->request.header.body_len = task->length - sizeof(SFCommonProtoHeader);
     ctx->request.header.status = buff2short(((SFCommonProtoHeader *)
                 task->data)->status);
-    ctx->request.body = task->data + sizeof(SFCommonProtoHeader);
+    if (task->recv_body != NULL) {
+        ctx->request.body = task->recv_body;
+    } else {
+        ctx->request.body = task->data + sizeof(SFCommonProtoHeader);
+    }
 }
 
 static inline void sf_log_network_error_ex1(SFResponseInfo *response,

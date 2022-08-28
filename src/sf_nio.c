@@ -41,8 +41,6 @@
 #include "sf_service.h"
 #include "sf_nio.h"
 
-#define SF_CTX  ((SFContext *)(task->ctx))
-
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
@@ -480,6 +478,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
     int bytes;
     int recv_bytes;
     int total_read;
+    bool new_alloc;
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
@@ -530,8 +529,12 @@ int sf_client_sock_read(int sock, short event, void *arg)
             bytes = read(sock, task->data + task->offset, recv_bytes);
         } else {
             recv_bytes = task->length - task->offset;
-            bytes = read(sock, task->recv_body + (task->offset -
-                        SF_CTX->header_size), recv_bytes);
+            if (task->recv_body == NULL) {
+                bytes = read(sock, task->data + task->offset, recv_bytes);
+            } else {
+                bytes = read(sock, task->recv_body + (task->offset -
+                            SF_CTX->header_size), recv_bytes);
+            }
         }
 
         if (bytes < 0) {
@@ -614,11 +617,18 @@ int sf_client_sock_read(int sock, short event, void *arg)
             }
 
             if (SF_CTX->alloc_recv_buffer != NULL) {
-                if ((task->recv_body=SF_CTX->alloc_recv_buffer(task)) == NULL) {
+                task->recv_body = SF_CTX->alloc_recv_buffer(task,
+                        task->length - SF_CTX->header_size, &new_alloc);
+                if (new_alloc && task->recv_body == NULL) {
+                    logInfo("recv_body is NULL!!!!!!!!!!!!!!!!!");
                     ioevent_add_to_deleted_list(task);
                     return -1;
                 }
             } else {
+                new_alloc = false;
+            }
+
+            if (!new_alloc) {
                 if (task->length > task->size) {
                     int old_size;
 
@@ -649,8 +659,6 @@ int sf_client_sock_read(int sock, short event, void *arg)
                             "size from %d to %d", __LINE__, task->client_ip,
                             task->length, old_size, task->size);
                 }
-
-                task->recv_body = task->data + SF_CTX->header_size;
             }
         }
 
