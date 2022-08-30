@@ -21,7 +21,6 @@ static int sf_shared_mbuffer_alloc_init(void *element, void *args)
 
     buffer = (SFSharedMBuffer *)((char *)element +
             sizeof(struct fast_allocator_wrapper));
-    buffer->buff = (char *)(buffer + 1);
     buffer->ctx = (SFSharedMBufferContext *)args;
     return 0;
 }

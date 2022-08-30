@@ -620,7 +620,6 @@ int sf_client_sock_read(int sock, short event, void *arg)
                 task->recv_body = SF_CTX->alloc_recv_buffer(task,
                         task->length - SF_CTX->header_size, &new_alloc);
                 if (new_alloc && task->recv_body == NULL) {
-                    logInfo("recv_body is NULL!!!!!!!!!!!!!!!!!");
                     ioevent_add_to_deleted_list(task);
                     return -1;
                 }

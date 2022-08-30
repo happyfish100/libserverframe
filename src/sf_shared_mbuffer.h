@@ -27,10 +27,10 @@ typedef struct sf_shared_mbuffer_context {
 } SFSharedMBufferContext;
 
 typedef struct sf_shared_mbuffer {
-    char *buff;
     int length;
     volatile int reffer_count;
     SFSharedMBufferContext *ctx;
+    char buff[0];  //must be last
 } SFSharedMBuffer;
 
 #ifdef __cplusplus
