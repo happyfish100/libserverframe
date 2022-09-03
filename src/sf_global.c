@@ -104,7 +104,7 @@ static int load_network_parameters(IniFullContext *ini_ctx,
         g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
     } else {
         g_sf_global_vars.min_buff_size = iniGetByteCorrectValueEx(ini_ctx,
-            "min_buff_size", SF_DEF_MIN_BUFF_SIZE, 1, 8192,
+            "min_buff_size", SF_DEF_MIN_BUFF_SIZE, 1, 4096,
             SF_MAX_NETWORK_BUFF_SIZE, true);
         g_sf_global_vars.max_buff_size = iniGetByteCorrectValueEx(ini_ctx,
             "max_buff_size", SF_DEF_MAX_BUFF_SIZE, 1, 8192,

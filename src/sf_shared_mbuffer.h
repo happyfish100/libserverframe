@@ -70,13 +70,16 @@ static inline SFSharedMBuffer *sf_shared_mbuffer_alloc_ex(
         fc_sleep_ms(sleep_ms);
     }
 
-    logInfo("file: "__FILE__", line: %d, "
-            "alloc shared buffer: %p, buff: %p",
-            __LINE__, buffer, buffer->buff);
-
     if (init_reffer_count > 0) {
         __sync_add_and_fetch(&buffer->reffer_count, init_reffer_count);
     }
+
+    /*
+    logInfo("file: "__FILE__", line: %d, "
+            "alloc shared buffer: %p, buff: %p, reffer_count: %d",
+            __LINE__, buffer, buffer->buff, __sync_add_and_fetch(&buffer->reffer_count, 0));
+            */
+
     return buffer;
 }
 
@@ -88,8 +91,10 @@ static inline void sf_shared_mbuffer_hold(SFSharedMBuffer *buffer)
 static inline void sf_shared_mbuffer_release(SFSharedMBuffer *buffer)
 {
     if (__sync_sub_and_fetch(&buffer->reffer_count, 1) == 0) {
+        /*
         logInfo("file: "__FILE__", line: %d, "
                 "free shared buffer: %p", __LINE__, buffer);
+                */
         fast_allocator_free(&buffer->ctx->allocator, buffer);
     }
 }
