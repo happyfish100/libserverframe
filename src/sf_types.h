@@ -34,13 +34,15 @@
 #define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
 #define SF_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
-typedef void (*sf_accept_done_callback)(struct fast_task_info *task,
-        const bool bInnerPort);
+typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
+        const in_addr_t client_addr, const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
 typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
         const int buff_size, bool *new_alloc);
 typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
+typedef int (*sf_send_done_callback)(struct fast_task_info *task,
+        const int length);
 
 /* calback for release iovec buffer */
 typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
@@ -69,6 +71,7 @@ typedef struct sf_context {
     sf_set_body_length_callback set_body_length;
     sf_alloc_recv_buffer_callback alloc_recv_buffer;
     sf_accept_done_callback accept_done_func;
+    sf_send_done_callback send_done_callback;
     TaskCleanUpCallback task_cleanup_func;
     sf_recv_timeout_callback timeout_callback;
     sf_release_buffer_callback release_buffer_callback;

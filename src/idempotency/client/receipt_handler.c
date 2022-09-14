@@ -493,7 +493,7 @@ static int do_init()
 
     return sf_service_init_ex2(&g_sf_context, "idemp-receipt",
             receipt_alloc_thread_extra_data, receipt_thread_loop_callback,
-            NULL, sf_proto_set_body_length, NULL, receipt_deal_task,
+            NULL, sf_proto_set_body_length, NULL, NULL, receipt_deal_task,
             receipt_task_finish_cleanup, receipt_recv_timeout_callback,
             1000, sizeof(SFCommonProtoHeader), 0, receipt_init_task, NULL);
 }

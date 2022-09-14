@@ -44,6 +44,7 @@
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
+        sf_send_done_callback send_done_callback,
         sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
         release_buffer_callback)
@@ -51,6 +52,7 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
     sf_context->header_size = header_size;
     sf_context->set_body_length = set_body_length_func;
     sf_context->alloc_recv_buffer = alloc_recv_buffer_func;
+    sf_context->send_done_callback = send_done_callback;
     sf_context->deal_task = deal_func;
     sf_context->task_cleanup_func = cleanup_func;
     sf_context->timeout_callback = timeout_callback;
@@ -680,6 +682,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
     int result;
     int bytes;
     int total_write;
+    int length;
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
@@ -724,10 +727,9 @@ int sf_client_sock_write(int sock, short event, void *arg)
                 continue;
             } else {
                 logWarning("file: "__FILE__", line: %d, "
-                    "client ip: %s, send fail, "
-                    "errno: %d, error info: %s",
-                    __LINE__, task->client_ip,
-                    errno, strerror(errno));
+                    "client ip: %s, send fail, task offset: %d, length: %d, "
+                    "errno: %d, error info: %s", __LINE__, task->client_ip,
+                    task->offset, task->length, errno, strerror(errno));
 
                 ioevent_add_to_deleted_list(task);
                 return -1;
@@ -747,11 +749,20 @@ int sf_client_sock_write(int sock, short event, void *arg)
         if (task->offset >= task->length) {
             release_iovec_buffer(task);
 
+            length = task->length;
             task->offset = 0;
             task->length = 0;
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }
+
+            if (SF_CTX->send_done_callback != NULL) {
+                if (SF_CTX->send_done_callback(task, length) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
+            }
+
             break;
         }
 

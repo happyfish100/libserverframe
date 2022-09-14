@@ -122,6 +122,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_accept_done_callback accept_done_callback,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
+        sf_send_done_callback send_done_callback,
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_arg_size,
@@ -143,8 +144,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     sf_context->accept_done_func = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size,
             set_body_length_func, alloc_recv_buffer_func,
-            deal_func, task_cleanup_func, timeout_callback,
-            release_buffer_callback);
+            send_done_callback, deal_func, task_cleanup_func,
+            timeout_callback, release_buffer_callback);
 
     if ((result=sf_init_free_queues(task_arg_size, init_callback)) != 0) {
         return result;
@@ -427,9 +428,15 @@ static void accept_run(struct accept_thread_context *accept_context)
         task->thread_data = accept_context->sf_context->thread_data +
             incomesock % accept_context->sf_context->work_threads;
         if (accept_context->sf_context->accept_done_func != NULL) {
-            accept_context->sf_context->accept_done_func(task,
-                    accept_context->server_sock ==
-                    accept_context->sf_context->inner_sock);
+            if (accept_context->sf_context->accept_done_func(task,
+                        inaddr.sin_addr.s_addr,
+                        accept_context->server_sock ==
+                        accept_context->sf_context->inner_sock) != 0)
+            {
+                close(incomesock);
+                sf_release_task(task);
+                continue;
+            }
         }
 
         if (sf_nio_notify(task, SF_NIO_STAGE_INIT) != 0) {

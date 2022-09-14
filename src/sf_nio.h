@@ -35,6 +35,7 @@ extern "C" {
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
+        sf_send_done_callback send_done_callback,
         sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
         release_buffer_callback);
