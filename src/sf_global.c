@@ -46,7 +46,7 @@ SFGlobalVariables g_sf_global_vars = {
 SFContext g_sf_context = {
     {'\0'}, NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
     {'\0'}, {'\0'}, 0, true, true, NULL, NULL, NULL, NULL,
-    sf_task_finish_clean_up, NULL
+    NULL, sf_task_finish_clean_up, NULL
 };
 
 static inline void set_config_str_value(const char *value,
@@ -60,6 +60,7 @@ static inline void set_config_str_value(const char *value,
 }
 
 static int load_network_parameters(IniFullContext *ini_ctx,
+        const char *max_pkg_size_item_nm,
         const int task_buffer_extra_size)
 {
     int result;
@@ -93,7 +94,7 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     }
 
     g_sf_global_vars.max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
-            "max_pkg_size", SF_DEF_MAX_PACKAGE_SIZE, 1, 8192,
+            max_pkg_size_item_nm, SF_DEF_MAX_PACKAGE_SIZE, 1, 8192,
             SF_MAX_NETWORK_BUFF_SIZE, true);
     pMinBuffSize = iniGetStrValueEx(ini_ctx->section_name,
             "min_buff_size", ini_ctx->context, true);
@@ -271,7 +272,8 @@ int sf_load_global_base_path(IniFullContext *ini_ctx)
 
 int sf_load_global_config_ex(const char *server_name,
         IniFullContext *ini_ctx, const bool load_network_params,
-        const int task_buffer_extra_size)
+        const char *max_pkg_size_item_nm, const int task_buffer_extra_size,
+        const bool need_set_run_by)
 {
     int result;
     const char *old_section_name;
@@ -287,7 +289,7 @@ int sf_load_global_config_ex(const char *server_name,
             "tcp_quick_ack", ini_ctx->context, true);
     tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
     if (load_network_params) {
-        if ((result=load_network_parameters(ini_ctx,
+        if ((result=load_network_parameters(ini_ctx, max_pkg_size_item_nm,
                         task_buffer_extra_size)) != 0)
         {
             return result;
@@ -350,10 +352,12 @@ int sf_load_global_config_ex(const char *server_name,
         g_sf_global_vars.run_by_uid = pUser->pw_uid;
     }
 
-    if ((result=set_run_by(g_sf_global_vars.run_by_group,
-                    g_sf_global_vars.run_by_user)) != 0)
-    {
-        return result;
+    if (need_set_run_by) {
+        if ((result=set_run_by(g_sf_global_vars.run_by_group,
+                        g_sf_global_vars.run_by_user)) != 0)
+        {
+            return result;
+        }
     }
 
     g_sf_global_vars.thread_stack_size = iniGetByteCorrectValueEx(ini_ctx,
@@ -379,12 +383,13 @@ int sf_load_global_config_ex(const char *server_name,
     return 0;
 }
 
-int sf_load_config_ex(const char *server_name, SFContextIniConfig
-        *config, const int task_buffer_extra_size)
+int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
+        const int task_buffer_extra_size, const bool need_set_run_by)
 {
     int result;
     if ((result=sf_load_global_config_ex(server_name, &config->ini_ctx,
-                    true, task_buffer_extra_size)) != 0)
+                    true, config->max_pkg_size_item_name,
+                    task_buffer_extra_size, need_set_run_by)) != 0)
     {
         return result;
     }
@@ -539,12 +544,14 @@ void sf_slow_log_config_to_string(SFSlowLogConfig *slow_log_cfg,
             slow_log_buff, output, size);
 }
 
-void sf_global_config_to_string(char *output, const int size)
+void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
+        char *output, const int size)
 {
     int len;
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
+    char pkg_buff[256];
 
     max_pkg_size = g_sf_global_vars.max_pkg_size -
         g_sf_global_vars.task_buffer_extra_size;
@@ -552,23 +559,31 @@ void sf_global_config_to_string(char *output, const int size)
         g_sf_global_vars.task_buffer_extra_size;
     max_buff_size = g_sf_global_vars.max_buff_size -
         g_sf_global_vars.task_buffer_extra_size;
+
+    if (min_buff_size == max_buff_size && max_pkg_size == max_buff_size) {
+        snprintf(pkg_buff, sizeof(pkg_buff), "%s=%d KB",
+                max_pkg_size_item_nm, max_pkg_size / 1024);
+    } else {
+        snprintf(pkg_buff, sizeof(pkg_buff), "%s=%d KB, "
+                "min_buff_size=%d KB, max_buff_size=%d KB",
+                max_pkg_size_item_nm, max_pkg_size / 1024,
+                min_buff_size / 1024, max_buff_size / 1024);
+    }
+
     len = snprintf(output, size,
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%d KB, "
-            "max_pkg_size=%d KB, min_buff_size=%d KB, "
-            "max_buff_size=%d KB, tcp_quick_ack=%d, log_level=%s, "
+            "%s, tcp_quick_ack=%d, log_level=%s, "
             "run_by_group=%s, run_by_user=%s, ", SF_G_BASE_PATH_STR,
             g_sf_global_vars.max_connections,
             g_sf_global_vars.connect_timeout,
             g_sf_global_vars.network_timeout,
             g_sf_global_vars.thread_stack_size / 1024,
-            max_pkg_size / 1024, min_buff_size / 1024,
-            max_buff_size / 1024,
-            g_sf_global_vars.tcp_quick_ack,
+            pkg_buff, g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
             g_sf_global_vars.run_by_group,
             g_sf_global_vars.run_by_user
-                );
+            );
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,
             "error-log", output + len, size - len);

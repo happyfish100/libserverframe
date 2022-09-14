@@ -199,8 +199,13 @@ const char *sf_parse_daemon_mode_and_action_ex(int argc, char *argv[],
             } else {
                 proc_name = argv[0];
             }
-            printf("\n%s V%d.%d.%d\n\n", proc_name, version->major,
-                    version->minor, version->patch);
+            if (version->patch > 0) {
+                printf("\n%s V%d.%d.%d\n\n", proc_name, version->major,
+                        version->minor, version->patch);
+            } else {
+                printf("\n%s V%d.%02d\n\n", proc_name,
+                        version->major, version->minor);
+            }
             return NULL;
         }
         if (strcmp(argv[i], "-h") == 0 ||
