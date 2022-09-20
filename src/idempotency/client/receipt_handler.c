@@ -68,9 +68,9 @@ static int receipt_recv_timeout_callback(struct fast_task_info *task)
                 __LINE__, task->server_ip, task->port);
     } else {
         logError("file: "__FILE__", line: %d, "
-                "communication with server %s:%u timeout, "
-                "channel established: %d", __LINE__,
-                task->server_ip, task->port,
+                "%s server %s:%u timeout, channel established: %d",
+                __LINE__, task->nio_stages.current == SF_NIO_STAGE_SEND ?
+                "send to" : "recv from", task->server_ip, task->port,
                 FC_ATOMIC_GET(channel->established));
     }
 
