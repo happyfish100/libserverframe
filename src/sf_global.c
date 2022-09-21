@@ -229,17 +229,27 @@ int sf_get_base_path_from_conf_file(const char *config_filename)
         return 0;
     }
 
-    result = get_base_path_from_conf_file(config_filename,
-            SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR));
-    if (result == 0) {
-        SF_G_BASE_PATH_INITED = true;
+    result = get_base_path_from_conf_file_ex(config_filename,
+            SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR), LOG_NOTHING);
+    if (result != 0) {
+        if (result == ENOENT) {
+            if ((result=fc_check_mkdir_ex(SF_G_BASE_PATH_STR,
+                            0775, &SF_G_BASE_PATH_CREATED)) != 0)
+            {
+                return result;
+            }
+        } else {
+            return result;
+        }
     }
 
-    return result;
+    SF_G_BASE_PATH_INITED = true;
+    return 0;
 }
 
 int sf_load_global_base_path(IniFullContext *ini_ctx)
 {
+    int result;
     char *pBasePath;
 
     if (!SF_G_BASE_PATH_INITED) {
@@ -255,10 +265,11 @@ int sf_load_global_base_path(IniFullContext *ini_ctx)
 
     chopPath(SF_G_BASE_PATH_STR);
     if (!fileExists(SF_G_BASE_PATH_STR)) {
-        logError("file: "__FILE__", line: %d, "
-                "\"%s\" can't be accessed, error info: %s",
-                __LINE__, SF_G_BASE_PATH_STR, strerror(errno));
-        return errno != 0 ? errno : ENOENT;
+        if ((result=fc_check_mkdir_ex(SF_G_BASE_PATH_STR, 0775,
+                        &SF_G_BASE_PATH_CREATED)) != 0)
+        {
+            return result;
+        }
     }
     if (!isDir(SF_G_BASE_PATH_STR)) {
         logError("file: "__FILE__", line: %d, "
@@ -350,6 +361,10 @@ int sf_load_global_config_ex(const char *server_name,
         }
 
         g_sf_global_vars.run_by_uid = pUser->pw_uid;
+    }
+
+    if (SF_G_BASE_PATH_CREATED) {
+        SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(SF_G_BASE_PATH_STR);
     }
 
     if (need_set_run_by) {

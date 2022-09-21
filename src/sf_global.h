@@ -35,6 +35,7 @@ typedef struct sf_global_variables {
     struct {
         char str[MAX_PATH_SIZE];
         bool inited;
+        bool created;
     } base_path;
 
     volatile bool continue_flag;
@@ -75,6 +76,7 @@ extern SFContext                 g_sf_context;
 
 #define SF_G_BASE_PATH_STR       g_sf_global_vars.base_path.str
 #define SF_G_BASE_PATH_INITED    g_sf_global_vars.base_path.inited
+#define SF_G_BASE_PATH_CREATED   g_sf_global_vars.base_path.created
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
