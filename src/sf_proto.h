@@ -332,10 +332,15 @@ static inline void sf_log_network_error_ex1(SFResponseInfo *response,
     sf_log_network_error_ex1(response, conn, service_name, result, \
             LOG_ERR, __FILE__, __LINE__)
 
-#define sf_log_network_error_for_update(response, conn, service_name, result) \
-        sf_log_network_error_ex(response, conn, service_name, result,         \
+#define sf_log_network_error_for_update_ex(response, \
+        conn, service_name, result, file, line) \
+        sf_log_network_error_ex1(response, conn, service_name, result, \
                 (result == SF_RETRIABLE_ERROR_CHANNEL_INVALID) ? \
-                LOG_DEBUG : LOG_ERR)
+                LOG_DEBUG : LOG_ERR, file, line)
+
+#define sf_log_network_error_for_update(response, conn, service_name, result) \
+    sf_log_network_error_for_update_ex(response, conn, \
+            service_name, result, __FILE__, __LINE__)
 
 #define sf_log_network_error_for_delete(response, conn, \
         service_name, result, enoent_log_level)  \
