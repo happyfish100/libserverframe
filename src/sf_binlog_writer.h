@@ -34,6 +34,7 @@
 #define SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX   3
 #define SF_BINLOG_BUFFER_TYPE_ROTATE_FILE       4
 #define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       5
+#define SF_BINLOG_BUFFER_TYPE_FLUSH_FILE        6
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -66,7 +67,8 @@ typedef struct binlog_writer_thread {
     char name[64];
     volatile bool running;
     bool use_fixed_buffer_size;
-    short order_mode;
+    bool passive_write;
+    char order_mode;
     struct {
         struct sf_binlog_writer_info *head;
         struct sf_binlog_writer_info *tail;
@@ -113,7 +115,7 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
         const int max_record_size, const int writer_count,
-        const bool use_fixed_buffer_size);
+        const bool use_fixed_buffer_size, const bool passive_write);
 
 #define sf_binlog_writer_init_normal(writer,  \
         data_path, subdir_name, buffer_size)  \
@@ -129,7 +131,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
 #define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
             SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
-            max_record_size, 1, true)
+            max_record_size, 1, true, false)
 
 static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
@@ -186,7 +188,15 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);
 
+static inline int64_t sf_binlog_writer_get_next_version(
+        SFBinlogWriterInfo *writer)
+{
+    return writer->version_ctx.next;
+}
+
 int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer);
+
+int sf_binlog_writer_flush_file(SFBinlogWriterInfo *writer);
 
 int sf_binlog_writer_change_write_index(SFBinlogWriterInfo *writer,
         const int write_index);

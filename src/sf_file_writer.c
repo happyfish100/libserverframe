@@ -282,7 +282,14 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
         return 0;
     }
 
-    result = check_write_to_file(writer, writer->binlog_buffer.buff, len);
+    if ((result=check_write_to_file(writer, writer->
+                    binlog_buffer.buff, len)) == 0)
+    {
+        if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
+            writer->last_versions.done = writer->last_versions.pending;
+        }
+    }
+
     writer->binlog_buffer.end = writer->binlog_buffer.buff;
     return result;
 }

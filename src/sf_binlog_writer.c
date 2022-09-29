@@ -168,9 +168,6 @@ static inline int flush_writer_files(SFBinlogWriterThread *thread)
             return result;
         }
 
-        if (writer->fw.flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
-            writer->fw.last_versions.done = writer->fw.last_versions.pending;
-        }
         writer->flush.in_queue = false;
         writer = writer->flush.next;
     }
@@ -202,6 +199,11 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                                 writer->fw, current->writer->fw.binlog.
                                 last_index + 1)) != 0)
                 {
+                    return result;
+                }
+                break;
+            case SF_BINLOG_BUFFER_TYPE_FLUSH_FILE:
+                if ((result=flush_writer_files(thread)) != 0) {
                     return result;
                 }
                 break;
@@ -277,7 +279,11 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
         }
     } while (wbuffer != NULL);
 
-    return flush_writer_files(thread);
+    if (thread->passive_write) {
+        return 0;
+    } else {
+        return flush_writer_files(thread);
+    }
 }
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
@@ -430,7 +436,7 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
         const int max_record_size, const int writer_count,
-        const bool use_fixed_buffer_size)
+        const bool use_fixed_buffer_size, const bool passive_write)
 {
     const int alloc_elements_once = 1024;
     int result;
@@ -441,6 +447,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     snprintf(thread->name, sizeof(thread->name), "%s", name);
     thread->order_mode = order_mode;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
+    thread->passive_write = passive_write;
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
 
@@ -549,6 +556,12 @@ int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer)
 {
     return sf_binlog_writer_push_directive(writer,
             SF_BINLOG_BUFFER_TYPE_ROTATE_FILE, 0);
+}
+
+int sf_binlog_writer_flush_file(SFBinlogWriterInfo *writer)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_FLUSH_FILE, 0);
 }
 
 int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer)
