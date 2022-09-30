@@ -333,6 +333,7 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
         {
             if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
                 writer->last_versions.pending = version;
+                writer->last_versions.done = version;
             }
         }
         return result;
