@@ -97,14 +97,14 @@
 
 #define SF_PROTO_QUERY_EXTRA_BODY_SIZE  FCFS_AUTH_SESSION_ID_LEN
 
-#define SF_PROTO_CLIENT_SET_REQ(client_ctx, out_buff, \
-        header, req, the_req_id, out_bytes) \
+#define SF_PROTO_CLIENT_SET_REQ_EX(client_ctx, auth_enabled, \
+        out_buff, header, req, the_req_id, out_bytes) \
     do {   \
         char *the_req_start;  \
         header = (SFCommonProtoHeader *)out_buff; \
         the_req_start = (char *)(header + 1);     \
         out_bytes = sizeof(SFCommonProtoHeader) + sizeof(*req); \
-        if (client_ctx->auth.enabled) { \
+        if (auth_enabled) { \
             out_bytes += FCFS_AUTH_SESSION_ID_LEN;   \
             memcpy(the_req_start, client_ctx->auth.ctx-> \
                     session.id, FCFS_AUTH_SESSION_ID_LEN);  \
@@ -121,6 +121,10 @@
         }  \
     } while (0)
 
+#define SF_PROTO_CLIENT_SET_REQ(client_ctx, out_buff, \
+        header, req, the_req_id, out_bytes) \
+   SF_PROTO_CLIENT_SET_REQ_EX(client_ctx, client_ctx->auth.enabled, \
+           out_buff, header, req, the_req_id, out_bytes)
 
 typedef struct sf_common_proto_header {
     unsigned char magic[4]; //magic number
