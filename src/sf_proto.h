@@ -210,7 +210,8 @@ typedef struct sf_proto_get_server_status_req {
         char is_leader;
         char is_master;
     };
-    char padding[3];
+    char auth_enabled;
+    char padding[2];
 } SFProtoGetServerStatusReq;
 
 typedef struct sf_get_server_status_request {
@@ -221,6 +222,7 @@ typedef struct sf_get_server_status_request {
         bool is_leader;
         bool is_master;
     };
+    bool auth_enabled;
 } SFGetServerStatusRequest;
 
 typedef struct sf_group_server_info {
@@ -591,6 +593,7 @@ static inline void sf_proto_get_server_status_pack(
 {
     int2buff(r->server_id, req->server_id);
     req->is_leader = (r->is_leader ? 1 : 0);
+    req->auth_enabled = (r->auth_enabled ? 1 : 0);
     memcpy(req->config_signs.servers, r->servers_sign,
             SF_CLUSTER_CONFIG_SIGN_LEN);
     if (r->cluster_sign != NULL) {
