@@ -125,6 +125,12 @@ static inline int sf_unify_errno(const int errnum)
             return SF_ERROR_EOPNOTSUPP;
         case ENODATA:
             return SF_ERROR_ENODATA;
+        case ENOLINK:
+            return SF_ERROR_ENOLINK;
+        case ENOTEMPTY:
+            return SF_ERROR_ENOTEMPTY;
+        case ELOOP:
+            return SF_ERROR_ELOOP;
         default:
             return errnum;
     }
@@ -153,6 +159,12 @@ static inline int sf_localize_errno(int errnum)
             return ENODATA;
         case SF_SESSION_ERROR_NOT_EXIST:
             return EPERM;
+        case SF_ERROR_ENOLINK:
+            return ENOLINK;
+        case SF_ERROR_ENOTEMPTY:
+            return ENOTEMPTY;
+        case SF_ERROR_ELOOP:
+            return ELOOP;
         default:
             return errnum;
     }
