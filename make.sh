@@ -113,7 +113,13 @@ sed_replace()
     fi
 }
 
-cd src
+cd src/include
+link=$(readlink sf)
+if [ $? -ne 0 ] || [ "$link" != '..' -a "$link" != '../' ]; then
+  ln -sf .. sf
+fi
+
+cd ..
 cp Makefile.in Makefile
 sed_replace "s#\\\$(CFLAGS)#$CFLAGS#g" Makefile
 sed_replace "s#\\\$(LIBS)#$LIBS#g" Makefile
