@@ -260,7 +260,10 @@ int sf_load_global_base_path(IniFullContext *ini_ctx);
 
 static inline void sf_set_global_base_path(const char *base_path)
 {
-    normalize_path(NULL, base_path, SF_G_BASE_PATH_STR,
+    string_t path_string;
+
+    FC_SET_STRING(path_string, (char *)base_path);
+    normalize_path(NULL, &path_string, SF_G_BASE_PATH_STR,
             sizeof(SF_G_BASE_PATH_STR));
     SF_G_BASE_PATH_INITED = true;
 }
