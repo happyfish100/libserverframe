@@ -72,7 +72,7 @@ install:
 	cp -f $(IDEMP_CLIENT_HEADER) $(TARGET_PREFIX)/include/sf/idempotency/client
 
 	@BUILDROOT=$$(echo "$(TARGET_PREFIX)" | grep BUILDROOT); \
-	if [ -z "$$BUILDROOT" ] && [ ! -e $(TARGET_PREFIX)/lib/libserverframe.so ]; then ln -s $(TARGET_LIB)/libserverframe.so $(TARGET_PREFIX)/lib/libserverframe.so; fi
+	if [ -z "$$BUILDROOT" ] && [ "$(TARGET_LIB)" != "$(TARGET_PREFIX)/lib" ]; then ln -sf $(TARGET_LIB)/libserverframe.so $(TARGET_PREFIX)/lib/libserverframe.so; fi
 clean:
 	rm -f $(ALL_OBJS) $(ALL_LIBS) $(ALL_PRGS)
 
