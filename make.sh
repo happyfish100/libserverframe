@@ -15,8 +15,19 @@ else
   OS_BITS=64
 fi
 
+uname=$(uname)
 if [ "$OS_BITS" -eq 64 ]; then
-  LIB_VERSION=lib64
+  if [ $uname = 'Linux' ]; then
+    osname=$(cat /etc/os-release | grep -w NAME | awk -F '=' '{print $2;}' | \
+            awk -F '"' '{if (NF==3) {print $2} else {print $1}}' | awk '{print $1}')
+    if [ $osname = 'Ubuntu' -o $osname = 'Debian' ]; then
+      LIB_VERSION=lib
+    else
+      LIB_VERSION=lib64
+    fi
+  else
+    LIB_VERSION=lib
+  fi
 else
   LIB_VERSION=lib
 fi
