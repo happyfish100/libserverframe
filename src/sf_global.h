@@ -258,6 +258,12 @@ void sf_log_config_ex(const char *other_config);
 int sf_get_base_path_from_conf_file(const char *config_filename);
 int sf_load_global_base_path(IniFullContext *ini_ctx);
 
+int sf_load_data_path_config_ex(IniFullContext *ini_ctx,
+        const char *item_name, const char *default_value, string_t *path);
+
+#define sf_load_data_path_config(ini_ctx, path) \
+    sf_load_data_path_config_ex(ini_ctx, "data_path", "data", path)
+
 static inline void sf_set_global_base_path(const char *base_path)
 {
     string_t path_string;

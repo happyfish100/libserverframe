@@ -619,3 +619,61 @@ void sf_log_config_ex(const char *other_config)
             (other_config != NULL) ? other_config : ""
            );
 }
+
+int sf_load_data_path_config_ex(IniFullContext *ini_ctx,
+        const char *item_name, const char *default_value, string_t *path)
+{
+    const char *data_path;
+
+    data_path = iniGetStrValue(ini_ctx->section_name,
+            item_name, ini_ctx->context);
+    if (data_path == NULL) {
+        data_path = default_value;
+    } else if (*data_path == '\0') {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s%s%s, empty %s! "
+                "please set %s correctly.", __LINE__,
+                ini_ctx->filename, ini_ctx->section_name != NULL ?
+                ", section: " : "", ini_ctx->section_name != NULL ?
+                ini_ctx->section_name : "", item_name, item_name);
+        return EINVAL;
+    }
+
+    if (*data_path == '/') {
+        path->len = strlen(data_path);
+        path->str = fc_strdup1(data_path, path->len);
+        if (path->str == NULL) {
+            return ENOMEM;
+        }
+    } else {
+        path->len = strlen(SF_G_BASE_PATH_STR) + strlen(data_path) + 1;
+        path->str = (char *)fc_malloc(path->len + 1);
+        if (path->str == NULL) {
+            return ENOMEM;
+        }
+        path->len = sprintf(path->str, "%s/%s",
+                SF_G_BASE_PATH_STR, data_path);
+    }
+    chopPath(path->str);
+    path->len = strlen(path->str);
+
+    if (access(path->str, F_OK) != 0) {
+        if (errno != ENOENT) {
+            logError("file: "__FILE__", line: %d, "
+                    "access %s fail, errno: %d, error info: %s",
+                    __LINE__, path->str, errno, STRERROR(errno));
+            return errno != 0 ? errno : EPERM;
+        }
+
+        if (mkdir(path->str, 0775) != 0) {
+            logError("file: "__FILE__", line: %d, "
+                    "mkdir %s fail, errno: %d, error info: %s",
+                    __LINE__, path->str, errno, STRERROR(errno));
+            return errno != 0 ? errno : EPERM;
+        }
+
+        SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(path->str);
+    }
+
+    return 0;
+}
