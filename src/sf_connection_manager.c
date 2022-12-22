@@ -91,8 +91,8 @@ static ConnectionInfo *get_server_connection(SFConnectionManager *cm,
     addr_array = &server->group_addrs[cm->server_group_index].address_array;
     if ((conn=make_connection(cm, addr_array, err_no)) == NULL) {
         logError("file: "__FILE__", line: %d, "
-                "%s server id: %d, get_server_connection fail",
-                __LINE__, cm->module_name, server->id);
+                "%s server id: %d, address count: %d, get_server_connection fail",
+                __LINE__, cm->module_name, server->id, addr_array->count);
     }
     return conn;
 }
