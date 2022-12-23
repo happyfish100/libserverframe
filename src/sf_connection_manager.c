@@ -435,6 +435,23 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
             if ((conn=get_spec_connection(cm, &leader.conn,
                             err_no)) == NULL)
             {
+                if (cm->server_cfg != NULL) {
+                    FCServerInfo *ls;
+                    if ((ls=fc_server_get_by_id(cm->server_cfg,
+                                    leader.server_id)) != NULL)
+                    {
+                        if (ls->group_addrs[cm->server_group_index].
+                                address_array.count > 1)
+                        {
+                            if ((conn=get_server_connection(cm, ls,
+                                            err_no)) != NULL)
+                            {
+                                return conn;
+                            }
+                        }
+                    }
+                }
+
                 break;
             }
 
@@ -501,7 +518,8 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const int group_count, const int server_group_index,
         const int server_count, const int max_count_per_entry,
         const int max_idle_time, fc_connection_callback_func
-        connect_done_callback, void *args, const bool bg_thread_enabled)
+        connect_done_callback, void *args, FCServerConfig *server_cfg,
+        const bool bg_thread_enabled)
 {
     const int socket_domain = AF_INET;
     int htable_init_capacity;
@@ -535,6 +553,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     cm->server_group_index = server_group_index;
     cm->module_name = module_name;
     cm->common_cfg = common_cfg;
+    cm->server_cfg = server_cfg;
     cm->alive_detect.bg_thread_enabled = bg_thread_enabled;
     cm->max_servers_per_group = 0;
     cm->extra = NULL;

@@ -115,6 +115,7 @@ typedef struct sf_connection_manager {
     ConnectionPool cpool;
     struct fast_mblock_man sptr_array_allocator; //element: SFCMServerPtrArray
     SFCMOperations ops;
+    FCServerConfig *server_cfg;
     void *extra;   //for simple connection manager
 } SFConnectionManager;
 
@@ -123,7 +124,8 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const int group_count, const int server_group_index,
         const int server_count, const int max_count_per_entry,
         const int max_idle_time, fc_connection_callback_func
-        connect_done_callback, void *args, const bool bg_thread_enabled);
+        connect_done_callback, void *args, FCServerConfig *server_cfg,
+        const bool bg_thread_enabled);
 
 static inline int sf_connection_manager_init(SFConnectionManager *cm,
         const char *module_name, const SFClientCommonConfig *common_cfg,
@@ -136,7 +138,7 @@ static inline int sf_connection_manager_init(SFConnectionManager *cm,
     return sf_connection_manager_init_ex(cm, module_name,
             common_cfg, group_count, server_group_index,
             server_count, max_count_per_entry, max_idle_time,
-            connect_done_callback, args, bg_thread_enabled);
+            connect_done_callback, args, NULL, bg_thread_enabled);
 }
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
