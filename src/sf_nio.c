@@ -471,7 +471,20 @@ static inline int check_task(struct fast_task_info *task,
         return -1;
     }
 
-    return task->nio_stages.current == expect_stage ? 0 : EAGAIN;
+    if (task->nio_stages.current == expect_stage) {
+        return 0;
+    }
+
+    if (tcp_socket_connected(task->event.fd)) {
+        return EAGAIN;
+    } else {
+        logDebug("file: "__FILE__", line: %d, "
+                "client ip: %s, connection is closed",
+                __LINE__, task->client_ip);
+
+        ioevent_add_to_deleted_list(task);
+        return -1;
+    }
 }
 
 int sf_client_sock_read(int sock, short event, void *arg)
