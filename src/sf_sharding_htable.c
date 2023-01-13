@@ -285,7 +285,7 @@ static SFShardingHashEntry *hash_entry_reclaim(SFHtableSharding *sharding)
     }
 
     if (reclaim_count > 0) {
-        logInfo("sharding index: %d, element_count: %"PRId64", "
+        logDebug("sharding index: %d, element_count: %"PRId64", "
                 "reclaim_ttl_ms: %"PRId64" ms, reclaim_count: %"PRId64", "
                 "reclaim_limit: %"PRId64, (int)(sharding - sharding->ctx->
                     sharding_array.entries), sharding->element_count,
