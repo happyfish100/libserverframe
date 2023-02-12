@@ -36,7 +36,7 @@
 SFGlobalVariables g_sf_global_vars = {
     SF_DEFAULT_CONNECT_TIMEOUT, SF_DEFAULT_NETWORK_TIMEOUT,
     {{'/', 't', 'm', 'p', '\0'}, false},
-    true, true, DEFAULT_MAX_CONNECTONS,
+    true, true, false, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
     0, 0, 0, {'\0'}, {'\0'}, {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
