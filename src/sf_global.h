@@ -40,6 +40,7 @@ typedef struct sf_global_variables {
 
     volatile bool continue_flag;
     bool tcp_quick_ack;
+    bool epoll_edge_trigger;
     int max_connections;
     int max_pkg_size;
     int min_buff_size;
@@ -97,6 +98,8 @@ extern SFContext                 g_sf_context;
 
 #define SF_G_ERROR_HANDLER       g_sf_global_vars.error_handler
 #define SF_G_EMPTY_STRING        g_sf_global_vars.empty
+
+#define SF_G_EPOLL_EDGE_TRIGGER  g_sf_global_vars.epoll_edge_trigger
 
 #define SF_WORK_THREADS(sf_context)        sf_context.work_threads
 #define SF_ALIVE_THREAD_COUNT(sf_context)  sf_context.thread_count

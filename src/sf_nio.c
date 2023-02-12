@@ -37,6 +37,7 @@
 #include "fastcommon/sockopt.h"
 #include "fastcommon/fast_task_queue.h"
 #include "fastcommon/ioevent_loop.h"
+#include "fastcommon/fc_atomic.h"
 #include "sf_global.h"
 #include "sf_service.h"
 #include "sf_nio.h"
@@ -143,7 +144,7 @@ static inline int set_write_event(struct fast_task_info *task)
     return 0;
 }
 
-int sf_set_read_event(struct fast_task_info *task)
+static int setup_read_event(struct fast_task_info *task)
 {
     int result;
 
@@ -167,6 +168,27 @@ int sf_set_read_event(struct fast_task_info *task)
     }
 
     return 0;
+}
+
+int sf_set_read_event(struct fast_task_info *task)
+{
+    int result;
+
+    if ((result=setup_read_event(task)) != 0) {
+        return result;
+    }
+
+    if (SF_G_EPOLL_EDGE_TRIGGER) {
+        if (FC_ATOMIC_GET(task->nio_stages.notify) == SF_NIO_STAGE_SEND) {
+            __sync_bool_compare_and_swap(&task->nio_stages.next,
+                    SF_NIO_STAGE_NONE, SF_NIO_STAGE_RECV);
+            return 0;
+        } else {
+            return sf_nio_notify(task, SF_NIO_STAGE_RECV);
+        }
+    } else {
+        return 0;
+    }
 }
 
 static inline int sf_ioevent_add(struct fast_task_info *task,
@@ -276,8 +298,7 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
             result = sf_connect_server(task);
             break;
         case SF_NIO_STAGE_RECV:
-            if ((result=sf_set_read_event(task)) == 0)
-            {
+            if ((result=setup_read_event(task)) == 0) {
                 sf_client_sock_read(task->event.fd,
                         IOEVENT_READ, task);
             }
@@ -321,7 +342,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     int old_stage;
     bool notify;
 
-    if (__sync_add_and_fetch(&task->canceled, 0)) {
+    if (FC_ATOMIC_GET(task->canceled)) {
         if (stage == SF_NIO_STAGE_CONTINUE) {
             if (task->continue_callback != NULL) {
                 return task->continue_callback(task);
@@ -342,11 +363,21 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
     while (!__sync_bool_compare_and_swap(&task->nio_stages.notify,
                 SF_NIO_STAGE_NONE, stage))
     {
-        old_stage = __sync_fetch_and_add(&task->nio_stages.notify, 0);
+        old_stage = FC_ATOMIC_GET(task->nio_stages.notify);
         if (old_stage == stage) {
             logDebug("file: "__FILE__", line: %d, "
                     "current stage: %d equals to the target, skip set",
                     __LINE__, stage);
+            return 0;
+
+        } else if (SF_G_EPOLL_EDGE_TRIGGER && (
+                    (old_stage == SF_NIO_STAGE_RECV &&
+                     stage == SF_NIO_STAGE_SEND) ||
+                    (old_stage == SF_NIO_STAGE_SEND &&
+                     stage == SF_NIO_STAGE_RECV)))
+        {
+            __sync_bool_compare_and_swap(&task->nio_stages.
+                    next, SF_NIO_STAGE_NONE, stage);
             return 0;
         } else if (old_stage != SF_NIO_STAGE_NONE) {
             logWarning("file: "__FILE__", line: %d, "
@@ -390,6 +421,7 @@ void sf_recv_notify_read(int sock, short event, void *arg)
 {
     int64_t n;
     int stage;
+    int next;
     struct nio_thread_data *thread_data;
     struct fast_task_info *task;
     struct fast_task_info *current;
@@ -410,7 +442,7 @@ void sf_recv_notify_read(int sock, short event, void *arg)
         task = current;
         current = current->next;
 
-        stage = __sync_add_and_fetch(&task->nio_stages.notify, 0);
+        stage = FC_ATOMIC_GET(task->nio_stages.notify);
         if (!task->canceled) {
             if (stage == SF_NIO_STAGE_CONTINUE) {
                 /* MUST set to SF_NIO_STAGE_NONE first for re-entry */
@@ -421,6 +453,15 @@ void sf_recv_notify_read(int sock, short event, void *arg)
                 sf_nio_deal_task(task, stage);
                 __sync_bool_compare_and_swap(&task->nio_stages.notify,
                         stage, SF_NIO_STAGE_NONE);
+            }
+
+            if (SF_G_EPOLL_EDGE_TRIGGER) {
+                next = FC_ATOMIC_GET(task->nio_stages.next);
+                if (next != SF_NIO_STAGE_NONE) {
+                    sf_nio_notify(task, next);
+                    __sync_bool_compare_and_swap(&task->nio_stages.next,
+                            next, SF_NIO_STAGE_NONE);
+                }
             }
         } else {
             if (stage != SF_NIO_STAGE_NONE) {
@@ -749,9 +790,9 @@ int sf_client_sock_write(int sock, short event, void *arg)
             }
         } else if (bytes == 0) {
             logWarning("file: "__FILE__", line: %d, "
-                "client ip: %s, sock: %d, send failed, "
-                "connection disconnected",
-                __LINE__, task->client_ip, sock);
+                "client ip: %s, sock: %d, task length: %d, offset: %d, "
+                "send failed, connection disconnected", __LINE__,
+                task->client_ip, sock, task->length, task->offset);
 
             ioevent_add_to_deleted_list(task);
             return -1;

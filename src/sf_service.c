@@ -131,6 +131,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 {
     int result;
     int bytes;
+    int extra_events;
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
     struct nio_thread_data *thread_data;
@@ -172,6 +173,18 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         return ENOMEM;
     }
 
+    if (SF_G_EPOLL_EDGE_TRIGGER) {
+#ifdef OS_LINUX
+        extra_events = EPOLLET;
+#elif defined(OS_FREEBSD)
+        extra_events = EV_CLEAR;
+#else
+        extra_events = 0;
+#endif
+    } else {
+        extra_events = 0;
+    }
+
     g_current_time = time(NULL);
     sf_context->thread_count = 0;
     data_end = sf_context->thread_data + sf_context->work_threads;
@@ -187,8 +200,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&thread_data->ev_puller,
-            g_sf_global_vars.max_connections + 2, net_timeout_ms, 0) != 0)
+        if (ioevent_init(&thread_data->ev_puller, 2 + g_sf_global_vars.
+                    max_connections, net_timeout_ms, extra_events) != 0)
         {
             result  = errno != 0 ? errno : ENOMEM;
             logError("file: "__FILE__", line: %d, "
