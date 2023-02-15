@@ -581,10 +581,9 @@ int sf_client_sock_read(int sock, short event, void *arg)
             if (task->offset > 0) {
                 if (task->length > 0) {
                     logWarning("file: "__FILE__", line: %d, "
-                            "client ip: %s, connection "
-                            "disconnected, expect pkg length: %d, "
-                            "recv pkg length: %d", __LINE__,
-                            task->client_ip, task->length,
+                            "client ip: %s, connection disconnected, "
+                            "expect pkg length: %d, recv pkg length: %d",
+                            __LINE__, task->client_ip, task->length,
                             task->offset);
                 } else {
                     logWarning("file: "__FILE__", line: %d, "
@@ -596,8 +595,8 @@ int sf_client_sock_read(int sock, short event, void *arg)
             } else {
                 logDebug("file: "__FILE__", line: %d, "
                         "client ip: %s, sock: %d, recv fail, "
-                        "connection disconnected",
-                        __LINE__, task->client_ip, sock);
+                        "connection disconnected", __LINE__,
+                        task->client_ip, sock);
             }
 
             ioevent_add_to_deleted_list(task);
