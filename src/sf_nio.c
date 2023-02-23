@@ -425,51 +425,26 @@ void sf_recv_notify_read(int sock, short event, void *arg)
                 __LINE__, sock, errno, STRERROR(errno));
     }
 
-    if (SF_G_EPOLL_EDGE_TRIGGER) {
-        while (1) {
-            PTHREAD_MUTEX_LOCK(&thread_data->waiting_queue.lock);
-            if (thread_data->waiting_queue.head != NULL) {
-                task = thread_data->waiting_queue.head;
-                thread_data->waiting_queue.head = task->notify_next;
-                if (thread_data->waiting_queue.head == NULL) {
-                    thread_data->waiting_queue.tail = NULL;
-                }
-            } else {
-                task = NULL;
-            }
-            PTHREAD_MUTEX_UNLOCK(&thread_data->waiting_queue.lock);
+    PTHREAD_MUTEX_LOCK(&thread_data->waiting_queue.lock);
+    current = thread_data->waiting_queue.head;
+    thread_data->waiting_queue.head = NULL;
+    thread_data->waiting_queue.tail = NULL;
+    PTHREAD_MUTEX_UNLOCK(&thread_data->waiting_queue.lock);
 
-            if (task != NULL) {
-                stage = FC_ATOMIC_GET(task->nio_stages.notify);
-                __sync_bool_compare_and_swap(&task->nio_stages.notify,
-                        stage, SF_NIO_STAGE_NONE);
-                deal_notified_task(task, stage);
-            } else {
-                break;
-            }
-        }
-    } else {
-        PTHREAD_MUTEX_LOCK(&thread_data->waiting_queue.lock);
-        current = thread_data->waiting_queue.head;
-        thread_data->waiting_queue.head = NULL;
-        thread_data->waiting_queue.tail = NULL;
-        PTHREAD_MUTEX_UNLOCK(&thread_data->waiting_queue.lock);
+    while (current != NULL) {
+        task = current;
+        current = current->notify_next;
 
-        while (current != NULL) {
-            task = current;
-            current = current->notify_next;
-
-            stage = FC_ATOMIC_GET(task->nio_stages.notify);
-            if (stage == SF_NIO_STAGE_CONTINUE) {
-                /* MUST set to SF_NIO_STAGE_NONE first for re-entry */
-                __sync_bool_compare_and_swap(&task->nio_stages.notify,
-                        stage, SF_NIO_STAGE_NONE);
-                deal_notified_task(task, stage);
-            } else {
-                deal_notified_task(task, stage);
-                __sync_bool_compare_and_swap(&task->nio_stages.notify,
-                        stage, SF_NIO_STAGE_NONE);
-            }
+        stage = FC_ATOMIC_GET(task->nio_stages.notify);
+        if (stage == SF_NIO_STAGE_CONTINUE || SF_G_EPOLL_EDGE_TRIGGER) {
+            /* MUST set to SF_NIO_STAGE_NONE first for re-entry */
+            __sync_bool_compare_and_swap(&task->nio_stages.notify,
+                    stage, SF_NIO_STAGE_NONE);
+            deal_notified_task(task, stage);
+        } else {
+            deal_notified_task(task, stage);
+            __sync_bool_compare_and_swap(&task->nio_stages.notify,
+                    stage, SF_NIO_STAGE_NONE);
         }
     }
 }
