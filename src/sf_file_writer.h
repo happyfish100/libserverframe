@@ -95,7 +95,8 @@ static inline int64_t sf_file_writer_get_last_version(
         return writer->last_versions.done;
     } else {
         logError("file: "__FILE__", line: %d, "
-                "should set writer flags to %d!", __LINE__,
+                "writer: %s, should set writer flags to %d!",
+                __LINE__, writer->cfg.subdir_name,
                 SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION);
         return -1;
     }
