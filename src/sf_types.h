@@ -263,4 +263,15 @@ typedef enum sf_replication_quorum {
     sf_replication_quorum_smart
 } SFReplicationQuorum;
 
+typedef struct sf_block_key {
+    int64_t oid;    //object id
+    int64_t offset; //aligned by block size
+    uint64_t hash_code;
+} SFBlockKey;
+
+typedef struct sf_slice_size {
+    int offset;  //offset within the block
+    int length;  //slice length
+} SFSliceSize;
+
 #endif
