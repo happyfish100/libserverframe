@@ -274,4 +274,9 @@ typedef struct sf_slice_size {
     int length;  //slice length
 } SFSliceSize;
 
+typedef struct sf_block_slice_key_info {
+    SFBlockKey block;
+    SFSliceSize slice;
+} SFBlockSliceKeyInfo;
+
 #endif
