@@ -44,7 +44,6 @@ struct sf_binlog_writer_info;
 typedef struct sf_binlog_writer_buffer {
     SFVersionRange version;
     BufferInfo bf;
-    int64_t tag;
     int type;    //for versioned writer
     struct sf_binlog_writer_info *writer;
     struct sf_binlog_writer_buffer *next;
@@ -114,8 +113,8 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_record_size, const int writer_count,
-        const bool use_fixed_buffer_size, const bool passive_write);
+        const int max_record_size, const bool use_fixed_buffer_size,
+        const bool passive_write);
 
 #define sf_binlog_writer_init_normal(writer,  \
         data_path, subdir_name, buffer_size)  \
@@ -131,7 +130,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
 #define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
             SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
-            max_record_size, 1, true, false)
+            max_record_size, true, false)
 
 static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,

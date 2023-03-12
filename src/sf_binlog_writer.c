@@ -73,9 +73,9 @@ static int deal_record_by_version(SFBinlogWriterBuffer *wb)
     if (wb->version.first < writer->version_ctx.next) {
         logError("file: "__FILE__", line: %d, subdir_name: %s, "
                 "current version: %"PRId64" is too small which "
-                "less than %"PRId64", tag: %"PRId64", buffer(%d): %.*s",
+                "less than %"PRId64", buffer(%d): %.*s",
                 __LINE__, writer->fw.cfg.subdir_name, wb->version.first,
-                writer->version_ctx.next, wb->tag, wb->bf.length,
+                writer->version_ctx.next, wb->bf.length,
                 wb->bf.length, wb->bf.buff);
         fast_mblock_free_object(&writer->thread->mblock, wb);
         return 0;
@@ -435,8 +435,8 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_record_size, const int writer_count,
-        const bool use_fixed_buffer_size, const bool passive_write)
+        const int max_record_size, const bool use_fixed_buffer_size,
+        const bool passive_write)
 {
     const int alloc_elements_once = 1024;
     int result;
