@@ -205,6 +205,9 @@ int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 #define sf_binlog_writer_set_flags(writer, flags) \
     sf_file_writer_set_flags(&(writer)->fw, flags)
 
+#define sf_binlog_writer_get_last_version_ex(writer, log_level) \
+    sf_file_writer_get_last_version_ex(&(writer)->fw, log_level)
+
 #define sf_binlog_writer_get_last_version(writer) \
     sf_file_writer_get_last_version(&(writer)->fw)
 

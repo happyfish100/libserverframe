@@ -88,18 +88,28 @@ static inline void sf_file_writer_set_flags(
     writer->flags = flags;
 }
 
-static inline int64_t sf_file_writer_get_last_version(
-        SFFileWriterInfo *writer)
+static inline int64_t sf_file_writer_get_last_version_ex(
+        SFFileWriterInfo *writer, const int log_level)
 {
     if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
         return writer->last_versions.done;
     } else {
-        logError("file: "__FILE__", line: %d, "
-                "writer: %s, should set writer flags to %d!",
-                __LINE__, writer->cfg.subdir_name,
-                SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION);
+        if (FC_LOG_BY_LEVEL(log_level)) {
+            log_it_ex(&g_log_context, log_level,
+                    "file: "__FILE__", line: %d, "
+                    "writer: %s, should set writer flags to %d!",
+                    __LINE__, writer->cfg.subdir_name,
+                    SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION);
+        }
+
         return -1;
     }
+}
+
+static inline int64_t sf_file_writer_get_last_version(
+        SFFileWriterInfo *writer)
+{
+    return sf_file_writer_get_last_version_ex(writer, LOG_ERR);
 }
 
 int sf_file_writer_get_binlog_indexes(const char *data_path,
