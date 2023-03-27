@@ -284,9 +284,9 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     }
     channel->buffer_size = FC_MIN(buffer_size, task->size);
 
-    PTHREAD_MUTEX_LOCK(&channel->lc_pair.lock);
-    pthread_cond_broadcast(&channel->lc_pair.cond);
-    PTHREAD_MUTEX_UNLOCK(&channel->lc_pair.lock);
+    PTHREAD_MUTEX_LOCK(&channel->lcp.lock);
+    pthread_cond_broadcast(&channel->lcp.cond);
+    PTHREAD_MUTEX_UNLOCK(&channel->lcp.lock);
 
     if (channel->waiting_resp_qinfo.head != NULL) {
         bool notify;

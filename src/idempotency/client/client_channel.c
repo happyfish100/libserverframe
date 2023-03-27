@@ -135,7 +135,7 @@ static int idempotency_channel_alloc_init(void *element, void *args)
         return result;
     }
 
-    if ((result=init_pthread_lock_cond_pair(&channel->lc_pair)) != 0) {
+    if ((result=init_pthread_lock_cond_pair(&channel->lcp)) != 0) {
         return result;
     }
 

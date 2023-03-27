@@ -46,7 +46,7 @@ typedef struct idempotency_client_channel {
     time_t last_connect_time;  //for connect frequency control
     time_t last_pkg_time;      //last communication time
     time_t last_report_time;   //last report time for rpc receipt
-    pthread_lock_cond_pair_t lc_pair;  //for channel valid check and notify
+    pthread_lock_cond_pair_t lcp;  //for channel valid check and notify
     struct fast_mblock_man receipt_allocator;
     struct fast_task_info *task;
     struct fc_queue queue;

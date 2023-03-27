@@ -80,7 +80,7 @@ static inline int idempotency_client_channel_check_wait_ex(
     }
 
     idempotency_client_channel_check_reconnect(channel);
-    lcp_timedwait_sec(&channel->lc_pair, timeout);
+    lcp_timedwait_sec(&channel->lcp, timeout);
     if (__sync_add_and_fetch(&channel->established, 0)) {
         return 0;
     } else {
