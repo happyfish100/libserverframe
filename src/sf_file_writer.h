@@ -95,10 +95,9 @@ static inline int64_t sf_file_writer_get_last_version_ex(
         return writer->last_versions.done;
     } else {
         if (FC_LOG_BY_LEVEL(log_level)) {
-            log_it_ex(&g_log_context, log_level,
-                    "file: "__FILE__", line: %d, "
+            log_it_ex(&g_log_context, log_level, "file: %s, line: %d, "
                     "writer: %s, should set writer flags to %d!",
-                    __LINE__, writer->cfg.subdir_name,
+                    __FILE__, __LINE__, writer->cfg.subdir_name,
                     SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION);
         }
 
@@ -106,11 +105,11 @@ static inline int64_t sf_file_writer_get_last_version_ex(
     }
 }
 
-static inline int64_t sf_file_writer_get_last_version(
-        SFFileWriterInfo *writer)
-{
-    return sf_file_writer_get_last_version_ex(writer, LOG_ERR);
-}
+#define sf_file_writer_get_last_version(writer) \
+    sf_file_writer_get_last_version_ex(writer, LOG_ERR)
+
+#define sf_file_writer_get_last_version_silence(writer) \
+    sf_file_writer_get_last_version_ex(writer, LOG_NOTHING)
 
 int sf_file_writer_get_binlog_indexes(const char *data_path,
         const char *subdir_name, int *start_index, int *last_index);

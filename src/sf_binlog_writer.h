@@ -211,6 +211,9 @@ int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 #define sf_binlog_writer_get_last_version(writer) \
     sf_file_writer_get_last_version(&(writer)->fw)
 
+#define sf_binlog_writer_get_last_version_silence(writer) \
+    sf_file_writer_get_last_version_silence(&(writer)->fw)
+
 #define sf_binlog_get_indexes(writer, start_index, last_index) \
     sf_file_writer_get_indexes(&(writer)->fw, start_index, last_index)
 
