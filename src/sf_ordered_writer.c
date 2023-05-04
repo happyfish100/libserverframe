@@ -223,7 +223,7 @@ static int sf_ordered_writer_init_thread(SFOrderedWriterContext *context,
     }
 
     if ((result=sorted_queue_init(&thread->queues.buffer, (unsigned long)
-                    (&((SFOrderedWriterBuffer *)NULL)->next),
+                    (&((SFOrderedWriterBuffer *)NULL)->dlink),
                     (int (*)(const void *, const void *))
                     compare_buffer_version)) != 0)
     {

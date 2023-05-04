@@ -29,7 +29,7 @@ typedef struct sf_writer_version_entry {
 typedef struct sf_ordered_writer_buffer {
     int64_t version;
     BufferInfo bf;
-    struct sf_ordered_writer_buffer *next;
+    struct fc_list_head dlink;
 } SFOrderedWriterBuffer;
 
 typedef struct sf_orderd_writer_thread {
