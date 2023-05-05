@@ -557,6 +557,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     cm->alive_detect.bg_thread_enabled = bg_thread_enabled;
     cm->max_servers_per_group = 0;
     cm->extra = NULL;
+    cm->exclude_server_id = 0;
 
     cm->ops.get_connection = get_connection;
     cm->ops.get_server_connection = get_server_connection;
@@ -789,6 +790,10 @@ static int get_group_servers_by_all(SFConnectionManager *cm,
 
     end = group->all.servers + group->all.count;
     for (server=group->all.servers; server<end; server++) {
+        if (server->id == cm->exclude_server_id) {
+            continue;
+        }
+
         if ((conn=make_connection(cm, server->addr_array,
                         &result)) == NULL)
         {

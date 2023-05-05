@@ -103,8 +103,9 @@ typedef struct sf_cm_operations {
 } SFCMOperations;
 
 typedef struct sf_connection_manager {
-    short server_group_index;
-    short max_servers_per_group;
+    int exclude_server_id;  //for server side
+    uint16_t max_servers_per_group;
+    uint8_t server_group_index;
     struct {
         bool bg_thread_enabled;
         struct common_blocked_queue queue;
@@ -139,6 +140,12 @@ static inline int sf_connection_manager_init(SFConnectionManager *cm,
             common_cfg, group_count, server_group_index,
             server_count, max_count_per_entry, max_idle_time,
             connect_done_callback, args, NULL, bg_thread_enabled);
+}
+
+static inline void sf_connection_manager_set_exclude_server_id(
+        SFConnectionManager *cm, const int exclude_server_id)
+{
+    cm->exclude_server_id = exclude_server_id;
 }
 
 int sf_connection_manager_add(SFConnectionManager *cm, const int group_id,
