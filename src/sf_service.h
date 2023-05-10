@@ -86,6 +86,9 @@ void sf_set_current_time();
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)
 
+void sf_socket_close_ex(SFContext *sf_context);
+#define sf_socket_close() sf_socket_close_ex(&g_sf_context)
+
 void sf_accept_loop_ex(SFContext *sf_context, const bool block);
 
 #define sf_accept_loop()  sf_accept_loop_ex(&g_sf_context, true)

@@ -400,6 +400,19 @@ int sf_socket_server_ex(SFContext *sf_context)
     return 0;
 }
 
+void sf_socket_close_ex(SFContext *sf_context)
+{
+    if (sf_context->inner_sock >= 0) {
+        close(sf_context->inner_sock);
+        sf_context->inner_sock = -1;
+    }
+
+    if (sf_context->outer_sock >= 0) {
+        close(sf_context->outer_sock);
+        sf_context->outer_sock = -1;
+    }
+}
+
 static void accept_run(struct accept_thread_context *accept_context)
 {
     int incomesock;
