@@ -114,6 +114,10 @@ static void *thread_run(void *arg)
     IdempotencyRequestMetadataContext *ctx;
     int64_t data_version;
 
+#ifdef OS_LINUX
+    prctl(PR_SET_NAME, "idemp-req-meta");
+#endif
+
     ctx = g_request_metadata.list.head;
     while (SF_G_CONTINUE_FLAG) {
         fc_sleep_ms(g_request_metadata.process_interval_ms);
