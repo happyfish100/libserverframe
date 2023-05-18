@@ -39,7 +39,6 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
 {
     struct fast_mblock_chain chain;
     struct fast_mblock_node *node;
-    int count = 0;
 
     chain.head = chain.tail = NULL;
     PTHREAD_MUTEX_LOCK(&ctx->lock);
@@ -53,7 +52,6 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
             }
             chain.tail = node;
 
-            ++count;
             ctx->list.head = ctx->list.head->next;
         } while (CHECK_MASTER_METADATA(ctx->list.head));
 
@@ -67,10 +65,6 @@ static void process_master_side(IdempotencyRequestMetadataContext *ctx)
         fast_mblock_batch_free(&ctx->allocator, &chain);
     }
     PTHREAD_MUTEX_UNLOCK(&ctx->lock);
-
-    if (count > 0) {
-        logInfo("#######func: %s, deal count: %d", __FUNCTION__, count);
-    }
 }
 
 #define CHECK_SLAVE_METADATA(meta, dv) \
