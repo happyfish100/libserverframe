@@ -439,6 +439,8 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const bool passive_write)
 {
     const int alloc_elements_once = 1024;
+    const int64_t alloc_elements_limit = 0;
+    const int prealloc_trunk_count = 0;
     int result;
     int element_size;
     pthread_t tid;
@@ -461,8 +463,8 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         callbacks.destroy_func = binlog_wbuffer_destroy_func;
     }
     if ((result=fast_mblock_init_ex2(&thread->mblock, "binlog-wbuffer",
-                     element_size, alloc_elements_once, 0,
-                     &callbacks, true, NULL)) != 0)
+                     element_size, alloc_elements_once, alloc_elements_limit,
+                     prealloc_trunk_count, &callbacks, true, NULL)) != 0)
     {
         return result;
     }
