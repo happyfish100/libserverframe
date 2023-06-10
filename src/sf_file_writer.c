@@ -232,14 +232,16 @@ static int do_write_to_file(SFFileWriterInfo *writer,
         return result;
     }
 
-    if (fsync(writer->file.fd) != 0) {
-        result = errno != 0 ? errno : EIO;
-        logError("file: "__FILE__", line: %d, "
-                "fsync to binlog file \"%s\" fail, "
-                "errno: %d, error info: %s",
-                __LINE__, writer->file.name,
-                result, STRERROR(result));
-        return result;
+    if (writer->cfg.call_fsync) {
+        if (fsync(writer->file.fd) != 0) {
+            result = errno != 0 ? errno : EIO;
+            logError("file: "__FILE__", line: %d, "
+                    "fsync to binlog file \"%s\" fail, "
+                    "errno: %d, error info: %s",
+                    __LINE__, writer->file.name,
+                    result, STRERROR(result));
+            return result;
+        }
     }
 
     writer->file.size += len;
@@ -382,6 +384,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         return result;
     }
 
+    writer->cfg.call_fsync = true;
     writer->cfg.file_rotate_size = file_rotate_size;
     writer->cfg.data_path = data_path;
     path_len = snprintf(filepath, sizeof(filepath),

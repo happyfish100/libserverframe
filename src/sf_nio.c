@@ -608,9 +608,9 @@ int sf_client_sock_read(int sock, short event, void *arg)
         TCP_SET_QUICK_ACK(sock);
         total_read += bytes;
         task->offset += bytes;
-        if (task->length == 0) { //header
+        if (task->length == 0) { //pkg header
             if (task->offset < SF_CTX->header_size) {
-                break;
+                continue;
             }
 
             if (SF_CTX->set_body_length(task) != 0) {

@@ -194,6 +194,16 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 fast_mblock_free_object(&current->writer->
                         thread->mblock, current);
                 break;
+            case SF_BINLOG_BUFFER_TYPE_CHANGE_PASSIVE_WRITE:
+                thread->passive_write = current->version.first;
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
+                break;
+            case SF_BINLOG_BUFFER_TYPE_CHANGE_CALL_FSYNC:
+                current->writer->fw.cfg.call_fsync = current->version.first;
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
+                break;
             case SF_BINLOG_BUFFER_TYPE_ROTATE_FILE:
                 if ((result=sf_file_writer_set_binlog_write_index(&current->
                                 writer->fw, current->writer->fw.binlog.
@@ -201,11 +211,15 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 {
                     return result;
                 }
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
                 break;
             case SF_BINLOG_BUFFER_TYPE_FLUSH_FILE:
                 if ((result=flush_writer_files(thread)) != 0) {
                     return result;
                 }
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
                 break;
             case SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX:
                 if ((result=sf_file_writer_set_binlog_write_index(&current->
@@ -213,9 +227,13 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 {
                     return result;
                 }
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
                 break;
             case SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT:
                 flush_writer_files(thread);
+                fast_mblock_free_object(&current->writer->
+                        thread->mblock, current);
                 return ERRNO_THREAD_EXIT;
             case SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION:
                 if (current->writer->order_by !=
@@ -255,7 +273,6 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                 fast_mblock_free_object(&current->writer->
                         thread->mblock, current);
                 break;
-
             default:
                 current->writer->fw.total_count++;
                 add_to_flush_writer_queue(thread, current->writer);
@@ -537,6 +554,22 @@ static inline int sf_binlog_writer_push_directive(SFBinlogWriterInfo *writer,
 
     fc_queue_push(&writer->thread->queue, buffer);
     return 0;
+}
+
+int sf_binlog_writer_change_passive_write(SFBinlogWriterInfo *writer,
+        const bool passive_write)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_CHANGE_PASSIVE_WRITE,
+            passive_write);
+}
+
+int sf_binlog_writer_change_call_fsync(SFBinlogWriterInfo *writer,
+        const bool call_fsync)
+{
+    return sf_binlog_writer_push_directive(writer,
+            SF_BINLOG_BUFFER_TYPE_CHANGE_CALL_FSYNC,
+            call_fsync);
 }
 
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,

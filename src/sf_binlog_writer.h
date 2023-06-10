@@ -28,13 +28,15 @@
 #define SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE     0
 #define SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION  1
 
-#define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE     0  //default type, must be 0
-#define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION  1
-#define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE 2
-#define SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX   3
-#define SF_BINLOG_BUFFER_TYPE_ROTATE_FILE       4
-#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT       5
-#define SF_BINLOG_BUFFER_TYPE_FLUSH_FILE        6
+#define SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE        0  //default type, must be 0
+#define SF_BINLOG_BUFFER_TYPE_SET_NEXT_VERSION     1
+#define SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE    2
+#define SF_BINLOG_BUFFER_TYPE_CHANGE_PASSIVE_WRITE 3
+#define SF_BINLOG_BUFFER_TYPE_CHANGE_CALL_FSYNC    4
+#define SF_BINLOG_BUFFER_TYPE_SET_WRITE_INDEX      5
+#define SF_BINLOG_BUFFER_TYPE_ROTATE_FILE          6
+#define SF_BINLOG_BUFFER_TYPE_NOTIFY_EXIT          7
+#define SF_BINLOG_BUFFER_TYPE_FLUSH_FILE           8
 
 #define SF_BINLOG_BUFFER_SET_VERSION(buffer, ver)  \
     (buffer)->version.first = (buffer)->version.last = ver
@@ -183,6 +185,12 @@ static inline void sf_binlog_writer_destroy(
 
 int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         const short order_by);
+
+int sf_binlog_writer_change_passive_write(SFBinlogWriterInfo *writer,
+        const bool passive_write);
+
+int sf_binlog_writer_change_call_fsync(SFBinlogWriterInfo *writer,
+        const bool call_fsync);
 
 int sf_binlog_writer_change_next_version(SFBinlogWriterInfo *writer,
         const int64_t next_version);

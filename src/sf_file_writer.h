@@ -40,6 +40,7 @@ typedef struct sf_file_writer_info {
         char file_prefix[SF_BINLOG_FILE_PREFIX_SIZE];
         int64_t file_rotate_size;
         int max_record_size;
+        bool call_fsync;
     } cfg;
 
     struct {
