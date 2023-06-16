@@ -124,10 +124,11 @@ static inline SFOrderedWriterBuffer *sf_ordered_writer_alloc_buffer(
 #define sf_ordered_writer_set_binlog_index(ctx, binlog_index) \
     sf_file_writer_set_binlog_index(&(ctx)->writer.fw, binlog_index)
 
-#define sf_push_to_binlog_thread_queue(ctx, buffer) \
+#define sf_ordered_writer_push_to_thread_queue(ctx, buffer) \
     sorted_queue_push(&(ctx)->thread.queues.buffer, buffer)
 
-static inline void sf_push_to_binlog_write_queue(SFOrderedWriterContext *ctx,
+static inline void sf_ordered_writer_push_to_queue(
+        SFOrderedWriterContext *ctx,
         SFOrderedWriterBuffer *buffer)
 {
     sorted_queue_push(&ctx->thread.queues.buffer, buffer);

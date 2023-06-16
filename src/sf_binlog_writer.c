@@ -177,7 +177,7 @@ static inline int flush_writer_files(SFBinlogWriterThread *thread)
 }
 
 static int deal_binlog_records(SFBinlogWriterThread *thread,
-        SFBinlogWriterBuffer *wb_head)
+        SFBinlogWriterBuffer *wb_head, uint32_t *last_timestamp)
 {
     int result;
     SFBinlogWriterBuffer *wbuffer;
@@ -187,6 +187,9 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
     do {
         current = wbuffer;
         wbuffer = wbuffer->next;
+        if (wbuffer == NULL) {
+            *last_timestamp = current->timestamp;
+        }
 
         switch (current->type) {
             case SF_BINLOG_BUFFER_TYPE_CHANGE_ORDER_TYPE:
@@ -306,6 +309,7 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
 {
     SFBinlogWriterBuffer *wb_head;
+    uint32_t last_timestamp;
     int count;
 
     if (writer->fw.file.name != NULL) {
@@ -332,7 +336,8 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
         wb_head = (SFBinlogWriterBuffer *)fc_queue_try_pop_all(
                 &writer->thread->queue);
         if (wb_head != NULL) {
-            deal_binlog_records(writer->thread, wb_head);
+            last_timestamp = 0;
+            deal_binlog_records(writer->thread, wb_head, &last_timestamp);
         }
 
         free(writer->fw.file.name);
@@ -349,6 +354,8 @@ static void *binlog_writer_func(void *arg)
 {
     SFBinlogWriterThread *thread;
     SFBinlogWriterBuffer *wb_head;
+    uint32_t current_timestamp;
+    uint32_t last_timestamp;
     int result;
 
     thread = (SFBinlogWriterThread *)arg;
@@ -362,6 +369,7 @@ static void *binlog_writer_func(void *arg)
     }
 #endif
 
+    current_timestamp = last_timestamp = 0;
     thread->running = true;
     while (SF_G_CONTINUE_FLAG) {
         wb_head = (SFBinlogWriterBuffer *)fc_queue_pop_all(&thread->queue);
@@ -369,7 +377,9 @@ static void *binlog_writer_func(void *arg)
             continue;
         }
 
-        if ((result=deal_binlog_records(thread, wb_head)) != 0) {
+        if ((result=deal_binlog_records(thread, wb_head,
+                        &current_timestamp)) != 0)
+        {
             if (result != ERRNO_THREAD_EXIT) {
                 logCrit("file: "__FILE__", line: %d, "
                         "deal_binlog_records fail, "
@@ -377,6 +387,23 @@ static void *binlog_writer_func(void *arg)
                 sf_terminate_myself();
             }
             break;
+        }
+
+        if (fc_queue_empty(&thread->queue)) {
+            current_timestamp = 0;
+        }
+        if (current_timestamp == 0 || current_timestamp > last_timestamp) {
+            if (current_timestamp != last_timestamp) {
+                last_timestamp = current_timestamp;
+                FC_ATOMIC_SET(thread->flow_ctrol.last_timestamp,
+                        current_timestamp);
+            }
+
+            PTHREAD_MUTEX_LOCK(&thread->flow_ctrol.lcp.lock);
+            if (thread->flow_ctrol.waiting_count > 0) {
+                pthread_cond_broadcast(&thread->flow_ctrol.lcp.cond);
+            }
+            PTHREAD_MUTEX_UNLOCK(&thread->flow_ctrol.lcp.lock);
         }
     }
 
@@ -452,8 +479,8 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_record_size, const bool use_fixed_buffer_size,
-        const bool passive_write)
+        const int max_delay, const int max_record_size, const bool
+        use_fixed_buffer_size, const bool passive_write)
 {
     const int alloc_elements_once = 1024;
     const int64_t alloc_elements_limit = 0;
@@ -467,9 +494,9 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     thread->order_mode = order_mode;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
     thread->passive_write = passive_write;
+    thread->flow_ctrol.max_delay = max_delay;
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
-
     callbacks.init_func = binlog_wbuffer_alloc_init;
     callbacks.args = writer;
     element_size = sizeof(SFBinlogWriterBuffer);
@@ -489,6 +516,12 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     if ((result=fc_queue_init(&thread->queue, (unsigned long)
                     (&((SFBinlogWriterBuffer *)NULL)->next))) != 0)
     {
+        return result;
+    }
+
+    thread->flow_ctrol.last_timestamp = 0;
+    thread->flow_ctrol.waiting_count = 0;
+    if ((result=init_pthread_lock_cond_pair(&thread->flow_ctrol.lcp)) != 0) {
         return result;
     }
 
@@ -537,7 +570,7 @@ int sf_binlog_writer_change_order_by(SFBinlogWriterInfo *writer,
         return ENOMEM;
     }
 
-    fc_queue_push(&writer->thread->queue, buffer);
+    sf_push_to_binlog_write_queue(writer, buffer);
     return 0;
 }
 
@@ -552,7 +585,7 @@ static inline int sf_binlog_writer_push_directive(SFBinlogWriterInfo *writer,
         return ENOMEM;
     }
 
-    fc_queue_push(&writer->thread->queue, buffer);
+    sf_push_to_binlog_write_queue(writer, buffer);
     return 0;
 }
 

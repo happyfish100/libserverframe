@@ -19,6 +19,7 @@
 #define _SF_BINLOG_WRITER_H_
 
 #include "fastcommon/fc_queue.h"
+#include "fastcommon/fc_atomic.h"
 #include "sf_types.h"
 #include "sf_file_writer.h"
 
@@ -46,7 +47,8 @@ struct sf_binlog_writer_info;
 typedef struct sf_binlog_writer_buffer {
     SFVersionRange version;
     BufferInfo bf;
-    int type;    //for versioned writer
+    int type;
+    uint32_t timestamp;  //for flow ctrol
     struct sf_binlog_writer_info *writer;
     struct sf_binlog_writer_buffer *next;
 } SFBinlogWriterBuffer;
@@ -70,6 +72,12 @@ typedef struct binlog_writer_thread {
     bool use_fixed_buffer_size;
     bool passive_write;
     char order_mode;
+    struct {
+        int max_delay;  //in seconds
+        volatile uint32_t last_timestamp;
+        int waiting_count;
+        pthread_lock_cond_pair_t lcp;
+    } flow_ctrol;
     struct {
         struct sf_binlog_writer_info *head;
         struct sf_binlog_writer_info *tail;
@@ -115,8 +123,8 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_record_size, const bool use_fixed_buffer_size,
-        const bool passive_write);
+        const int max_delay, const int max_record_size, const bool
+        use_fixed_buffer_size, const bool passive_write);
 
 #define sf_binlog_writer_init_normal(writer,  \
         data_path, subdir_name, buffer_size)  \
@@ -129,15 +137,16 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
             SF_BINLOG_FILE_PREFIX, next_version, buffer_size, \
             ring_size, SF_BINLOG_DEFAULT_ROTATE_SIZE)
 
-#define sf_binlog_writer_init_thread(thread, name, writer, max_record_size) \
+#define sf_binlog_writer_init_thread(thread, name, \
+        writer, max_delay, max_record_size) \
     sf_binlog_writer_init_thread_ex(thread, name, writer, \
-            SF_BINLOG_THREAD_ORDER_MODE_FIXED,  \
+            SF_BINLOG_THREAD_ORDER_MODE_FIXED, max_delay, \
             max_record_size, true, false)
 
 static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
         const char *file_prefix, const int buffer_size,
-        const int max_record_size)
+        const int max_delay, const int max_record_size)
 {
     int result;
     if ((result=sf_binlog_writer_init_normal_ex(&context->writer,
@@ -147,14 +156,14 @@ static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         return result;
     }
 
-    return sf_binlog_writer_init_thread(&context->thread,
-            subdir_name, &context->writer, max_record_size);
+    return sf_binlog_writer_init_thread(&context->thread, subdir_name,
+            &context->writer, max_delay, max_record_size);
 }
 
-#define sf_binlog_writer_init(context, data_path,  \
-        subdir_name, buffer_size, max_record_size) \
+#define sf_binlog_writer_init(context, data_path, subdir_name, \
+        buffer_size, max_delay, max_record_size) \
     sf_binlog_writer_init_ex(context, data_path, subdir_name, \
-            SF_BINLOG_FILE_PREFIX, buffer_size, max_record_size)
+            SF_BINLOG_FILE_PREFIX, buffer_size, max_delay, max_record_size)
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 
@@ -240,7 +249,12 @@ int sf_binlog_writer_notify_exit(SFBinlogWriterInfo *writer);
 static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_buffer(
         SFBinlogWriterThread *thread)
 {
-    return (SFBinlogWriterBuffer *)fast_mblock_alloc_object(&thread->mblock);
+    SFBinlogWriterBuffer *buffer;
+
+    if ((buffer=fast_mblock_alloc_object(&thread->mblock)) != NULL) {
+        buffer->type = SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE;
+    }
+    return buffer;
 }
 
 #define sf_binlog_writer_alloc_one_version_buffer(writer, version) \
@@ -257,6 +271,7 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
         const int64_t last_version, const int type)
 {
     SFBinlogWriterBuffer *buffer;
+
     buffer = (SFBinlogWriterBuffer *)fast_mblock_alloc_object(
             &writer->thread->mblock);
     if (buffer != NULL) {
@@ -310,13 +325,32 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_versioned_buffer_ex(
 #define sf_binlog_writer_set_binlog_write_index(writer, last_index) \
     sf_file_writer_set_binlog_write_index(&(writer)->fw, last_index)
 
-#define sf_push_to_binlog_thread_queue(thread, buffer) \
-    fc_queue_push(&(thread)->queue, buffer)
-
 static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
         SFBinlogWriterBuffer *buffer)
 {
-    buffer->type = SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE;
+    int64_t last_timestamp;
+
+    last_timestamp = FC_ATOMIC_GET(writer->thread->flow_ctrol.last_timestamp);
+    if (last_timestamp > 0 && g_current_time - last_timestamp >
+            writer->thread->flow_ctrol.max_delay)
+    {
+        PTHREAD_MUTEX_LOCK(&writer->thread->flow_ctrol.lcp.lock);
+        writer->thread->flow_ctrol.waiting_count++;
+        last_timestamp = FC_ATOMIC_GET(writer->thread->
+                flow_ctrol.last_timestamp);
+        while (last_timestamp > 0 && g_current_time - last_timestamp >
+                writer->thread->flow_ctrol.max_delay)
+        {
+            pthread_cond_wait(&writer->thread->flow_ctrol.lcp.cond,
+                    &writer->thread->flow_ctrol.lcp.lock);
+            last_timestamp = FC_ATOMIC_GET(writer->thread->
+                    flow_ctrol.last_timestamp);
+        }
+        writer->thread->flow_ctrol.waiting_count--;
+        PTHREAD_MUTEX_UNLOCK(&writer->thread->flow_ctrol.lcp.lock);
+    }
+
+    buffer->timestamp = g_current_time;
     fc_queue_push(&writer->thread->queue, buffer);
 }
 
