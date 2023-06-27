@@ -334,6 +334,10 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
     if (last_timestamp > 0 && g_current_time - last_timestamp >
             writer->thread->flow_ctrol.max_delay)
     {
+        time_t start_time;
+        int time_used;
+
+        start_time = g_current_time;
         PTHREAD_MUTEX_LOCK(&writer->thread->flow_ctrol.lcp.lock);
         writer->thread->flow_ctrol.waiting_count++;
         last_timestamp = FC_ATOMIC_GET(writer->thread->
@@ -348,6 +352,14 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
         }
         writer->thread->flow_ctrol.waiting_count--;
         PTHREAD_MUTEX_UNLOCK(&writer->thread->flow_ctrol.lcp.lock);
+
+        time_used = g_current_time - start_time;
+        if (time_used > 0) {
+            logWarning("file: "__FILE__", line: %d, "
+                    "subdir_name: %s, max_delay: %d s, flow ctrol waiting "
+                    "time: %d s", __LINE__, writer->fw.cfg.subdir_name,
+                    writer->thread->flow_ctrol.max_delay, time_used);
+        }
     }
 
     buffer->timestamp = g_current_time;
