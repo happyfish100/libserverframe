@@ -367,7 +367,8 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
 
 int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         const char *subdir_name, const char *file_prefix,
-        const int buffer_size, const int64_t file_rotate_size)
+        const int buffer_size, const int64_t file_rotate_size,
+        const bool call_fsync)
 {
     int result;
     int path_len;
@@ -384,7 +385,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         return result;
     }
 
-    writer->cfg.call_fsync = true;
+    writer->cfg.call_fsync = call_fsync;
     writer->cfg.file_rotate_size = file_rotate_size;
     writer->cfg.data_path = data_path;
     path_len = snprintf(filepath, sizeof(filepath),

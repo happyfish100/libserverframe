@@ -71,7 +71,8 @@ extern "C" {
 
 int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         const char *subdir_name, const char *file_prefix,
-        const int buffer_size, const int64_t file_rotate_size);
+        const int buffer_size, const int64_t file_rotate_size,
+        const bool call_fsync);
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
 

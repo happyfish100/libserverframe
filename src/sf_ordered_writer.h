@@ -65,13 +65,14 @@ extern "C" {
 int sf_ordered_writer_init_ex(SFOrderedWriterContext *context,
         const char *data_path, const char *subdir_name,
         const char *file_prefix, const int buffer_size,
-        const int max_record_size, const int64_t file_rotate_size);
+        const int max_record_size, const int64_t file_rotate_size,
+        const bool call_fsync);
 
 #define sf_ordered_writer_init(context, data_path, \
         subdir_name, buffer_size, max_record_size) \
     sf_ordered_writer_init_ex(context, data_path, subdir_name,   \
             SF_BINLOG_FILE_PREFIX, buffer_size, max_record_size, \
-            SF_BINLOG_DEFAULT_ROTATE_SIZE)
+            SF_BINLOG_DEFAULT_ROTATE_SIZE, true)
 
 #define sf_ordered_writer_set_flags(ctx, flags) \
     sf_file_writer_set_flags(&(ctx)->writer.fw, flags)
