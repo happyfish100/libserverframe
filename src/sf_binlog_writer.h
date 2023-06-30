@@ -338,7 +338,9 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
             writer->thread->flow_ctrol.max_delay)
     {
         time_t start_time;
+        time_t last_log_timestamp;
         int time_used;
+        int log_level;
 
         start_time = g_current_time;
         PTHREAD_MUTEX_LOCK(&writer->thread->flow_ctrol.lcp.lock);
@@ -358,10 +360,23 @@ static inline void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
 
         time_used = g_current_time - start_time;
         if (time_used > 0) {
-            logWarning("file: "__FILE__", line: %d, "
-                    "subdir_name: %s, max_delay: %d s, flow ctrol waiting "
-                    "time: %d s", __LINE__, writer->fw.cfg.subdir_name,
-                    writer->thread->flow_ctrol.max_delay, time_used);
+            last_log_timestamp = FC_ATOMIC_GET(
+                    LAST_BINLOG_WRITER_LOG_TIMESTAMP);
+            if (g_current_time != last_log_timestamp &&
+                    __sync_bool_compare_and_swap(
+                        &LAST_BINLOG_WRITER_LOG_TIMESTAMP,
+                        last_log_timestamp, g_current_time))
+            {
+                if (time_used <= writer->thread->flow_ctrol.max_delay) {
+                    log_level = LOG_DEBUG;
+                } else {
+                    log_level = LOG_WARNING;
+                }
+                log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
+                        "subdir_name: %s, max_delay: %d s, flow ctrol waiting "
+                        "time: %d s", __LINE__, writer->fw.cfg.subdir_name,
+                        writer->thread->flow_ctrol.max_delay, time_used);
+            }
         }
     }
 

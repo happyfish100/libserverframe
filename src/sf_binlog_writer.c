@@ -392,12 +392,12 @@ static void *binlog_writer_func(void *arg)
         if (fc_queue_empty(&thread->queue)) {
             current_timestamp = 0;
         }
-        if (current_timestamp == 0 || current_timestamp > last_timestamp) {
-            if (current_timestamp != last_timestamp) {
-                last_timestamp = current_timestamp;
-                FC_ATOMIC_SET(thread->flow_ctrol.last_timestamp,
-                        current_timestamp);
-            }
+        if ((current_timestamp == 0 && last_timestamp != 0) ||
+                (current_timestamp > last_timestamp))
+        {
+            last_timestamp = current_timestamp;
+            FC_ATOMIC_SET(thread->flow_ctrol.last_timestamp,
+                    current_timestamp);
 
             PTHREAD_MUTEX_LOCK(&thread->flow_ctrol.lcp.lock);
             if (thread->flow_ctrol.waiting_count > 0) {

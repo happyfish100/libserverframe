@@ -58,6 +58,7 @@ typedef struct sf_global_variables {
     SFConnectionStat connection_stat;
     sf_error_handler_callback error_handler;
     string_t empty;
+    volatile time_t last_binlog_writer_log_timestamp;
 } SFGlobalVariables;
 
 typedef struct sf_context_ini_config {
@@ -98,6 +99,8 @@ extern SFContext                 g_sf_context;
 
 #define SF_G_ERROR_HANDLER       g_sf_global_vars.error_handler
 #define SF_G_EMPTY_STRING        g_sf_global_vars.empty
+#define LAST_BINLOG_WRITER_LOG_TIMESTAMP  g_sf_global_vars. \
+    last_binlog_writer_log_timestamp
 
 #define SF_G_EPOLL_EDGE_TRIGGER  g_sf_global_vars.epoll_edge_trigger
 
