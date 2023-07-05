@@ -179,10 +179,16 @@ static int binlog_wbuffer_alloc_init(void *element, void *args)
     return 0;
 }
 
-static int compare_buffer_version(const SFOrderedWriterBuffer *entry1,
+static int push_compare_buffer_version(const SFOrderedWriterBuffer *entry1,
         const SFOrderedWriterBuffer *entry2)
 {
     return fc_compare_int64(entry1->version, entry2->version);
+}
+
+static int pop_compare_buffer_version(const SFOrderedWriterBuffer *entry,
+        const SFOrderedWriterBuffer *less_equal, void *arg)
+{
+    return fc_compare_int64(entry->version, less_equal->version);
 }
 
 static int sf_ordered_writer_init_thread(SFOrderedWriterContext *context,
@@ -225,7 +231,9 @@ static int sf_ordered_writer_init_thread(SFOrderedWriterContext *context,
     if ((result=sorted_queue_init(&thread->queues.buffer, (unsigned long)
                     (&((SFOrderedWriterBuffer *)NULL)->dlink),
                     (int (*)(const void *, const void *))
-                    compare_buffer_version)) != 0)
+                    push_compare_buffer_version,
+                    (int (*)(const void *, const void *, void *arg))
+                    pop_compare_buffer_version, NULL)) != 0)
     {
         return result;
     }
