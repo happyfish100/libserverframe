@@ -213,6 +213,24 @@ static inline int64_t sf_binlog_writer_get_next_version(
     return writer->version_ctx.next;
 }
 
+static inline int sf_binlog_writer_get_waiting_count(
+        SFBinlogWriterInfo *writer)
+{
+    return writer->version_ctx.ring.waiting_count;
+}
+
+static inline int sf_binlog_writer_get_thread_waiting_count(
+        SFBinlogWriterThread *thread)
+{
+    int waiting_count;
+
+    PTHREAD_MUTEX_LOCK(&thread->flow_ctrol.lcp.lock);
+    waiting_count = thread->flow_ctrol.waiting_count;
+    PTHREAD_MUTEX_UNLOCK(&thread->flow_ctrol.lcp.lock);
+
+    return waiting_count;
+}
+
 int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer);
 
 int sf_binlog_writer_flush_file(SFBinlogWriterInfo *writer);
