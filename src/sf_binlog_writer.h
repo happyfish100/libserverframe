@@ -89,7 +89,7 @@ typedef struct sf_binlog_writer_info {
 
     struct {
         SFBinlogWriterBufferRing ring;
-        int64_t next;
+        volatile int64_t next;
         int64_t change_count;  //version change count
     } version_ctx;
     SFBinlogWriterThread *thread;

@@ -632,8 +632,10 @@ void sf_push_to_binlog_write_queue(SFBinlogWriterInfo *writer,
     int64_t last_timestamp;
 
     last_timestamp = FC_ATOMIC_GET(writer->thread->flow_ctrol.last_timestamp);
-    if (last_timestamp > 0 && g_current_time - last_timestamp >
-            writer->thread->flow_ctrol.max_delay)
+    if ((last_timestamp > 0 && g_current_time - last_timestamp > writer->
+                thread->flow_ctrol.max_delay) && !(writer->order_by ==
+                    SF_BINLOG_WRITER_TYPE_ORDER_BY_VERSION && buffer->
+                    version.first - writer->version_ctx.next < 128))
     {
         time_t start_time;
         time_t last_log_timestamp;
