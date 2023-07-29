@@ -68,10 +68,6 @@ static int parse(SFBinlogIndexContext *ctx, const string_t *lines,
     const string_t *end;
     void *bindex;
 
-    if (row_count < 1) {
-        return EINVAL;
-    }
-
     if ((result=parse_header(lines, &record_count, &ctx->
                     last_version, error_info)) != 0)
     {
@@ -140,7 +136,9 @@ static int load(SFBinlogIndexContext *ctx)
     }
 
     row_count = split_string_ex(&context, '\n', lines, row_count, true);
-    result = parse(ctx, lines, row_count);
+    if (row_count > 0) {
+        result = parse(ctx, lines, row_count);
+    }
     free(lines);
     free(context.str);
     return result;
