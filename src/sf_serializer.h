@@ -21,6 +21,7 @@
 #include "fastcommon/common_define.h"
 #include "fastcommon/shared_func.h"
 #include "fastcommon/fast_buffer.h"
+#include "fastcommon/uniq_skiplist.h"
 #include "fastcommon/hash.h"
 
 #define SF_SERIALIZER_VALUE_TYPE_COUNT  12
@@ -430,6 +431,44 @@ static inline int sf_serializer_pack_id_name_array(FastBuffer *buffer,
 
     p = obj->value.ptr;
     for (pair=in_pairs; pair<end; pair++) {
+        long2buff(pair->id, p);
+        p += sizeof(int64_t);
+        SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, &pair->name);
+    }
+    buffer->length += length;
+    return 0;
+}
+
+static inline int sf_serializer_pack_id_name_skiplist(
+        FastBuffer *buffer, const unsigned char fid,
+        UniqSkiplist *sl)
+{
+    int result;
+    int length;
+    SFSerializerPackFieldArray *obj;
+    const id_name_pair_t *pair;
+    UniqSkiplistIterator it;
+    char *p;
+
+    length = sizeof(SFSerializerPackFieldArray);
+    uniq_skiplist_iterator(sl, &it);
+    while ((pair=uniq_skiplist_next(&it)) != NULL) {
+        length += sizeof(int64_t) + pair->name.len +
+            sizeof(SFSerializerPackStringValue);
+    }
+
+    if ((result=fast_buffer_check_inc_size(buffer, length)) != 0) {
+        return result;
+    }
+
+    obj = (SFSerializerPackFieldArray *)(buffer->data + buffer->length);
+    obj->field.id = fid;
+    obj->field.type = sf_serializer_value_type_id_name_array;
+    int2buff(uniq_skiplist_count(sl), obj->value.count);
+
+    p = obj->value.ptr;
+    uniq_skiplist_iterator(sl, &it);
+    while ((pair=uniq_skiplist_next(&it)) != NULL) {
         long2buff(pair->id, p);
         p += sizeof(int64_t);
         SF_SERIALIZER_PACK_STRING_AND_MOVE_PTR(p, &pair->name);
