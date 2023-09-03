@@ -43,10 +43,10 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {
-    {'\0'}, NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
-    {'\0'}, {'\0'}, 0, true, true, NULL, NULL, NULL, NULL,
-    NULL, sf_task_finish_clean_up, NULL
+SFContext g_sf_context = {{'\0'}, NULL, 0,
+    {{false, sf_network_type_sock}, {false, sf_network_type_rdma}},
+    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, NULL,
+    NULL, NULL, NULL, NULL, sf_task_finish_clean_up, NULL
 };
 
 static inline void set_config_str_value(const char *value,
@@ -411,17 +411,50 @@ int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
     return sf_load_context_from_config_ex(&g_sf_context, config);
 }
 
+static int init_network_handler(SFNetworkHandler *handler,
+        SFContext *sf_context)
+{
+    handler->ctx = sf_context;
+    handler->inner.handler = handler;
+    handler->outer.handler = handler;
+    handler->inner.is_inner = true;
+    handler->outer.is_inner = false;
+
+    if (handler->type == sf_network_type_sock) {
+        handler->inner.sock = -1;
+        handler->outer.sock = -1;
+    } else {
+    }
+
+    return 0;
+}
+
 int sf_load_context_from_config_ex(SFContext *sf_context,
         SFContextIniConfig *config)
 {
+    SFNetworkHandler *sock_handler;
+    SFNetworkHandler *rdma_handler;
     char *inner_port;
     char *outer_port;
     char *inner_bind_addr;
     char *outer_bind_addr;
     char *bind_addr;
     int port;
+    int i;
+    int result;
 
-    sf_context->inner_port = sf_context->outer_port = 0;
+    memset(sf_context->handlers, 0, sizeof(sf_context->handlers));
+    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    rdma_handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    sock_handler->type = sf_network_type_sock;
+    rdma_handler->type = sf_network_type_rdma;
+    for (i=0; i<SF_NETWORK_HANDLER_COUNT; i++) {
+        if ((result=init_network_handler(sf_context->handlers + i,
+                        sf_context)) != 0)
+        {
+            return result;
+        }
+    }
 
     inner_port = iniGetStrValue(config->ini_ctx.section_name,
             "inner_port", config->ini_ctx.context);
@@ -431,22 +464,30 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         port = iniGetIntValue(config->ini_ctx.section_name,
                 "port", config->ini_ctx.context, 0);
         if (port > 0) {
-            sf_context->inner_port = sf_context->outer_port = port;
+            sock_handler->inner.port = sock_handler->outer.port = port;
         }
     } else {
         if (inner_port != NULL) {
-            sf_context->inner_port = atoi(inner_port);
+            sock_handler->inner.port = strtol(inner_port, NULL, 10);
         }
         if (outer_port != NULL) {
-            sf_context->outer_port = atoi(outer_port);
+            sock_handler->outer.port = strtol(outer_port, NULL, 10);
         }
     }
 
-    if (sf_context->inner_port <= 0) {
-        sf_context->inner_port = config->default_inner_port;
+    if (sock_handler->inner.port <= 0) {
+        sock_handler->inner.port = config->default_inner_port;
     }
-    if (sf_context->outer_port <= 0) {
-        sf_context->outer_port = config->default_outer_port;
+    if (sock_handler->outer.port <= 0) {
+        sock_handler->outer.port = config->default_outer_port;
+    }
+
+    if (sock_handler->inner.port == sock_handler->outer.port) {
+        sock_handler->inner.enabled = false;
+        sock_handler->outer.enabled = true;
+    } else {
+        sock_handler->inner.enabled = true;
+        sock_handler->outer.enabled = true;
     }
 
     inner_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
@@ -495,23 +536,25 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)
 {
+    const SFNetworkHandler *sock_handler;
     int len;
 
+    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
     len = 0;
-    if ((sf_context->inner_port == sf_context->outer_port) &&
+    if ((sock_handler->inner.port == sock_handler->outer.port) &&
             (strcmp(sf_context->inner_bind_addr,
                     sf_context->outer_bind_addr) == 0))
     {
         len += snprintf(output + len, size - len,
                 "port=%u, bind_addr=%s",
-                sf_context->inner_port,
+                sock_handler->inner.port,
                 sf_context->inner_bind_addr);
     } else {
         len += snprintf(output + len, size - len,
                 "inner_port=%u, inner_bind_addr=%s, "
                 "outer_port=%u, outer_bind_addr=%s",
-                sf_context->inner_port, sf_context->inner_bind_addr,
-                sf_context->outer_port, sf_context->outer_bind_addr);
+                sock_handler->inner.port, sf_context->inner_bind_addr,
+                sock_handler->outer.port, sf_context->outer_bind_addr);
     }
 
     len += snprintf(output + len, size - len,
