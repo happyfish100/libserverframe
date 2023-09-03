@@ -53,6 +53,17 @@ typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
 
 typedef int (*sf_error_handler_callback)(const int errnum);
 
+typedef enum {
+    sf_network_type_sock = 's',
+    sf_network_type_rdma = 'r'
+} SFNetworkType;
+
+typedef enum {
+    sf_comm_action_continue = 'c',
+    sf_comm_action_break = 'b',
+    sf_comm_action_finish = 'f'
+} SFCommAction;
+
 struct sf_listener;
 typedef int (*sf_create_server_callback)(struct sf_listener *listener,
         const char *bind_addr);
@@ -63,15 +74,10 @@ typedef int (*sf_async_connect_server_callback)(struct fast_task_info *task);
 typedef int (*sf_connect_server_done_callback)(struct fast_task_info *task);
 typedef void (*sf_close_connection_callback)(struct fast_task_info *task);
 
-typedef int (*sf_send_data_callback)(struct fast_task_info *task,
-        bool *send_done);
-typedef int (*sf_recv_data_callback)(struct fast_task_info *task,
-        bool *recv_done);
-
-typedef enum {
-    sf_network_type_sock = 's',
-    sf_network_type_rdma = 'r'
-} SFNetworkType;
+typedef ssize_t (*sf_send_data_callback)(struct fast_task_info *task,
+        SFCommAction *action);
+typedef ssize_t (*sf_recv_data_callback)(struct fast_task_info *task,
+        SFCommAction *action);
 
 struct sf_network_handler;
 typedef struct sf_listener {
@@ -83,6 +89,7 @@ typedef struct sf_listener {
         int sock;  //for socket
         void *id;  //for rdma_cm
     };
+    struct sockaddr_in inaddr;  //for accept
 } SFListener;
 
 struct sf_context;

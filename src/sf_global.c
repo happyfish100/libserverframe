@@ -31,6 +31,7 @@
 #include "fastcommon/process_ctrl.h"
 #include "fastcommon/logger.h"
 #include "sf_nio.h"
+#include "sf_service.h"
 #include "sf_global.h"
 
 SFGlobalVariables g_sf_global_vars = {
@@ -423,7 +424,16 @@ static int init_network_handler(SFNetworkHandler *handler,
     if (handler->type == sf_network_type_sock) {
         handler->inner.sock = -1;
         handler->outer.sock = -1;
+        handler->create_server = sf_create_socket_server;
+        handler->close_server = sf_close_socket_server;
+        handler->accept_connection = sf_accept_socket_connection;
+        handler->async_connect_server = sf_async_connect_socket_server;
+        handler->connect_server_done = sf_connect_socket_server_done;
+        handler->close_connection = sf_close_socket_connection;
+        handler->send_data = sf_socket_send_data;
+        handler->recv_data = sf_socket_recv_data;
     } else {
+        //TODO
     }
 
     return 0;
@@ -483,8 +493,8 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
     if (sock_handler->inner.port == sock_handler->outer.port) {
-        sock_handler->inner.enabled = false;
-        sock_handler->outer.enabled = true;
+        sock_handler->inner.enabled = true;
+        sock_handler->outer.enabled = false;
     } else {
         sock_handler->inner.enabled = true;
         sock_handler->outer.enabled = true;

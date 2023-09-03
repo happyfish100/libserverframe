@@ -85,6 +85,9 @@ void sf_set_current_time();
 
 int sf_create_socket_server(SFListener *listener, const char *bind_addr);
 void sf_close_socket_server(SFListener *listener);
+struct fast_task_info *sf_accept_socket_connection(SFListener *listener);
+
+void sf_close_socket_connection(struct fast_task_info *task);
 
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)
@@ -127,7 +130,7 @@ void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 int sf_init_task(struct fast_task_info *task);
 
 static inline struct fast_task_info *sf_alloc_init_task(
-        SFContext *sf_context, const int sock)
+        SFNetworkHandler *handler, const int fd)
 {
     struct fast_task_info *task;
 
@@ -139,11 +142,11 @@ static inline struct fast_task_info *sf_alloc_init_task(
                 __LINE__);
         return NULL;
     }
+
     __sync_add_and_fetch(&task->reffer_count, 1);
     __sync_bool_compare_and_swap(&task->canceled, 1, 0);
-    task->ctx = sf_context;
-    task->event.fd = sock;
-
+    task->handler = handler;
+    task->event.fd = fd;
     return task;
 }
 

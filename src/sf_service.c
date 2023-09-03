@@ -436,6 +436,49 @@ void sf_close_socket_server(SFListener *listener)
     }
 }
 
+struct fast_task_info *sf_accept_socket_connection(SFListener *listener)
+{
+    int incomesock;
+    int port;
+    socklen_t sockaddr_len;
+    struct fast_task_info *task;
+
+    sockaddr_len = sizeof(listener->inaddr);
+    incomesock = accept(listener->sock, (struct sockaddr *)
+            &listener->inaddr, &sockaddr_len);
+    if (incomesock < 0) { //error
+        if (!(errno == EINTR || errno == EAGAIN)) {
+            logError("file: "__FILE__", line: %d, "
+                    "accept fail, errno: %d, error info: %s",
+                    __LINE__, errno, strerror(errno));
+        }
+
+        return NULL;
+    }
+
+    if (tcpsetnonblockopt(incomesock) != 0) {
+        close(incomesock);
+        return NULL;
+    }
+    FC_SET_CLOEXEC(incomesock);
+
+    if ((task=sf_alloc_init_task(listener->handler, incomesock)) == NULL) {
+        close(incomesock);
+        return NULL;
+    }
+
+    getPeerIpAddPort(incomesock, task->client_ip,
+            sizeof(task->client_ip), &port);
+    task->port = port;
+    return task;
+}
+
+void sf_close_socket_connection(struct fast_task_info *task)
+{
+    close(task->event.fd);
+    task->event.fd = -1;
+}
+
 void sf_socket_close_ex(SFContext *sf_context)
 {
     SFNetworkHandler *handler;
@@ -457,57 +500,28 @@ void sf_socket_close_ex(SFContext *sf_context)
 
 static void accept_run(SFListener *listener)
 {
-    int incomesock;
-    int port;
-    struct sockaddr_in inaddr;
-    socklen_t sockaddr_len;
     struct fast_task_info *task;
 
     while (g_sf_global_vars.continue_flag) {
-        sockaddr_len = sizeof(inaddr);
-        incomesock = accept(listener->sock,
-                (struct sockaddr*)&inaddr, &sockaddr_len);
-        if (incomesock < 0) { //error
-            if (!(errno == EINTR || errno == EAGAIN)) {
-                logError("file: "__FILE__", line: %d, "
-                        "accept fail, errno: %d, error info: %s",
-                        __LINE__, errno, strerror(errno));
-            }
-
+        if ((task=listener->handler->accept_connection(listener)) == NULL) {
             continue;
         }
 
-        if (tcpsetnonblockopt(incomesock) != 0) {
-            close(incomesock);
-            continue;
-        }
-        FC_SET_CLOEXEC(incomesock);
-
-        if ((task=sf_alloc_init_task(listener->handler->ctx,
-                        incomesock)) == NULL)
-        {
-            close(incomesock);
-            continue;
-        }
-
-        getPeerIpAddPort(incomesock, task->client_ip,
-                sizeof(task->client_ip), &port);
-        task->port = port;
         task->thread_data = listener->handler->ctx->thread_data +
-            incomesock % listener->handler->ctx->work_threads;
+            task->event.fd % listener->handler->ctx->work_threads;
         if (listener->handler->ctx->accept_done_func != NULL) {
-            if (listener->handler->ctx->accept_done_func(
-                        task, inaddr.sin_addr.s_addr,
+            if (listener->handler->ctx->accept_done_func(task,
+                        listener->inaddr.sin_addr.s_addr,
                         listener->is_inner) != 0)
             {
-                close(incomesock);
+                listener->handler->close_connection(task);
                 sf_release_task(task);
                 continue;
             }
         }
 
         if (sf_nio_notify(task, SF_NIO_STAGE_INIT) != 0) {
-            close(incomesock);
+            listener->handler->close_connection(task);
             sf_release_task(task);
         }
     }

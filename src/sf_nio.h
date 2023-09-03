@@ -26,7 +26,7 @@
 #include "sf_define.h"
 #include "sf_types.h"
 
-#define SF_CTX  ((SFContext *)(task->ctx))
+#define SF_CTX  (task->handler->ctx)
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,6 +91,12 @@ void sf_task_switch_thread(struct fast_task_info *task,
         const int new_thread_index);
 
 void sf_task_detach_thread(struct fast_task_info *task);
+
+int sf_async_connect_socket_server(struct fast_task_info *task);
+int sf_connect_socket_server_done(struct fast_task_info *task);
+
+ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action);
+ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action);
 
 static inline int sf_nio_forward_request(struct fast_task_info *task,
         const int new_thread_index)
