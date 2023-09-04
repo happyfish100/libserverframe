@@ -423,6 +423,14 @@ int sf_socket_server_ex(SFContext *sf_context)
             handler->inner.enabled = true;
             handler->outer.enabled = true;
         }
+
+        /*
+        logInfo("%p [%d] inner {port: %d, enabled: %d}, "
+                "outer {port: %d, enabled: %d}", sf_context,
+                (int)(handler-sf_context->handlers),
+                handler->inner.port, handler->inner.enabled,
+                handler->outer.port, handler->outer.enabled);
+                */
     }
 
     return 0;
@@ -533,7 +541,7 @@ static void *accept_thread_entrance(SFListener *listener)
     {
         char thread_name[32];
         snprintf(thread_name, sizeof(thread_name), "%s-%s-listen",
-                listener->handler->type == sf_network_type_sock ?
+                listener->handler->type == fc_network_type_sock ?
                 "sock" : "rdma", listener->handler->ctx->name);
         prctl(PR_SET_NAME, thread_name);
     }

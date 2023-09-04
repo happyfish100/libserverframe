@@ -31,11 +31,11 @@
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/fc_queue.h"
-#include "../../sf_util.h"
-#include "../../sf_func.h"
-#include "../../sf_nio.h"
-#include "../../sf_global.h"
-#include "../../sf_service.h"
+#include "sf/sf_util.h"
+#include "sf/sf_func.h"
+#include "sf/sf_nio.h"
+#include "sf/sf_global.h"
+#include "sf/sf_service.h"
 #include "client_channel.h"
 
 typedef struct {
@@ -171,13 +171,13 @@ void client_channel_destroy()
 }
 
 static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
-        *channel, const uint32_t hash_code, const SFNetworkType network_type,
+        *channel, const uint32_t hash_code, const FCNetworkType network_type,
         const char *server_ip, const uint16_t port, int *err_no)
 {
     struct fast_task_info *task;
     SFNetworkHandler *handler;
 
-    if (network_type == sf_network_type_sock) {
+    if (network_type == fc_network_type_sock) {
         handler = g_sf_context.handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
     } else {
         handler = g_sf_context.handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
@@ -232,7 +232,7 @@ int idempotency_client_channel_check_reconnect(
 }
 
 struct idempotency_client_channel *idempotency_client_channel_get(
-        const SFNetworkType network_type, const char *server_ip,
+        const FCNetworkType network_type, const char *server_ip,
         const uint16_t server_port, const int timeout, int *err_no)
 {
     int r;

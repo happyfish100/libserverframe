@@ -85,8 +85,10 @@ extern SFContext                 g_sf_context;
 #define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
 
-#define SF_G_OUTER_PORT          g_sf_context.outer_port
-#define SF_G_INNER_PORT          g_sf_context.inner_port
+#define SF_G_SOCK_HANDLER        (g_sf_context.handlers + \
+        SF_SOCKET_NETWORK_HANDLER_INDEX)
+#define SF_G_OUTER_PORT          SF_G_SOCK_HANDLER->outer.port
+#define SF_G_INNER_PORT          SF_G_SOCK_HANDLER->inner.port
 #define SF_G_OUTER_BIND_ADDR     g_sf_context.outer_bind_addr
 #define SF_G_INNER_BIND_ADDR     g_sf_context.inner_bind_addr
 

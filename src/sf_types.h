@@ -54,11 +54,6 @@ typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
 typedef int (*sf_error_handler_callback)(const int errnum);
 
 typedef enum {
-    sf_network_type_sock = 's',
-    sf_network_type_rdma = 'r'
-} SFNetworkType;
-
-typedef enum {
     sf_comm_action_continue = 'c',
     sf_comm_action_break = 'b',
     sf_comm_action_finish = 'f'
@@ -95,7 +90,7 @@ typedef struct sf_listener {
 struct sf_context;
 typedef struct sf_network_handler {
     bool enabled;
-    SFNetworkType type;
+    FCNetworkType type;
     struct sf_context *ctx;
 
     SFListener inner;

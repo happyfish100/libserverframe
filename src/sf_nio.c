@@ -721,7 +721,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
         *action = sf_comm_action_continue;
     }
 
-    return 0;
+    return bytes;
 }
 
 int sf_client_sock_read(int sock, short event, void *arg)

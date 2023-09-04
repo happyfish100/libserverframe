@@ -280,7 +280,7 @@ int sf_proto_set_body_length(struct fast_task_info *task);
 const char *sf_get_cmd_caption(const int cmd);
 
 int sf_proto_deal_task_done(struct fast_task_info *task,
-        SFCommonTaskContext *ctx);
+        const char *service_name, SFCommonTaskContext *ctx);
 
 static inline void sf_proto_init_task_context(struct fast_task_info *task,
         SFCommonTaskContext *ctx)

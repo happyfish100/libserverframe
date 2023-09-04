@@ -45,7 +45,7 @@ SFGlobalVariables g_sf_global_vars = {
 };
 
 SFContext g_sf_context = {{'\0'}, NULL, 0,
-    {{false, sf_network_type_sock}, {false, sf_network_type_rdma}},
+    {{true, fc_network_type_sock}, {false, fc_network_type_rdma}},
     1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, NULL,
     NULL, NULL, NULL, NULL, sf_task_finish_clean_up, NULL
 };
@@ -421,7 +421,7 @@ static int init_network_handler(SFNetworkHandler *handler,
     handler->inner.is_inner = true;
     handler->outer.is_inner = false;
 
-    if (handler->type == sf_network_type_sock) {
+    if (handler->type == fc_network_type_sock) {
         handler->inner.sock = -1;
         handler->outer.sock = -1;
         handler->create_server = sf_create_socket_server;
@@ -453,11 +453,10 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     int i;
     int result;
 
-    memset(sf_context->handlers, 0, sizeof(sf_context->handlers));
     sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
     rdma_handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
-    sock_handler->type = sf_network_type_sock;
-    rdma_handler->type = sf_network_type_rdma;
+    sock_handler->type = fc_network_type_sock;
+    rdma_handler->type = fc_network_type_rdma;
     for (i=0; i<SF_NETWORK_HANDLER_COUNT; i++) {
         if ((result=init_network_handler(sf_context->handlers + i,
                         sf_context)) != 0)
