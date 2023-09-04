@@ -83,11 +83,12 @@ int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx);
 
 void sf_set_current_time();
 
-int sf_create_socket_server(SFListener *listener, const char *bind_addr);
-void sf_close_socket_server(SFListener *listener);
-struct fast_task_info *sf_accept_socket_connection(SFListener *listener);
+int sf_socket_create_server(SFListener *listener,
+        int af, const char *bind_addr);
+void sf_socket_close_server(SFListener *listener);
+struct fast_task_info *sf_socket_accept_connection(SFListener *listener);
 
-void sf_close_socket_connection(struct fast_task_info *task);
+void sf_socket_close_connection(struct fast_task_info *task);
 
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)

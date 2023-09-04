@@ -190,7 +190,7 @@ static inline int sf_nio_init(struct fast_task_info *task)
             task->network_timeout);
 }
 
-int sf_connect_socket_server_done(struct fast_task_info *task)
+int sf_socket_connect_server_done(struct fast_task_info *task)
 {
     int result;
     socklen_t len;
@@ -229,7 +229,7 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
     return SF_CTX->deal_task(task, SF_NIO_STAGE_HANDSHAKE);
 }
 
-int sf_async_connect_socket_server(struct fast_task_info *task)
+int sf_socket_async_connect_server(struct fast_task_info *task)
 {
     int result;
     if ((task->event.fd=socketCreateEx2(AF_UNSPEC, task->server_ip,

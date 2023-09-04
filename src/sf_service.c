@@ -339,11 +339,12 @@ static void *worker_thread_entrance(void *arg)
     return NULL;
 }
 
-int sf_create_socket_server(SFListener *listener, const char *bind_addr)
+int sf_socket_create_server(SFListener *listener,
+        int af, const char *bind_addr)
 {
     int result;
 
-    listener->sock = socketServer(bind_addr, listener->port, &result);
+    listener->sock = socketServer2(af, bind_addr, listener->port, &result);
     if (listener->sock < 0) {
         return result;
     }
@@ -358,6 +359,7 @@ int sf_create_socket_server(SFListener *listener, const char *bind_addr)
 int sf_socket_server_ex(SFContext *sf_context)
 {
     int result;
+    int af = AF_INET;
     bool dual_ports;
     const char *bind_addr;
     SFNetworkHandler *handler;
@@ -376,7 +378,7 @@ int sf_socket_server_ex(SFContext *sf_context)
                     *sf_context->inner_bind_addr == '\0') {
                 bind_addr = "";
                 if ((result=handler->create_server(&handler->
-                                outer, bind_addr)) != 0)
+                                outer, af, bind_addr)) != 0)
                 {
                     return result;
                 }
@@ -387,14 +389,14 @@ int sf_socket_server_ex(SFContext *sf_context)
                 bind_addr = sf_context->outer_bind_addr;
                 if (is_private_ip(bind_addr)) {
                     if ((result=handler->create_server(&handler->
-                                    inner, bind_addr)) != 0)
+                                    inner, af, bind_addr)) != 0)
                     {
                         return result;
                     }
                     handler->inner.enabled = true;
                 } else {
                     if ((result=handler->create_server(&handler->
-                                    outer, bind_addr)) != 0)
+                                    outer, af, bind_addr)) != 0)
                     {
                         return result;
                     }
@@ -409,13 +411,13 @@ int sf_socket_server_ex(SFContext *sf_context)
         }
 
         if (dual_ports) {
-            if ((result=handler->create_server(&handler->outer,
+            if ((result=handler->create_server(&handler->outer, af,
                             sf_context->outer_bind_addr)) != 0)
             {
                 return result;
             }
 
-            if ((result=handler->create_server(&handler->inner,
+            if ((result=handler->create_server(&handler->inner, af,
                             sf_context->inner_bind_addr)) != 0)
             {
                 return result;
@@ -436,7 +438,7 @@ int sf_socket_server_ex(SFContext *sf_context)
     return 0;
 }
 
-void sf_close_socket_server(SFListener *listener)
+void sf_socket_close_server(SFListener *listener)
 {
     if (listener->sock >= 0) {
         close(listener->sock);
@@ -444,7 +446,7 @@ void sf_close_socket_server(SFListener *listener)
     }
 }
 
-struct fast_task_info *sf_accept_socket_connection(SFListener *listener)
+struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
 {
     int incomesock;
     int port;
@@ -481,7 +483,7 @@ struct fast_task_info *sf_accept_socket_connection(SFListener *listener)
     return task;
 }
 
-void sf_close_socket_connection(struct fast_task_info *task)
+void sf_socket_close_connection(struct fast_task_info *task)
 {
     close(task->event.fd);
     task->event.fd = -1;

@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -412,6 +413,44 @@ int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
     return sf_load_context_from_config_ex(&g_sf_context, config);
 }
 
+#define API_PREFIX_NAME  "fast_rdma_"
+
+#define LOAD_API(handler, fname) \
+    do { \
+        handler->fname = dlsym(dlhandle, API_PREFIX_NAME#fname); \
+        if (handler->fname == NULL) {  \
+            logError("file: "__FILE__", line: %d, "  \
+                    "dlsym api %s fail, error info: %s", \
+                    __LINE__, API_PREFIX_NAME#fname, dlerror()); \
+            return ENOENT; \
+        } \
+    } while (0)
+
+static int load_rdma_apis(SFNetworkHandler *handler)
+{
+    const char *library = "libfastrdma.so";
+    void *dlhandle;
+
+    dlhandle = dlopen(library, RTLD_LAZY);
+    if (dlhandle == NULL) {
+        logError("file: "__FILE__", line: %d, "
+                "dlopen %s fail, error info: %s",
+                __LINE__, library, dlerror());
+        return EFAULT;
+    }
+
+    LOAD_API(handler, create_server);
+    LOAD_API(handler, close_server);
+    LOAD_API(handler, accept_connection);
+    LOAD_API(handler, async_connect_server);
+    LOAD_API(handler, connect_server_done);
+    LOAD_API(handler, close_connection);
+    LOAD_API(handler, send_data);
+    LOAD_API(handler, recv_data);
+
+    return 0;
+}
+
 static int init_network_handler(SFNetworkHandler *handler,
         SFContext *sf_context)
 {
@@ -424,19 +463,20 @@ static int init_network_handler(SFNetworkHandler *handler,
     if (handler->type == fc_network_type_sock) {
         handler->inner.sock = -1;
         handler->outer.sock = -1;
-        handler->create_server = sf_create_socket_server;
-        handler->close_server = sf_close_socket_server;
-        handler->accept_connection = sf_accept_socket_connection;
-        handler->async_connect_server = sf_async_connect_socket_server;
-        handler->connect_server_done = sf_connect_socket_server_done;
-        handler->close_connection = sf_close_socket_connection;
+        handler->create_server = sf_socket_create_server;
+        handler->close_server = sf_socket_close_server;
+        handler->accept_connection = sf_socket_accept_connection;
+        handler->async_connect_server = sf_socket_async_connect_server;
+        handler->connect_server_done = sf_socket_connect_server_done;
+        handler->close_connection = sf_socket_close_connection;
         handler->send_data = sf_socket_send_data;
         handler->recv_data = sf_socket_recv_data;
+        return 0;
     } else {
-        //TODO
+        handler->inner.id = NULL;
+        handler->outer.id = NULL;
+        return load_rdma_apis(handler);
     }
-
-    return 0;
 }
 
 int sf_load_context_from_config_ex(SFContext *sf_context,

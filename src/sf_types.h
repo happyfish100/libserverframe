@@ -60,8 +60,8 @@ typedef enum {
 } SFCommAction;
 
 struct sf_listener;
-typedef int (*sf_create_server_callback)(struct sf_listener *listener,
-        const char *bind_addr);
+typedef int (*sf_create_server_callback)(struct sf_listener
+        *listener, int af, const char *bind_addr);
 typedef void (*sf_close_server_callback)(struct sf_listener *listener);
 typedef struct fast_task_info * (*sf_accept_connection_callback)(
         struct sf_listener *listener);
