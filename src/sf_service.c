@@ -66,8 +66,8 @@ int sf_init_task(struct fast_task_info *task)
 
 static void *worker_thread_entrance(void *arg);
 
-static int sf_init_free_queues(const int task_arg_size,
-        TaskInitCallback init_callback)
+static int sf_init_free_queues(const int task_padding_size,
+        const int task_arg_size, TaskInitCallback init_callback)
 {
 #define ALLOC_CONNECTIONS_ONCE 1024
 
@@ -100,7 +100,7 @@ static int sf_init_free_queues(const int task_arg_size,
     if ((result=free_queue_init_ex2(g_sf_global_vars.max_connections,
                     init_connections, alloc_conn_once, g_sf_global_vars.
                     min_buff_size, g_sf_global_vars.max_buff_size,
-                    task_arg_size, init_callback != NULL ?
+                    task_padding_size, task_arg_size, init_callback != NULL ?
                     init_callback : sf_init_task)) != 0)
     {
         return result;
@@ -119,9 +119,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_send_done_callback send_done_callback,
         sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
-        const int proto_header_size, const int task_arg_size,
-        TaskInitCallback init_callback, sf_release_buffer_callback
-        release_buffer_callback)
+        const int proto_header_size, const int task_padding_size,
+        const int task_arg_size, TaskInitCallback init_callback,
+        sf_release_buffer_callback release_buffer_callback)
 {
     int result;
     int bytes;
@@ -142,7 +142,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             send_done_callback, deal_func, task_cleanup_func,
             timeout_callback, release_buffer_callback);
 
-    if ((result=sf_init_free_queues(task_arg_size, init_callback)) != 0) {
+    if ((result=sf_init_free_queues(task_padding_size,
+                    task_arg_size, init_callback)) != 0)
+    {
         return result;
     }
 

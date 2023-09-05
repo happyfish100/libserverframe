@@ -88,10 +88,12 @@ typedef struct sf_listener {
 } SFListener;
 
 struct sf_context;
+struct ibv_pd;
 typedef struct sf_network_handler {
     bool enabled;
     FCNetworkType type;
     struct sf_context *ctx;
+    struct ibv_pd *pd;
 
     SFListener inner;
     SFListener outer;
