@@ -439,6 +439,8 @@ static int load_rdma_apis(SFNetworkHandler *handler)
         return EFAULT;
     }
 
+    LOAD_API(handler, get_connection_size);
+    LOAD_API(handler, init_connection);
     LOAD_API(handler, create_server);
     LOAD_API(handler, close_server);
     LOAD_API(handler, accept_connection);

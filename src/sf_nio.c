@@ -654,24 +654,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
             return bytes;
         }
 
-        if (SF_CTX->set_body_length(task) != 0) {
-            return -1;
-        }
-        if (task->length < 0) {
-            logError("file: "__FILE__", line: %d, "
-                    "client ip: %s, pkg length: %d < 0",
-                    __LINE__, task->client_ip,
-                    task->length);
-            return -1;
-        }
-
-        task->length += SF_CTX->header_size;
-        if (task->length > g_sf_global_vars.max_pkg_size) {
-            logError("file: "__FILE__", line: %d, "
-                    "client ip: %s, pkg length: %d > "
-                    "max pkg size: %d", __LINE__,
-                    task->client_ip, task->length,
-                    g_sf_global_vars.max_pkg_size);
+        if (sf_set_body_length(task) != 0) {
             return -1;
         }
 

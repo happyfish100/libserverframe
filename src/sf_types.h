@@ -60,6 +60,9 @@ typedef enum {
 } SFCommAction;
 
 struct sf_listener;
+
+typedef int (*sf_get_connection_size_callback)();
+typedef int (*sf_init_connection_callback)(struct fast_task_info *task, void *arg);
 typedef int (*sf_create_server_callback)(struct sf_listener
         *listener, int af, const char *bind_addr);
 typedef void (*sf_close_server_callback)(struct sf_listener *listener);
@@ -99,6 +102,8 @@ typedef struct sf_network_handler {
     SFListener outer;
 
     /* for server side */
+    sf_get_connection_size_callback get_connection_size;
+    sf_init_connection_callback init_connection;
     sf_create_server_callback create_server;
     sf_close_server_callback close_server;
     sf_accept_connection_callback accept_connection;

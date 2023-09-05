@@ -92,6 +92,32 @@ void sf_task_switch_thread(struct fast_task_info *task,
 
 void sf_task_detach_thread(struct fast_task_info *task);
 
+static inline int sf_set_body_length(struct fast_task_info *task)
+{
+    if (SF_CTX->set_body_length(task) != 0) {
+        return -1;
+    }
+    if (task->length < 0) {
+        logError("file: "__FILE__", line: %d, "
+                "client ip: %s, pkg length: %d < 0",
+                __LINE__, task->client_ip,
+                task->length);
+        return -1;
+    }
+
+    task->length += SF_CTX->header_size;
+    if (task->length > g_sf_global_vars.max_pkg_size) {
+        logError("file: "__FILE__", line: %d, "
+                "client ip: %s, pkg length: %d > "
+                "max pkg size: %d", __LINE__,
+                task->client_ip, task->length,
+                g_sf_global_vars.max_pkg_size);
+        return -1;
+    }
+
+    return 0;
+}
+
 int sf_socket_async_connect_server(struct fast_task_info *task);
 int sf_socket_connect_server_done(struct fast_task_info *task);
 
