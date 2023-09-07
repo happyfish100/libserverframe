@@ -59,10 +59,15 @@ typedef enum {
     sf_comm_action_finish = 'f'
 } SFCommAction;
 
+struct ibv_pd;
 struct sf_listener;
 
 typedef int (*sf_get_connection_size_callback)();
-typedef int (*sf_init_connection_callback)(struct fast_task_info *task, void *arg);
+typedef int (*sf_init_connection_callback)(
+        struct fast_task_info *task, void *arg);
+typedef struct ibv_pd *(*sf_alloc_pd_callback)(
+        const char **ip_addrs, const int count);
+
 typedef int (*sf_create_server_callback)(struct sf_listener
         *listener, int af, const char *bind_addr);
 typedef void (*sf_close_server_callback)(struct sf_listener *listener);
@@ -91,10 +96,9 @@ typedef struct sf_listener {
 } SFListener;
 
 struct sf_context;
-struct ibv_pd;
 typedef struct sf_network_handler {
     bool enabled;
-    FCNetworkType type;
+    FCCommunicationType comm_type;
     struct sf_context *ctx;
     struct ibv_pd *pd;
 
@@ -104,6 +108,7 @@ typedef struct sf_network_handler {
     /* for server side */
     sf_get_connection_size_callback get_connection_size;
     sf_init_connection_callback init_connection;
+    sf_alloc_pd_callback alloc_pd;
     sf_create_server_callback create_server;
     sf_close_server_callback close_server;
     sf_accept_connection_callback accept_connection;

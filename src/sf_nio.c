@@ -38,7 +38,6 @@
 #include "fastcommon/fast_task_queue.h"
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_atomic.h"
-#include "sf_global.h"
 #include "sf_service.h"
 #include "sf_nio.h"
 
@@ -212,6 +211,9 @@ static int sf_client_sock_connect(int sock, short event, void *arg)
         result = ETIMEDOUT;
     } else {
         result = task->handler->connect_server_done(task);
+        if (result == EINPROGRESS) {
+            return 0;
+        }
     }
 
     if (result != 0) {

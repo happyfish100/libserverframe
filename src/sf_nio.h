@@ -25,6 +25,7 @@
 #include "fastcommon/ioevent_loop.h"
 #include "sf_define.h"
 #include "sf_types.h"
+#include "sf_global.h"
 
 #define SF_CTX  (task->handler->ctx)
 

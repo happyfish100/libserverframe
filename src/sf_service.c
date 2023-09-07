@@ -545,7 +545,7 @@ static void *accept_thread_entrance(SFListener *listener)
     {
         char thread_name[32];
         snprintf(thread_name, sizeof(thread_name), "%s-%s-listen",
-                listener->handler->type == fc_network_type_sock ?
+                listener->handler->comm_type == fc_comm_type_sock ?
                 "sock" : "rdma", listener->handler->ctx->name);
         prctl(PR_SET_NAME, thread_name);
     }

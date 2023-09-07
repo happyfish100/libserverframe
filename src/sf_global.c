@@ -46,7 +46,7 @@ SFGlobalVariables g_sf_global_vars = {
 };
 
 SFContext g_sf_context = {{'\0'}, NULL, 0,
-    {{true, fc_network_type_sock}, {false, fc_network_type_rdma}},
+    {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}},
     1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, NULL,
     NULL, NULL, NULL, NULL, sf_task_finish_clean_up, NULL
 };
@@ -441,6 +441,7 @@ static int load_rdma_apis(SFNetworkHandler *handler)
 
     LOAD_API(handler, get_connection_size);
     LOAD_API(handler, init_connection);
+    LOAD_API(handler, alloc_pd);
     LOAD_API(handler, create_server);
     LOAD_API(handler, close_server);
     LOAD_API(handler, accept_connection);
@@ -462,7 +463,7 @@ static int init_network_handler(SFNetworkHandler *handler,
     handler->inner.is_inner = true;
     handler->outer.is_inner = false;
 
-    if (handler->type == fc_network_type_sock) {
+    if (handler->comm_type == fc_comm_type_sock) {
         handler->inner.sock = -1;
         handler->outer.sock = -1;
         handler->create_server = sf_socket_create_server;
@@ -497,9 +498,22 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
 
     sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
     rdma_handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
-    sock_handler->type = fc_network_type_sock;
-    rdma_handler->type = fc_network_type_rdma;
+    sock_handler->comm_type = fc_comm_type_sock;
+    rdma_handler->comm_type = fc_comm_type_rdma;
+    if (config->comm_type == fc_comm_type_sock) {
+        sock_handler->enabled = true;
+        rdma_handler->enabled = false;
+    } else if (config->comm_type == fc_comm_type_rdma) {
+        sock_handler->enabled = false;
+        rdma_handler->enabled = true;
+    } else if (config->comm_type == fc_comm_type_both) {
+        sock_handler->enabled = true;
+        rdma_handler->enabled = true;
+    }
     for (i=0; i<SF_NETWORK_HANDLER_COUNT; i++) {
+        if (!sf_context->handlers[i].enabled) {
+            continue;
+        }
         if ((result=init_network_handler(sf_context->handlers + i,
                         sf_context)) != 0)
         {
@@ -582,6 +596,34 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
     return 0;
+}
+
+int sf_alloc_rdma_pd(SFContext *sf_context,
+        FCAddressPtrArray *address_array)
+{
+    SFNetworkHandler *handler;
+    char *ip_addrs[FC_MAX_SERVER_IP_COUNT];
+    char **ip_addr;
+    FCAddressInfo **addr;
+    FCAddressInfo **end;
+
+    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    if (!handler->enabled) {
+        return 0;
+    }
+
+    end = address_array->addrs + address_array->count;
+    for (addr=address_array->addrs, ip_addr=ip_addrs; addr<end; addr++) {
+        *ip_addr = (*addr)->conn.ip_addr;
+    }
+
+    if ((handler->pd=handler->alloc_pd((const char **)ip_addrs,
+                    address_array->count)) != NULL)
+    {
+        return 0;
+    } else {
+        return ENODEV;
+    }
 }
 
 void sf_context_config_to_string(const SFContext *sf_context,

@@ -168,6 +168,60 @@ static inline void sf_release_task(struct fast_task_info *task)
     }
 }
 
+static inline SFNetworkHandler *sf_get_first_network_handler_ex(
+        SFContext *sf_context)
+{
+    SFNetworkHandler *handler;
+    SFNetworkHandler *end;
+
+    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
+    for (handler=sf_context->handlers; handler<end; handler++) {
+        if (handler->enabled) {
+            return handler;
+        }
+    }
+
+    return NULL;
+}
+#define sf_get_first_network_handler() \
+    sf_get_first_network_handler_ex(&g_sf_context)
+
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler(
+        SFContext *sf_context)
+{
+    SFNetworkHandler *handler;
+
+    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    return (handler->enabled ? handler : NULL);
+}
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler2(
+        SFContext *sf_context1, SFContext *sf_context2)
+{
+    SFNetworkHandler *handler;
+
+    if ((handler=sf_get_rdma_network_handler(sf_context1)) != NULL) {
+        return handler;
+    }
+    return sf_get_rdma_network_handler(sf_context2);
+}
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler3(
+        SFContext *sf_context1, SFContext *sf_context2,
+        SFContext *sf_context3)
+{
+    SFNetworkHandler *handler;
+
+    if ((handler=sf_get_rdma_network_handler(sf_context1)) != NULL) {
+        return handler;
+    }
+    if ((handler=sf_get_rdma_network_handler(sf_context2)) != NULL) {
+        return handler;
+    }
+    return sf_get_rdma_network_handler(sf_context3);
+}
+
 #ifdef __cplusplus
 }
 #endif
