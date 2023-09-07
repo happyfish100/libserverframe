@@ -555,6 +555,11 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         sock_handler->outer.enabled = true;
     }
 
+    rdma_handler->inner.port = sock_handler->inner.port;
+    rdma_handler->inner.enabled = sock_handler->inner.enabled;
+    rdma_handler->outer.port = sock_handler->outer.port;
+    rdma_handler->outer.enabled = sock_handler->outer.enabled;
+
     inner_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
             "inner_bind_addr", config->ini_ctx.context);
     outer_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
