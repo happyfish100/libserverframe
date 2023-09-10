@@ -535,16 +535,27 @@ int sf_send_and_recv_vary_response(ConnectionInfo *conn,
         const int network_timeout, const unsigned char expect_cmd,
         SFProtoRecvBuffer *buffer, const int min_body_len);
 
-static inline void sf_proto_extract_header(const SFCommonProtoHeader
-        *header_proto, SFHeaderInfo *header_info)
+static inline int sf_proto_parse_header(const SFCommonProtoHeader
+        *header_proto, SFResponseInfo *response)
 {
-    header_info->cmd = header_proto->cmd;
-    header_info->body_len = buff2int(header_proto->body_len);
-    header_info->flags = buff2short(header_proto->flags);
-    header_info->status = buff2short(header_proto->status);
-    if (header_info->status > 255) {
-        header_info->status = sf_localize_errno(header_info->status);
+    if (!SF_PROTO_CHECK_MAGIC(header_proto->magic)) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
+                "expect: "SF_PROTO_MAGIC_FORMAT,
+                SF_PROTO_MAGIC_PARAMS(header_proto->magic),
+                SF_PROTO_MAGIC_EXPECT_PARAMS);
+        return EINVAL;
     }
+
+    response->header.cmd = header_proto->cmd;
+    response->header.body_len = buff2int(header_proto->body_len);
+    response->header.flags = buff2short(header_proto->flags);
+    response->header.status = buff2short(header_proto->status);
+    if (response->header.status > 255) {
+        response->header.status = sf_localize_errno(response->header.status);
+    }
+    return 0;
 }
 
 static inline void sf_proto_pack_limit(const SFListLimitInfo

@@ -99,7 +99,7 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
     SFCommonProtoHeader header_proto;
 
     if ((result=tcprecvdata_nb(conn->sock, &header_proto,
-            sizeof(SFCommonProtoHeader), network_timeout)) != 0)
+                    sizeof(SFCommonProtoHeader), network_timeout)) != 0)
     {
         response->error.length = snprintf(response->error.message,
                 sizeof(response->error.message),
@@ -108,18 +108,7 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
         return result;
     }
 
-    if (!SF_PROTO_CHECK_MAGIC(header_proto.magic)) {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
-                "expect: "SF_PROTO_MAGIC_FORMAT,
-                SF_PROTO_MAGIC_PARAMS(header_proto.magic),
-                SF_PROTO_MAGIC_EXPECT_PARAMS);
-        return EINVAL;
-    }
-
-    sf_proto_extract_header(&header_proto, &response->header);
-    return 0;
+    return sf_proto_parse_header(&header_proto, response);
 }
 
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,

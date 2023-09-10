@@ -415,16 +415,18 @@ int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
 
 #define API_PREFIX_NAME  "fast_rdma_"
 
-#define LOAD_API(handler, fname) \
+#define LOAD_API_EX(handler, prefix, fname) \
     do { \
-        handler->fname = dlsym(dlhandle, API_PREFIX_NAME#fname); \
+        handler->fname = dlsym(dlhandle, API_PREFIX_NAME#prefix#fname); \
         if (handler->fname == NULL) {  \
             logError("file: "__FILE__", line: %d, "  \
                     "dlsym api %s fail, error info: %s", \
-                    __LINE__, API_PREFIX_NAME#fname, dlerror()); \
+                    __LINE__, API_PREFIX_NAME#prefix#fname, dlerror()); \
             return ENOENT; \
         } \
     } while (0)
+
+#define LOAD_API(handler, fname)  LOAD_API_EX(handler, "server_", fname)
 
 static int load_rdma_apis(SFNetworkHandler *handler)
 {
@@ -442,11 +444,11 @@ static int load_rdma_apis(SFNetworkHandler *handler)
     LOAD_API(handler, get_connection_size);
     LOAD_API(handler, init_connection);
     LOAD_API(handler, alloc_pd);
-    LOAD_API(handler, create_server);
-    LOAD_API(handler, close_server);
+    LOAD_API_EX(handler, "", create_server);
+    LOAD_API_EX(handler, "", close_server);
     LOAD_API(handler, accept_connection);
-    LOAD_API(handler, async_connect_server);
-    LOAD_API(handler, connect_server_done);
+    LOAD_API_EX(handler, "", async_connect_server);
+    LOAD_API_EX(handler, "", connect_server_done);
     LOAD_API(handler, close_connection);
     LOAD_API(handler, send_data);
     LOAD_API(handler, recv_data);
