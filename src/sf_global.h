@@ -174,29 +174,33 @@ extern SFContext                 g_sf_context;
 
 int sf_load_global_config_ex(const char *server_name,
         IniFullContext *ini_ctx, const bool load_network_params,
-        const char *max_pkg_size_item_nm, const int task_buffer_extra_size,
-        const bool need_set_run_by);
+        const char *max_pkg_size_item_nm, const int fixed_buff_size,
+        const int task_buffer_extra_size, const bool need_set_run_by);
 
 static inline int sf_load_global_config(const char *server_name,
         IniFullContext *ini_ctx)
 {
     const bool load_network_params = true;
     const char *max_pkg_size_item_nm = "max_pkg_size";
+    const int fixed_buff_size = 0;
     const int task_buffer_extra_size = 0;
     const bool need_set_run_by = true;
 
     return sf_load_global_config_ex(server_name, ini_ctx, load_network_params,
-            max_pkg_size_item_nm, task_buffer_extra_size, need_set_run_by);
+            max_pkg_size_item_nm, fixed_buff_size, task_buffer_extra_size,
+            need_set_run_by);
 }
 
 int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
-        const int task_buffer_extra_size, const bool need_set_run_by);
+        const int fixed_buff_size, const int task_buffer_extra_size,
+        const bool need_set_run_by);
 
 static inline int sf_load_config(const char *server_name,
         const FCCommunicationType comm_type,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
-        const int default_outer_port, const int task_buffer_extra_size)
+        const int default_outer_port, const int fixed_buff_size,
+        const int task_buffer_extra_size)
 {
     const bool need_set_run_by = true;
     SFContextIniConfig config;
@@ -204,7 +208,7 @@ static inline int sf_load_config(const char *server_name,
     SF_SET_CONTEXT_INI_CONFIG(config, comm_type, filename, pIniContext,
             section_name, default_inner_port, default_outer_port,
             DEFAULT_WORK_THREADS);
-    return sf_load_config_ex(server_name, &config,
+    return sf_load_config_ex(server_name, &config, fixed_buff_size,
             task_buffer_extra_size, need_set_run_by);
 }
 

@@ -522,6 +522,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const bool bg_thread_enabled)
 {
     const int socket_domain = AF_INET;
+    const int padding_size = 1024;
     struct {
         ConnectionExtraParams holder;
         ConnectionExtraParams *ptr;
@@ -544,9 +545,18 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     if (server_group->comm_type == fc_comm_type_sock) {
         extra_params.ptr = NULL;
     } else {
-        //TODO: fix me!!!
-        extra_params.holder.buffer_size = 256 * 1024;
-        extra_params.holder.pd = NULL;
+        FCServerInfo *first_server;
+
+        first_server = FC_SID_SERVERS(*server_cfg);
+        extra_params.holder.buffer_size = server_group->
+            buffer_size + padding_size;
+        extra_params.holder.pd = fc_alloc_rdma_pd(
+                G_RDMA_CONNECTION_CALLBACKS.alloc_pd,
+                &first_server->group_addrs[server_group_index].
+                address_array, &result);
+        if (result != 0) {
+            return result;
+        }
         extra_params.ptr = &extra_params.holder;
     }
     if ((result=conn_pool_init_ex1(&cm->cpool, common_cfg->connect_timeout,
