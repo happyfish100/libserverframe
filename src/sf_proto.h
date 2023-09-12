@@ -475,6 +475,27 @@ static inline void sf_free_recv_buffer(SFProtoRecvBuffer *buffer)
     }
 }
 
+static inline int sf_proto_send_buf1(ConnectionInfo *conn, char *data,
+        const int len, SFResponseInfo *response, const int network_timeout)
+{
+    int result;
+
+    if (conn->comm_type == fc_comm_type_rdma) {
+        result = G_RDMA_CONNECTION_CALLBACKS.request_by_buf1(
+                conn, data, len, network_timeout * 1000);
+    } else {
+        result = tcpsenddata_nb(conn->sock, data, len, network_timeout);
+    }
+    if (result != 0) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "send data fail, errno: %d, error info: %s",
+                result, STRERROR(result));
+    }
+
+    return result;
+}
+
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
         const int len, SFResponseInfo *response, const int network_timeout);
 

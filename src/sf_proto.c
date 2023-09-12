@@ -70,8 +70,14 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
             response->error.length = response->header.body_len;
         }
 
-        if ((result=tcprecvdata_nb_ex(conn->sock, response->error.message,
-                response->error.length, network_timeout, &recv_bytes)) == 0)
+        if (conn->comm_type == fc_comm_type_rdma) {
+            memcpy(response->error.message, G_RDMA_CONNECTION_CALLBACKS.
+                    get_buffer(conn)->buff + sizeof(SFCommonProtoHeader),
+                    response->error.length);
+            response->error.message[response->error.length] = '\0';
+        } else if ((result=tcprecvdata_nb_ex(conn->sock, response->
+                        error.message, response->error.length,
+                        network_timeout, &recv_bytes)) == 0)
         {
             response->error.message[response->error.length] = '\0';
         } else {
@@ -96,19 +102,41 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
         SFResponseInfo *response, const int network_timeout)
 {
     int result;
+    BufferInfo *buffer;
     SFCommonProtoHeader header_proto;
 
-    if ((result=tcprecvdata_nb(conn->sock, &header_proto,
-                    sizeof(SFCommonProtoHeader), network_timeout)) != 0)
-    {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "recv data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
-        return result;
-    }
+    if (conn->comm_type == fc_comm_type_rdma) {
+        buffer = G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn);
+        if ((result=sf_proto_parse_header((SFCommonProtoHeader *)
+                        buffer->buff, response)) != 0)
+        {
+            return result;
+        }
 
-    return sf_proto_parse_header(&header_proto, response);
+        if (buffer->length != (sizeof(SFCommonProtoHeader) +
+                    response->header.body_len))
+        {
+            response->error.length = snprintf(response->error.message,
+                    sizeof(response->error.message),
+                    "recv package length: %d != calculate: %d",
+                    buffer->length, (int)(sizeof(SFCommonProtoHeader) +
+                        response->header.body_len));
+            return EINVAL;
+        }
+
+        return 0;
+    } else {
+        if ((result=tcprecvdata_nb(conn->sock, &header_proto,
+                        sizeof(SFCommonProtoHeader), network_timeout)) != 0)
+        {
+            response->error.length = snprintf(response->error.message,
+                    sizeof(response->error.message),
+                    "recv data fail, errno: %d, error info: %s",
+                    result, STRERROR(result));
+            return result;
+        }
+        return sf_proto_parse_header(&header_proto, response);
+    }
 }
 
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
@@ -116,11 +144,9 @@ int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
 {
     int result;
 
-    if ((result=tcpsenddata_nb(conn->sock, data, len, network_timeout)) != 0) {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "send data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
+    if ((result=sf_proto_send_buf1(conn, data, len,
+                    response, network_timeout)) != 0)
+    {
         return result;
     }
 
@@ -183,7 +209,10 @@ int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
+                sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -223,7 +252,11 @@ int sf_send_and_recv_response_ex1(ConnectionInfo *conn, char *send_data,
         return EOVERFLOW;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
+                sizeof(SFCommonProtoHeader), response->header.body_len);
+        *body_len = response->header.body_len;
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, body_len)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -264,7 +297,10 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
+                sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
                     network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -332,7 +368,10 @@ int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
         buffer->alloc_size = alloc_size;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(buffer->buff, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -353,13 +392,9 @@ int sf_send_and_recv_vary_response(ConnectionInfo *conn,
 {
     int result;
 
-    if ((result=tcpsenddata_nb(conn->sock, send_data,
-                    send_len, network_timeout)) != 0)
+    if ((result=sf_proto_send_buf1(conn, send_data, send_len,
+                    response, network_timeout)) != 0)
     {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "send data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
         return result;
     }
 
@@ -566,6 +601,7 @@ int sf_proto_get_leader(ConnectionInfo *conn, const char *service_name,
         memcpy(leader->conn.ip_addr, server_resp.ip_addr, IP_ADDRESS_SIZE);
         *(leader->conn.ip_addr + IP_ADDRESS_SIZE - 1) = '\0';
         leader->conn.port = buff2short(server_resp.port);
+        leader->conn.comm_type = conn->comm_type;
     }
 
     return result;
