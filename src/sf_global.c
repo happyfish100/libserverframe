@@ -436,7 +436,7 @@ int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
         } \
     } while (0)
 
-#define LOAD_API(handler, fname)  LOAD_API_EX(handler, "server_", fname)
+#define LOAD_API(handler, fname)  LOAD_API_EX(handler, server_, fname)
 
 static int load_rdma_apis(SFNetworkHandler *handler)
 {
@@ -454,11 +454,11 @@ static int load_rdma_apis(SFNetworkHandler *handler)
     LOAD_API(handler, get_connection_size);
     LOAD_API(handler, init_connection);
     LOAD_API(handler, alloc_pd);
-    LOAD_API_EX(handler, "", create_server);
-    LOAD_API_EX(handler, "", close_server);
+    LOAD_API_EX(handler, , create_server);
+    LOAD_API_EX(handler, , close_server);
     LOAD_API(handler, accept_connection);
-    LOAD_API_EX(handler, "", async_connect_server);
-    LOAD_API_EX(handler, "", connect_server_done);
+    LOAD_API_EX(handler, , async_connect_server);
+    LOAD_API_EX(handler, , connect_server_done);
     LOAD_API(handler, close_connection);
     LOAD_API(handler, send_data);
     LOAD_API(handler, recv_data);
