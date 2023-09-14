@@ -495,15 +495,19 @@ static inline int check_task(struct fast_task_info *task,
         return 0;
     }
 
-    if (tcp_socket_connected(task->event.fd)) {
-        return EAGAIN;
-    } else {
-        logDebug("file: "__FILE__", line: %d, "
-                "client ip: %s, connection is closed",
-                __LINE__, task->client_ip);
+    if (task->handler->comm_type == fc_comm_type_sock) {
+        if (tcp_socket_connected(task->event.fd)) {
+            return EAGAIN;
+        } else {
+            logDebug("file: "__FILE__", line: %d, "
+                    "client ip: %s, connection is closed",
+                    __LINE__, task->client_ip);
 
-        ioevent_add_to_deleted_list(task);
-        return -1;
+            ioevent_add_to_deleted_list(task);
+            return -1;
+        }
+    } else {
+        return EAGAIN;
     }
 }
 
