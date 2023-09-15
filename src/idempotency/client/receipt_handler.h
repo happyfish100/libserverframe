@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-int receipt_handler_init();
+int receipt_handler_init(FCAddressPtrArray *address_array);
 int receipt_handler_destroy();
 
 #ifdef __cplusplus
