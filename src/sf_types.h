@@ -140,6 +140,7 @@ typedef struct sf_context {
     int header_size;
     bool remove_from_ready_list;
     bool realloc_task_buffer;
+    FCSmartPollingConfig smart_polling;
     sf_deal_task_func deal_task;
     sf_set_body_length_callback set_body_length;
     sf_alloc_recv_buffer_callback alloc_recv_buffer;

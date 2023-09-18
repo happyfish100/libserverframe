@@ -76,6 +76,15 @@ void sf_service_set_thread_loop_callback_ex(SFContext *sf_context,
 #define sf_service_set_thread_loop_callback(thread_loop_callback) \
     sf_service_set_thread_loop_callback_ex(&g_sf_context, thread_loop_callback)
 
+static inline void sf_service_set_smart_polling_ex(SFContext *sf_context,
+        const FCSmartPollingConfig *smart_polling)
+{
+    sf_context->smart_polling = *smart_polling;
+}
+
+#define sf_service_set_smart_polling(smart_polling) \
+    sf_service_set_smart_polling_ex(&g_sf_context, smart_polling)
+
 int sf_setup_signal_handler();
 
 int sf_startup_schedule(pthread_t *schedule_tid);

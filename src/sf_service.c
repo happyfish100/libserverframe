@@ -187,6 +187,14 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
             thread_data<data_end; thread_data++,thread_ctx++)
     {
+        FC_INIT_LIST_HEAD(&thread_data->polling_queue);
+        if (sf_context->smart_polling.enabled) {
+            thread_data->busy_polling_callback =
+                sf_rdma_busy_polling_callback;
+        } else {
+            thread_data->busy_polling_callback = NULL;
+        }
+
         thread_data->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
             thread_data->arg = alloc_thread_extra_data_callback(

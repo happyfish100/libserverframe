@@ -125,6 +125,8 @@ int sf_socket_connect_server_done(struct fast_task_info *task);
 ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action);
 ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action);
 
+int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data);
+
 static inline int sf_nio_forward_request(struct fast_task_info *task,
         const int new_thread_index)
 {

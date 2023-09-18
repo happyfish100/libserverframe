@@ -47,8 +47,9 @@ SFGlobalVariables g_sf_global_vars = {
 
 SFContext g_sf_context = {{'\0'}, NULL, 0,
     {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}},
-    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, NULL,
-    NULL, NULL, NULL, NULL, sf_task_finish_clean_up, NULL
+    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true,
+    {false, 0, 0}, NULL, NULL, NULL, NULL, NULL,
+    sf_task_finish_clean_up, NULL
 };
 
 static inline void set_config_str_value(const char *value,

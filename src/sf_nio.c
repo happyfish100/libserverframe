@@ -507,7 +507,8 @@ static inline int check_task(struct fast_task_info *task,
             return -1;
         }
     } else {
-        return EAGAIN;
+        //TODO: for streaming should return EAGAIN
+        return 0;
     }
 }
 
@@ -713,6 +714,114 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
     return bytes;
 }
 
+static int calc_iops_and_trigger_polling(struct fast_task_info *task)
+{
+    int time_distance;
+    int result = 0;
+
+    time_distance = g_current_time - task->polling.last_calc_time;
+    if (time_distance > 0) {
+        if ((task->req_count - task->polling.last_req_count) /
+                time_distance >= SF_CTX->smart_polling.switch_on_iops)
+        {
+            task->polling.continuous_count++;
+            if (task->polling.continuous_count >= SF_CTX->
+                    smart_polling.switch_on_count)
+            {
+                task->polling.continuous_count = 0;
+                task->polling.in_queue = true;
+                result = ioevent_detach(&task->thread_data->
+                        ev_puller, task->event.fd);
+                fc_list_add_tail(&task->polling.dlink,
+                        &task->thread_data->polling_queue);
+            }
+        } else {
+            if (task->polling.continuous_count > 0) {
+                task->polling.continuous_count = 0;
+            }
+        }
+
+        logInfo("====== trigger_polling iops: %"PRId64, (task->req_count -
+                    task->polling.last_req_count) / time_distance);
+
+        task->polling.last_calc_time = g_current_time;
+        task->polling.last_req_count = task->req_count;
+    }
+
+    return result;
+}
+
+static int calc_iops_and_remove_polling(struct fast_task_info *task)
+{
+    int time_distance;
+    int result = 0;
+
+    time_distance = g_current_time - task->polling.last_calc_time;
+    if (time_distance > 0) {
+        if ((task->req_count - task->polling.last_req_count) /
+                time_distance < SF_CTX->smart_polling.switch_on_iops)
+        {
+            task->polling.continuous_count++;
+            if (task->polling.continuous_count >= SF_CTX->
+                    smart_polling.switch_on_count)
+            {
+                task->polling.continuous_count = 0;
+                task->polling.in_queue = false;
+                fc_list_del_init(&task->polling.dlink);
+                result = sf_ioevent_add(task, (IOEventCallback)
+                        sf_client_sock_read, task->network_timeout);
+            }
+        } else {
+            if (task->polling.continuous_count > 0) {
+                task->polling.continuous_count = 0;
+            }
+        }
+
+        logInfo("@@@@@ remove_polling iops: %"PRId64, (task->req_count -
+                    task->polling.last_req_count) / time_distance);
+
+        task->polling.last_calc_time = g_current_time;
+        task->polling.last_req_count = task->req_count;
+    }
+
+    return result;
+}
+
+int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
+{
+    struct fast_task_info *task;
+    struct fast_task_info *tmp;
+    int bytes;
+    SFCommAction action;
+
+    fc_list_for_each_entry_safe(task, tmp, &thread_data->
+            polling_queue, polling.dlink)
+    {
+        if ((bytes=task->handler->recv_data(task, &action)) < 0) {
+            ioevent_add_to_deleted_list(task);
+            continue;
+        }
+
+        if (action == sf_comm_action_finish) {
+            fast_timer_modify(&task->thread_data->timer,
+                    &task->event.timer, g_current_time +
+                    task->network_timeout);
+
+            task->req_count++;
+            task->nio_stages.current = SF_NIO_STAGE_SEND;
+            if (SF_CTX->deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
+                ioevent_add_to_deleted_list(task);
+            }
+        } else {
+            if (calc_iops_and_remove_polling(task) != 0) {
+                ioevent_add_to_deleted_list(task);
+            }
+        }
+    }
+
+    return 0;
+}
+
 int sf_client_sock_read(int sock, short event, void *arg)
 {
     int result;
@@ -779,6 +888,14 @@ int sf_client_sock_read(int sock, short event, void *arg)
                 ioevent_add_to_deleted_list(task);
                 return -1;
             }
+
+            if (SF_CTX->smart_polling.enabled) {
+                if (calc_iops_and_trigger_polling(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
+            }
+
             break;
         } else if (action == sf_comm_action_break) {
             break;
