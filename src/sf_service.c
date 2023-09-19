@@ -187,6 +187,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
             thread_data<data_end; thread_data++,thread_ctx++)
     {
+        thread_data->timeout_ms = net_timeout_ms;
         FC_INIT_LIST_HEAD(&thread_data->polling_queue);
         if (sf_context->smart_polling.enabled) {
             thread_data->busy_polling_callback =

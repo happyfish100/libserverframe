@@ -732,17 +732,26 @@ static int calc_iops_and_trigger_polling(struct fast_task_info *task)
                 task->polling.in_queue = true;
                 result = ioevent_detach(&task->thread_data->
                         ev_puller, task->event.fd);
+                fast_timer_remove(&task->thread_data->timer,
+                        &task->event.timer);
+
+                if (fc_list_empty(&task->thread_data->polling_queue)) {
+                    ioevent_set_timeout(&task->thread_data->
+                            ev_puller, 0);
+                }
                 fc_list_add_tail(&task->polling.dlink,
                         &task->thread_data->polling_queue);
+
+                logInfo("file: "__FILE__", line: %d, client: %s:%u, "
+                        "trigger polling iops: %"PRId64, __LINE__,
+                        task->client_ip, task->port, (task->req_count -
+                            task->polling.last_req_count) / time_distance);
             }
         } else {
             if (task->polling.continuous_count > 0) {
                 task->polling.continuous_count = 0;
             }
         }
-
-        logInfo("====== trigger_polling iops: %"PRId64, (task->req_count -
-                    task->polling.last_req_count) / time_distance);
 
         task->polling.last_calc_time = g_current_time;
         task->polling.last_req_count = task->req_count;
@@ -768,17 +777,23 @@ static int calc_iops_and_remove_polling(struct fast_task_info *task)
                 task->polling.continuous_count = 0;
                 task->polling.in_queue = false;
                 fc_list_del_init(&task->polling.dlink);
+                if (fc_list_empty(&task->thread_data->polling_queue)) {
+                    ioevent_set_timeout(&task->thread_data->ev_puller,
+                            task->thread_data->timeout_ms);
+                }
                 result = sf_ioevent_add(task, (IOEventCallback)
                         sf_client_sock_read, task->network_timeout);
+
+                logInfo("file: "__FILE__", line: %d, client: %s:%u, "
+                        "remove polling iops: %"PRId64, __LINE__,
+                        task->client_ip, task->port, (task->req_count -
+                            task->polling.last_req_count) / time_distance);
             }
         } else {
             if (task->polling.continuous_count > 0) {
                 task->polling.continuous_count = 0;
             }
         }
-
-        logInfo("@@@@@ remove_polling iops: %"PRId64, (task->req_count -
-                    task->polling.last_req_count) / time_distance);
 
         task->polling.last_calc_time = g_current_time;
         task->polling.last_req_count = task->req_count;
@@ -797,16 +812,15 @@ int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
     fc_list_for_each_entry_safe(task, tmp, &thread_data->
             polling_queue, polling.dlink)
     {
+        if (task->canceled) {
+            continue;
+        }
         if ((bytes=task->handler->recv_data(task, &action)) < 0) {
             ioevent_add_to_deleted_list(task);
             continue;
         }
 
         if (action == sf_comm_action_finish) {
-            fast_timer_modify(&task->thread_data->timer,
-                    &task->event.timer, g_current_time +
-                    task->network_timeout);
-
             task->req_count++;
             task->nio_stages.current = SF_NIO_STAGE_SEND;
             if (SF_CTX->deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
