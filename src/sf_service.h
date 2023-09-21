@@ -139,8 +139,9 @@ void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
 int sf_init_task(struct fast_task_info *task);
 
-static inline struct fast_task_info *sf_alloc_init_task(
-        SFNetworkHandler *handler, const int fd)
+static inline struct fast_task_info *sf_alloc_init_task_ex(
+        SFNetworkHandler *handler, const int fd,
+        const int reffer_count)
 {
     struct fast_task_info *task;
 
@@ -153,7 +154,7 @@ static inline struct fast_task_info *sf_alloc_init_task(
         return NULL;
     }
 
-    __sync_add_and_fetch(&task->reffer_count, 1);
+    __sync_add_and_fetch(&task->reffer_count, reffer_count);
     __sync_bool_compare_and_swap(&task->canceled, 1, 0);
     task->handler = handler;
     task->event.fd = fd;
@@ -161,6 +162,7 @@ static inline struct fast_task_info *sf_alloc_init_task(
 }
 
 #define sf_hold_task(task) __sync_add_and_fetch(&task->reffer_count, 1)
+#define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
 
 static inline void sf_release_task(struct fast_task_info *task)
 {
