@@ -47,9 +47,8 @@ SFGlobalVariables g_sf_global_vars = {
 
 SFContext g_sf_context = {{'\0'}, NULL, 0,
     {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}},
-    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true,
-    {false, 0, 0}, NULL, NULL, NULL, NULL, NULL,
-    sf_task_finish_clean_up, NULL
+    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, true,
+    {false, 0, 0}, {sf_task_finish_clean_up}
 };
 
 static inline void set_config_str_value(const char *value,
@@ -459,7 +458,7 @@ static int load_rdma_apis(SFNetworkHandler *handler)
     LOAD_API_EX(handler, , close_server);
     LOAD_API(handler, accept_connection);
     LOAD_API_EX(handler, , async_connect_server);
-    LOAD_API_EX(handler, , connect_server_done);
+    LOAD_API_EX(handler, , async_connect_check);
     LOAD_API(handler, close_connection);
     LOAD_API(handler, send_data);
     LOAD_API(handler, recv_data);
@@ -483,7 +482,7 @@ static int init_network_handler(SFNetworkHandler *handler,
         handler->close_server = sf_socket_close_server;
         handler->accept_connection = sf_socket_accept_connection;
         handler->async_connect_server = sf_socket_async_connect_server;
-        handler->connect_server_done = sf_socket_connect_server_done;
+        handler->async_connect_check = sf_socket_async_connect_check;
         handler->close_connection = sf_socket_close_connection;
         handler->send_data = sf_socket_send_data;
         handler->recv_data = sf_socket_recv_data;

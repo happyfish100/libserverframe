@@ -117,7 +117,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, TaskInitCallback init_callback,
@@ -134,9 +134,10 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     pthread_attr_t thread_attr;
 
     snprintf(sf_context->name, sizeof(sf_context->name), "%s", name);
+    sf_context->connect_need_log = true;
     sf_context->realloc_task_buffer = g_sf_global_vars.
                     min_buff_size < g_sf_global_vars.max_buff_size;
-    sf_context->accept_done_func = accept_done_callback;
+    sf_context->callbacks.accept_done = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size,
             set_body_length_func, alloc_recv_buffer_func,
             send_done_callback, deal_func, task_cleanup_func,
@@ -335,7 +336,7 @@ static void *worker_thread_entrance(void *arg)
 
     ioevent_loop(thread_ctx->thread_data,
             sf_recv_notify_read,
-            thread_ctx->sf_context->task_cleanup_func,
+            thread_ctx->sf_context->callbacks.task_cleanup,
             &g_sf_global_vars.continue_flag);
     ioevent_destroy(&thread_ctx->thread_data->ev_puller);
 
@@ -530,8 +531,8 @@ static void accept_run(SFListener *listener)
 
         task->thread_data = listener->handler->ctx->thread_data +
             task->event.fd % listener->handler->ctx->work_threads;
-        if (listener->handler->ctx->accept_done_func != NULL) {
-            if (listener->handler->ctx->accept_done_func(task,
+        if (listener->handler->ctx->callbacks.accept_done != NULL) {
+            if (listener->handler->ctx->callbacks.accept_done(task,
                         listener->inaddr.sin_addr.s_addr,
                         listener->is_inner) != 0)
             {

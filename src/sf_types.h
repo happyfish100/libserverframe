@@ -43,10 +43,12 @@ typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
 typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
         const int buff_size, bool *new_alloc);
-typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
+typedef int (*sf_deal_task_callback)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 typedef int (*sf_send_done_callback)(struct fast_task_info *task,
         const int length);
+typedef void (*sf_connect_done_callback)(struct fast_task_info *task,
+        const int err_no);
 
 /* calback for release iovec buffer */
 typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
@@ -73,7 +75,7 @@ typedef void (*sf_close_server_callback)(struct sf_listener *listener);
 typedef struct fast_task_info * (*sf_accept_connection_callback)(
         struct sf_listener *listener);
 typedef int (*sf_async_connect_server_callback)(struct fast_task_info *task);
-typedef int (*sf_connect_server_done_callback)(struct fast_task_info *task);
+typedef int (*sf_async_connect_check_callback)(struct fast_task_info *task);
 typedef void (*sf_close_connection_callback)(struct fast_task_info *task);
 
 typedef ssize_t (*sf_send_data_callback)(struct fast_task_info *task,
@@ -114,7 +116,7 @@ typedef struct sf_network_handler {
 
     /* for client side */
     sf_async_connect_server_callback async_connect_server;
-    sf_connect_server_done_callback connect_server_done;
+    sf_async_connect_check_callback  async_connect_check;
 
     /* server and client both */
     sf_close_connection_callback close_connection;
@@ -122,6 +124,18 @@ typedef struct sf_network_handler {
     sf_send_data_callback send_data;
     sf_recv_data_callback recv_data;
 } SFNetworkHandler;
+
+typedef struct sf_nio_callbacks {
+    TaskCleanUpCallback task_cleanup;
+    sf_deal_task_callback deal_task;
+    sf_set_body_length_callback set_body_length;
+    sf_alloc_recv_buffer_callback alloc_recv_buffer;
+    sf_accept_done_callback accept_done;
+    sf_connect_done_callback connect_done;
+    sf_send_done_callback send_done;
+    sf_recv_timeout_callback task_timeout;
+    sf_release_buffer_callback release_buffer;
+} SFNIOCallbacks;
 
 typedef struct sf_context {
     char name[64];
@@ -140,15 +154,10 @@ typedef struct sf_context {
     int header_size;
     bool remove_from_ready_list;
     bool realloc_task_buffer;
+    bool connect_need_log;  //for client connect
     FCSmartPollingConfig smart_polling;
-    sf_deal_task_func deal_task;
-    sf_set_body_length_callback set_body_length;
-    sf_alloc_recv_buffer_callback alloc_recv_buffer;
-    sf_accept_done_callback accept_done_func;
-    sf_send_done_callback send_done_callback;
-    TaskCleanUpCallback task_cleanup_func;
-    sf_recv_timeout_callback timeout_callback;
-    sf_release_buffer_callback release_buffer_callback;
+
+    SFNIOCallbacks callbacks;
 } SFContext;
 
 typedef struct {

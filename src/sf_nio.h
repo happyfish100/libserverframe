@@ -37,7 +37,7 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
         release_buffer_callback);
 
@@ -47,17 +47,28 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
             set_body_length_func, alloc_recv_buffer_func, \
             deal_func, cleanup_func, timeout_callback, NULL)
 
-static inline void sf_set_deal_task_func_ex(SFContext *sf_context,
-        sf_deal_task_func deal_func)
+static inline void sf_set_deal_task_callback_ex(SFContext *sf_context,
+        sf_deal_task_callback deal_func)
 {
-    sf_context->deal_task = deal_func;
+    sf_context->callbacks.deal_task = deal_func;
 }
 
-#define sf_set_deal_task_func(deal_func) \
-    sf_set_deal_task_func_ex(&g_sf_context, deal_func)
+#define sf_set_deal_task_callback(deal_func) \
+    sf_set_deal_task_callback_ex(&g_sf_context, deal_func)
 
-static inline void sf_set_remove_from_ready_list_ex(SFContext *sf_context,
-        const bool enabled)
+
+static inline void sf_set_connect_done_callback_ex(SFContext *sf_context,
+        sf_connect_done_callback done_callback)
+{
+    sf_context->callbacks.connect_done = done_callback;
+}
+
+#define sf_set_connect_done_callback(done_callback) \
+    sf_set_connect_done_callback_ex(&g_sf_context, done_callback)
+
+
+static inline void sf_set_remove_from_ready_list_ex(
+        SFContext *sf_context, const bool enabled)
 {
     sf_context->remove_from_ready_list = enabled;
 }
@@ -65,14 +76,14 @@ static inline void sf_set_remove_from_ready_list_ex(SFContext *sf_context,
 #define sf_set_remove_from_ready_list(enabled) \
     sf_set_remove_from_ready_list_ex(&g_sf_context, enabled);
 
-static inline TaskCleanUpCallback sf_get_task_cleanup_func_ex(
+static inline TaskCleanUpCallback sf_get_task_cleanup_callback_ex(
         SFContext *sf_context)
 {
-    return sf_context->task_cleanup_func;
+    return sf_context->callbacks.task_cleanup;
 }
 
-#define sf_get_task_cleanup_func() \
-    sf_get_task_cleanup_func_ex(&g_sf_context)
+#define sf_get_task_cleanup_callback() \
+    sf_get_task_cleanup_callback_ex(&g_sf_context)
 
 #define sf_nio_task_is_idle(task) \
     (task->offset == 0 && task->length == 0)
@@ -95,7 +106,7 @@ void sf_task_detach_thread(struct fast_task_info *task);
 
 static inline int sf_set_body_length(struct fast_task_info *task)
 {
-    if (SF_CTX->set_body_length(task) != 0) {
+    if (SF_CTX->callbacks.set_body_length(task) != 0) {
         return -1;
     }
     if (task->length < 0) {
@@ -120,7 +131,7 @@ static inline int sf_set_body_length(struct fast_task_info *task)
 }
 
 int sf_socket_async_connect_server(struct fast_task_info *task);
-int sf_socket_connect_server_done(struct fast_task_info *task);
+int sf_socket_async_connect_check(struct fast_task_info *task);
 
 ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action);
 ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action);

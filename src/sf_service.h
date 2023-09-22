@@ -41,7 +41,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, TaskInitCallback init_callback,
@@ -81,9 +81,17 @@ static inline void sf_service_set_smart_polling_ex(SFContext *sf_context,
 {
     sf_context->smart_polling = *smart_polling;
 }
-
 #define sf_service_set_smart_polling(smart_polling) \
     sf_service_set_smart_polling_ex(&g_sf_context, smart_polling)
+
+static inline void sf_service_set_connect_need_log_ex(
+        SFContext *sf_context, const bool need_log)
+{
+    sf_context->connect_need_log = need_log;
+}
+#define sf_service_set_connect_need_log(need_log) \
+    sf_service_set_connect_need_log_ex(&g_sf_context, need_log)
+
 
 int sf_setup_signal_handler();
 
