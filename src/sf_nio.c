@@ -175,16 +175,20 @@ static inline int sf_ioevent_add(struct fast_task_info *task,
     return result > 0 ? -1 * result : result;
 }
 
-static inline int sf_nio_init(struct fast_task_info *task)
+static inline void inc_connection_current_count()
 {
     int current_connections;
 
-    current_connections = __sync_add_and_fetch(
-            &g_sf_global_vars.connection_stat.current_count, 1);
+    current_connections = FC_ATOMIC_INC(g_sf_global_vars.
+            connection_stat.current_count);
     if (current_connections > g_sf_global_vars.connection_stat.max_count) {
         g_sf_global_vars.connection_stat.max_count = current_connections;
     }
+}
 
+static inline int sf_nio_init(struct fast_task_info *task)
+{
+    inc_connection_current_count();
     return sf_ioevent_add(task, (IOEventCallback)sf_client_sock_read,
             task->network_timeout);
 }
@@ -301,11 +305,12 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
     int result;
 
     switch (stage) {
-        case SF_NIO_STAGE_INIT:
+        case SF_NIO_STAGE_INIT:    //for server init
             task->nio_stages.current = SF_NIO_STAGE_RECV;
             result = sf_nio_init(task);
             break;
-        case SF_NIO_STAGE_CONNECT:
+        case SF_NIO_STAGE_CONNECT:  //for client init
+            inc_connection_current_count();
             result = sf_async_connect_server(task);
             break;
         case SF_NIO_STAGE_RECV:
