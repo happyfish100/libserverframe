@@ -107,6 +107,13 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
 
     if (conn->comm_type == fc_comm_type_rdma) {
         buffer = G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn);
+        if (buffer->length < sizeof(SFCommonProtoHeader)) {
+            response->error.length = sprintf(response->error.message,
+                    "recv pkg length: %d < header size: %d",
+                    buffer->length, (int)sizeof(SFCommonProtoHeader));
+            return EINVAL;
+        }
+
         if ((result=sf_proto_parse_header((SFCommonProtoHeader *)
                         buffer->buff, response)) != 0)
         {
