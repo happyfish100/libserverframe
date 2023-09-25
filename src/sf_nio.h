@@ -86,7 +86,18 @@ static inline TaskCleanUpCallback sf_get_task_cleanup_callback_ex(
     sf_get_task_cleanup_callback_ex(&g_sf_context)
 
 #define sf_nio_task_is_idle(task) \
-    (task->offset == 0 && task->length == 0)
+    ((task->send.ptr->offset == 0 && task->send.ptr->length == 0) && \
+     (task->recv.ptr->offset == 0 && task->recv.ptr->length == 0))
+
+static inline void sf_nio_reset_task_length(struct fast_task_info *task)
+{
+    task->send.ptr->length = 0;
+    task->send.ptr->offset = 0;
+    if (task->free_queue->double_buffers) {
+        task->recv.ptr->length = 0;
+        task->recv.ptr->offset = 0;
+    }
+}
 
 void sf_recv_notify_read(int sock, short event, void *arg);
 int sf_send_add_event(struct fast_task_info *task);
@@ -109,20 +120,20 @@ static inline int sf_set_body_length(struct fast_task_info *task)
     if (SF_CTX->callbacks.set_body_length(task) != 0) {
         return -1;
     }
-    if (task->length < 0) {
+    if (task->recv.ptr->length < 0) {
         logError("file: "__FILE__", line: %d, "
                 "client ip: %s, pkg length: %d < 0",
                 __LINE__, task->client_ip,
-                task->length);
+                task->recv.ptr->length);
         return -1;
     }
 
-    task->length += SF_CTX->header_size;
-    if (task->length > g_sf_global_vars.max_pkg_size) {
+    task->recv.ptr->length += SF_CTX->header_size;
+    if (task->recv.ptr->length > g_sf_global_vars.max_pkg_size) {
         logError("file: "__FILE__", line: %d, "
                 "client ip: %s, pkg length: %d > "
                 "max pkg size: %d", __LINE__,
-                task->client_ip, task->length,
+                task->client_ip, task->recv.ptr->length,
                 g_sf_global_vars.max_pkg_size);
         return -1;
     }

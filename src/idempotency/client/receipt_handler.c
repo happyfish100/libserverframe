@@ -95,8 +95,7 @@ static void receipt_task_finish_cleanup(struct fast_task_info *task)
         task->handler->close_connection(task);
     }
 
-    task->length = 0;
-    task->offset = 0;
+    sf_nio_reset_task_length(task);
     task->req_count = 0;
 
     channel = (IdempotencyClientChannel *)task->arg;
@@ -116,14 +115,15 @@ static void setup_channel_request(struct fast_task_info *task)
     SFProtoSetupChannelReq *req;
 
     channel = (IdempotencyClientChannel *)task->arg;
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->send.ptr->data;
     req = (SFProtoSetupChannelReq *)(header + 1);
     int2buff(__sync_add_and_fetch(&channel->id, 0), req->channel_id);
     int2buff(__sync_add_and_fetch(&channel->key, 0), req->key);
 
     SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_SETUP_CHANNEL_REQ,
             sizeof(SFProtoSetupChannelReq));
-    task->length = sizeof(SFCommonProtoHeader) + sizeof(SFProtoSetupChannelReq);
+    task->send.ptr->length = sizeof(SFCommonProtoHeader) +
+        sizeof(SFProtoSetupChannelReq);
     sf_send_add_event(task);
 }
 
@@ -150,10 +150,10 @@ static int check_report_req_receipt(struct fast_task_info *task)
         return 0;
     }
 
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->send.ptr->data;
     rheader = (SFProtoReportReqReceiptHeader *)(header + 1);
     rbody = rstart = (SFProtoReportReqReceiptBody *)(rheader + 1);
-    buff_end = task->data + channel->buffer_size;
+    buff_end = task->send.ptr->data + channel->buffer_size;
     last = NULL;
     receipt = channel->waiting_resp_qinfo.head;
     do {
@@ -183,8 +183,9 @@ static int check_report_req_receipt(struct fast_task_info *task)
 
     count = rbody - rstart;
     int2buff(count, rheader->count);
-    task->length = (char *)rbody - task->data;
-    int2buff(task->length - sizeof(SFCommonProtoHeader), header->body_len);
+    task->send.ptr->length = (char *)rbody - task->send.ptr->data;
+    int2buff(task->send.ptr->length - sizeof(SFCommonProtoHeader),
+            header->body_len);
     header->cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_REQ;
     sf_send_add_event(task);
     return count;
@@ -198,18 +199,18 @@ static void close_channel_request(struct fast_task_info *task)
     channel = (IdempotencyClientChannel *)task->arg;
     idempotency_client_channel_set_id_key(channel, 0, 0);
 
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->send.ptr->data;
     SF_PROTO_SET_HEADER(header, SF_SERVICE_PROTO_CLOSE_CHANNEL_REQ, 0);
-    task->length = sizeof(SFCommonProtoHeader);
+    task->send.ptr->length = sizeof(SFCommonProtoHeader);
     sf_send_add_event(task);
 }
 
 static void active_test_request(struct fast_task_info *task)
 {
     SFCommonProtoHeader *header;
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->send.ptr->data;
     SF_PROTO_SET_HEADER(header, SF_PROTO_ACTIVE_TEST_REQ, 0);
-    task->length = sizeof(SFCommonProtoHeader);
+    task->send.ptr->length = sizeof(SFCommonProtoHeader);
     sf_send_add_event(task);
 }
 
@@ -243,11 +244,12 @@ static void report_req_receipt_request(struct fast_task_info *task,
 static inline int receipt_expect_body_length(struct fast_task_info *task,
         const int expect_body_len)
 {
-    if ((int)(task->length - sizeof(SFCommonProtoHeader)) != expect_body_len) {
+    int body_len;
+    body_len = task->recv.ptr->length - sizeof(SFCommonProtoHeader);
+    if (body_len != expect_body_len) {
         logError("file: "__FILE__", line: %d, "
-                "server %s:%u, response body length: %d != %d",
-                __LINE__, task->server_ip, task->port, (int)(task->length -
-                    sizeof(SFCommonProtoHeader)), expect_body_len);
+                "server %s:%u, response body length: %d != %d", __LINE__,
+                task->server_ip, task->port, body_len, expect_body_len);
         return EINVAL;
     }
 
@@ -279,8 +281,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
         return 0;
     }
 
-    resp = (SFProtoSetupChannelResp *)(task->data +
-            sizeof(SFCommonProtoHeader));
+    resp = (SFProtoSetupChannelResp *)SF_PROTO_RECV_BODY(task);
     channel_id = buff2int(resp->channel_id);
     channel_key = buff2int(resp->key);
     buffer_size = buff2int(resp->buffer_size);
@@ -290,7 +291,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
         thread_ctx = (IdempotencyReceiptThreadContext *)task->thread_data->arg;
         fc_list_add_tail(&channel->dlink, &thread_ctx->head);
     }
-    channel->buffer_size = FC_MIN(buffer_size, task->size);
+    channel->buffer_size = FC_MIN(buffer_size, task->send.ptr->size);
 
     PTHREAD_MUTEX_LOCK(&channel->lcp.lock);
     pthread_cond_broadcast(&channel->lcp.cond);
@@ -343,6 +344,7 @@ static inline int deal_report_req_receipt_response(struct fast_task_info *task)
 static int receipt_deal_task(struct fast_task_info *task, const int stage)
 {
     int result;
+    SFCommonProtoHeader *header;
 
     do {
         if (stage == SF_NIO_STAGE_HANDSHAKE) {
@@ -350,7 +352,7 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
             result = 0;
             break;
         } else if (stage == SF_NIO_STAGE_CONTINUE) {
-            if (task->length == 0 && task->offset == 0) {
+            if (sf_nio_task_is_idle(task)) {
                 if (((IdempotencyClientChannel *)task->arg)->established) {
                     report_req_receipt_request(task, true);
                 } else if (task->req_count > 0) {
@@ -362,24 +364,24 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
             break;
         }
 
-        result = buff2short(((SFCommonProtoHeader *)task->data)->status);
+        header = (SFCommonProtoHeader *)task->recv.ptr->data;
+        result = buff2short(header->status);
         if (result != 0) {
             int msg_len;
             char *message;
 
-            msg_len = task->length - sizeof(SFCommonProtoHeader);
-            message = task->data + sizeof(SFCommonProtoHeader);
+            msg_len = SF_RECV_BODY_LENGTH(task);
+            message = SF_PROTO_RECV_BODY(task);
             logError("file: "__FILE__", line: %d, "
                     "response from server %s:%u, cmd: %d (%s), "
-                    "status: %d, error info: %.*s",
-                    __LINE__, task->server_ip, task->port,
-                    ((SFCommonProtoHeader *)task->data)->cmd,
-                    sf_get_cmd_caption(((SFCommonProtoHeader *)task->data)->cmd),
+                    "status: %d, error info: %.*s", __LINE__,
+                    task->server_ip, task->port, header->cmd,
+                    sf_get_cmd_caption(header->cmd),
                     result, msg_len, message);
             break;
         }
 
-        switch (((SFCommonProtoHeader *)task->data)->cmd) {
+        switch (header->cmd) {
             case SF_SERVICE_PROTO_SETUP_CHANNEL_RESP:
                 result = deal_setup_channel_response(task);
                 break;
@@ -398,16 +400,15 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
             default:
                 logError("file: "__FILE__", line: %d, "
                         "response from server %s:%u, unexpect cmd: %d (%s)",
-                        __LINE__, task->server_ip, task->port,
-                        ((SFCommonProtoHeader *)task->data)->cmd,
-                        sf_get_cmd_caption(((SFCommonProtoHeader *)task->data)->cmd));
+                        __LINE__, task->server_ip, task->port, header->cmd,
+                        sf_get_cmd_caption(header->cmd));
                 result = EINVAL;
                 break;
         }
 
         if (result == 0) {
             update_lru_chain(task);
-            task->offset = task->length = 0;
+            sf_nio_reset_task_length(task);
             report_req_receipt_request(task, false);
         }
     } while (0);
@@ -489,6 +490,8 @@ static void *receipt_alloc_thread_extra_data(const int thread_index)
 
 static int do_init(FCAddressPtrArray *address_array)
 {
+    const int task_arg_size = 0;
+    const bool double_buffers = false;
     int result;
     int bytes;
     SFNetworkHandler *rdma_handler;
@@ -518,8 +521,8 @@ static int do_init(FCAddressPtrArray *address_array)
             receipt_alloc_thread_extra_data, receipt_thread_loop_callback,
             NULL, sf_proto_set_body_length, NULL, NULL, receipt_deal_task,
             receipt_task_finish_cleanup, receipt_recv_timeout_callback,
-            1000, sizeof(SFCommonProtoHeader), TASK_PADDING_SIZE, 0,
-            receipt_init_task, NULL);
+            1000, sizeof(SFCommonProtoHeader), TASK_PADDING_SIZE,
+            task_arg_size, double_buffers, receipt_init_task, NULL);
 }
 
 int receipt_handler_init(FCAddressPtrArray *address_array)

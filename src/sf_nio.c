@@ -143,6 +143,8 @@ int sf_set_read_event(struct fast_task_info *task)
 {
     int result;
 
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
     task->nio_stages.current = SF_NIO_STAGE_RECV;
     if (task->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
@@ -488,8 +490,8 @@ void sf_recv_notify_read(int sock, short event, void *arg)
 
 int sf_send_add_event(struct fast_task_info *task)
 {
-    task->offset = 0;
-    if (task->length > 0) {
+    task->send.ptr->offset = 0;
+    if (task->send.ptr->length > 0) {
         /* direct send */
         task->nio_stages.current = SF_NIO_STAGE_SEND;
         if (sf_client_sock_write(task->event.fd, IOEVENT_WRITE, task) < 0) {
@@ -533,8 +535,7 @@ static inline int check_task(struct fast_task_info *task,
             return -1;
         }
     } else {
-        //TODO: for streaming should return EAGAIN
-        return 0;
+        return EAGAIN;
     }
 }
 
@@ -546,8 +547,9 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
         bytes = writev(task->event.fd, task->iovec_array.iovs,
                 FC_MIN(task->iovec_array.count, IOV_MAX));
     } else {
-        bytes = write(task->event.fd, task->data + task->offset,
-                task->length - task->offset);
+        bytes = write(task->event.fd, task->send.ptr->data +
+                task->send.ptr->offset, task->send.ptr->length -
+                task->send.ptr->offset);
     }
     if (bytes < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -567,19 +569,19 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
             logWarning("file: "__FILE__", line: %d, "
                     "client ip: %s, send fail, task offset: %d, length: %d, "
                     "errno: %d, error info: %s", __LINE__, task->client_ip,
-                    task->offset, task->length, errno, strerror(errno));
+                    task->send.ptr->offset, task->send.ptr->length, errno, strerror(errno));
             return -1;
         }
     } else if (bytes == 0) {
         logWarning("file: "__FILE__", line: %d, "
                 "client ip: %s, sock: %d, task length: %d, offset: %d, "
                 "send failed, connection disconnected", __LINE__,
-                task->client_ip, task->event.fd, task->length, task->offset);
+                task->client_ip, task->event.fd, task->send.ptr->length, task->send.ptr->offset);
         return -1;
     }
 
-    task->offset += bytes;
-    if (task->offset >= task->length) {
+    task->send.ptr->offset += bytes;
+    if (task->send.ptr->offset >= task->send.ptr->length) {
         *action = sf_comm_action_finish;
     } else {
         *action = sf_comm_action_continue;
@@ -623,16 +625,19 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
     int recv_bytes;
     bool new_alloc;
 
-    if (task->length == 0) { //recv header
-        recv_bytes = SF_CTX->header_size - task->offset;
-        bytes = read(task->event.fd, task->data + task->offset, recv_bytes);
+    if (task->recv.ptr->length == 0) { //recv header
+        recv_bytes = SF_CTX->header_size - task->recv.ptr->offset;
+        bytes = read(task->event.fd, task->recv.ptr->data +
+                task->recv.ptr->offset, recv_bytes);
     } else {
-        recv_bytes = task->length - task->offset;
+        recv_bytes = task->recv.ptr->length - task->recv.ptr->offset;
         if (task->recv_body == NULL) {
-            bytes = read(task->event.fd, task->data + task->offset, recv_bytes);
+            bytes = read(task->event.fd, task->recv.ptr->data +
+                    task->recv.ptr->offset, recv_bytes);
         } else {
-            bytes = read(task->event.fd, task->recv_body + (task->offset -
-                        SF_CTX->header_size), recv_bytes);
+            bytes = read(task->event.fd, task->recv_body +
+                    (task->recv.ptr->offset - SF_CTX->
+                     header_size), recv_bytes);
         }
     }
 
@@ -655,19 +660,19 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
             return -1;
         }
     } else if (bytes == 0) {
-        if (task->offset > 0) {
-            if (task->length > 0) {
+        if (task->recv.ptr->offset > 0) {
+            if (task->recv.ptr->length > 0) {
                 logWarning("file: "__FILE__", line: %d, "
                         "client ip: %s, connection disconnected, "
                         "expect pkg length: %d, recv pkg length: %d",
-                        __LINE__, task->client_ip, task->length,
-                        task->offset);
+                        __LINE__, task->client_ip, task->recv.ptr->length,
+                        task->recv.ptr->offset);
             } else {
                 logWarning("file: "__FILE__", line: %d, "
                         "client ip: %s, connection "
                         "disconnected, recv pkg length: %d",
                         __LINE__, task->client_ip,
-                        task->offset);
+                        task->recv.ptr->offset);
             }
         } else {
             logDebug("file: "__FILE__", line: %d, "
@@ -680,9 +685,9 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
     }
 
     TCP_SET_QUICK_ACK(task->event.fd);
-    task->offset += bytes;
-    if (task->length == 0) { //pkg header
-        if (task->offset < SF_CTX->header_size) {
+    task->recv.ptr->offset += bytes;
+    if (task->recv.ptr->length == 0) { //pkg header
+        if (task->recv.ptr->offset < SF_CTX->header_size) {
             *action = sf_comm_action_continue;
             return bytes;
         }
@@ -693,7 +698,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
 
         if (SF_CTX->callbacks.alloc_recv_buffer != NULL) {
             task->recv_body = SF_CTX->callbacks.alloc_recv_buffer(task,
-                    task->length - SF_CTX->header_size, &new_alloc);
+                    task->recv.ptr->length - SF_CTX->header_size, &new_alloc);
             if (new_alloc && task->recv_body == NULL) {
                 return -1;
             }
@@ -702,36 +707,38 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
         }
 
         if (!new_alloc) {
-            if (task->length > task->size) {
+            if (task->recv.ptr->length > task->recv.ptr->size) {
                 int old_size;
 
                 if (!SF_CTX->realloc_task_buffer) {
                     logError("file: "__FILE__", line: %d, "
                             "client ip: %s, pkg length: %d exceeds "
                             "task size: %d, but realloc buffer disabled",
-                            __LINE__, task->client_ip, task->size,
-                            task->length);
+                            __LINE__, task->client_ip, task->recv.ptr->size,
+                            task->recv.ptr->length);
                     return -1;
                 }
 
-                old_size = task->size;
-                if (free_queue_realloc_buffer(task, task->length) != 0) {
+                old_size = task->recv.ptr->size;
+                if (free_queue_realloc_recv_buffer(task, task->
+                            recv.ptr->length) != 0)
+                {
                     logError("file: "__FILE__", line: %d, "
-                            "client ip: %s, realloc buffer size "
-                            "from %d to %d fail", __LINE__,
-                            task->client_ip, task->size, task->length);
+                            "client ip: %s, realloc buffer size from %d "
+                            "to %d fail", __LINE__, task->client_ip,
+                            task->recv.ptr->size, task->recv.ptr->length);
                     return -1;
                 }
 
                 logDebug("file: "__FILE__", line: %d, "
                         "client ip: %s, task length: %d, realloc buffer "
                         "size from %d to %d", __LINE__, task->client_ip,
-                        task->length, old_size, task->size);
+                        task->recv.ptr->length, old_size, task->recv.ptr->size);
             }
         }
     }
 
-    if (task->offset >= task->length) { //recv done
+    if (task->recv.ptr->offset >= task->recv.ptr->length) { //recv done
         *action = sf_comm_action_finish;
     } else {
         *action = sf_comm_action_continue;
@@ -876,7 +883,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
     }
 
     if (event & IOEVENT_TIMEOUT) {
-        if (task->offset == 0 && task->req_count > 0) {
+        if (task->recv.ptr->offset == 0 && task->req_count > 0) {
             if (SF_CTX->callbacks.task_timeout != NULL) {
                 if (SF_CTX->callbacks.task_timeout(task) != 0) {
                     ioevent_add_to_deleted_list(task);
@@ -889,12 +896,12 @@ int sf_client_sock_read(int sock, short event, void *arg)
             fast_timer_add(&task->thread_data->timer,
                 &task->event.timer);
         } else {
-            if (task->length > 0) {
+            if (task->recv.ptr->length > 0) {
                 logWarning("file: "__FILE__", line: %d, "
-                        "client ip: %s, recv timeout, "
-                        "recv offset: %d, expect length: %d",
-                        __LINE__, task->client_ip,
-                        task->offset, task->length);
+                        "client ip: %s, recv timeout, recv "
+                        "offset: %d, expect length: %d", __LINE__,
+                        task->client_ip, task->recv.ptr->offset,
+                        task->recv.ptr->length);
             } else {
                 logWarning("file: "__FILE__", line: %d, "
                         "client ip: %s, req_count: %"PRId64", recv timeout",
@@ -962,8 +969,9 @@ int sf_client_sock_write(int sock, short event, void *arg)
     if (event & IOEVENT_TIMEOUT) {
         logError("file: "__FILE__", line: %d, "
             "client ip: %s, send timeout. total length: %d, offset: %d, "
-            "remain: %d", __LINE__, task->client_ip, task->length,
-            task->offset, task->length - task->offset);
+            "remain: %d", __LINE__, task->client_ip, task->send.ptr->length,
+            task->send.ptr->offset, task->send.ptr->length -
+            task->send.ptr->offset);
 
         ioevent_add_to_deleted_list(task);
         return -1;
@@ -985,9 +993,11 @@ int sf_client_sock_write(int sock, short event, void *arg)
         if (action == sf_comm_action_finish) {
             release_iovec_buffer(task);
 
-            length = task->length;
-            task->offset = 0;
-            task->length = 0;
+            length = task->send.ptr->length;
+            if (task->free_queue->double_buffers) {
+                task->send.ptr->offset = 0;
+                task->send.ptr->length = 0;
+            }
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }

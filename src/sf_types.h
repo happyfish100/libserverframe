@@ -158,6 +158,7 @@ typedef struct sf_context {
     FCSmartPollingConfig smart_polling;
 
     SFNIOCallbacks callbacks;
+    struct fast_task_queue free_queue;
 } SFContext;
 
 typedef struct {

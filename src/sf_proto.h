@@ -89,8 +89,18 @@
         int2buff((resp_header).body_len, (proto_header)->body_len);\
     } while (0)
 
-#define SF_PROTO_RESP_BODY(task)  \
-    (task->data + sizeof(SFCommonProtoHeader))
+
+#define SF_PROTO_SEND_BODY(task)  \
+    (task->send.ptr->data + sizeof(SFCommonProtoHeader))
+
+#define SF_PROTO_RECV_BODY(task) \
+    (task->recv.ptr->data + sizeof(SFCommonProtoHeader))
+
+#define SF_RECV_BODY_LENGTH(task) \
+    (task->recv.ptr->length - sizeof(SFCommonProtoHeader))
+
+#define SF_SEND_BUFF_END(task) (task->send.ptr->data + task->send.ptr->size)
+#define SF_RECV_BUFF_END(task) (task->recv.ptr->data + task->recv.ptr->size)
 
 #define SF_PROTO_UPDATE_EXTRA_BODY_SIZE \
     sizeof(SFProtoIdempotencyAdditionalHeader) + FCFS_AUTH_SESSION_ID_LEN
@@ -282,6 +292,16 @@ const char *sf_get_cmd_caption(const int cmd);
 int sf_proto_deal_task_done(struct fast_task_info *task,
         const char *service_name, SFCommonTaskContext *ctx);
 
+static inline void sf_proto_init_task_magic(struct fast_task_info *task)
+{
+    SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                task->send.ptr->data)->magic);
+    if (task->free_queue->double_buffers) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+}
+
 static inline void sf_proto_init_task_context(struct fast_task_info *task,
         SFCommonTaskContext *ctx)
 {
@@ -295,14 +315,15 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     ctx->response_done = false;
     ctx->need_response = true;
 
-    ctx->request.header.cmd = ((SFCommonProtoHeader *)task->data)->cmd;
-    ctx->request.header.body_len = task->length - sizeof(SFCommonProtoHeader);
+    ctx->request.header.cmd = ((SFCommonProtoHeader *)
+            task->recv.ptr->data)->cmd;
+    ctx->request.header.body_len = SF_RECV_BODY_LENGTH(task);
     ctx->request.header.status = buff2short(((SFCommonProtoHeader *)
-                task->data)->status);
+                task->recv.ptr->data)->status);
     if (task->recv_body != NULL) {
         ctx->request.body = task->recv_body;
     } else {
-        ctx->request.body = task->data + sizeof(SFCommonProtoHeader);
+        ctx->request.body = SF_PROTO_RECV_BODY(task);
     }
 }
 

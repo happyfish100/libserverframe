@@ -30,7 +30,7 @@ int sf_proto_set_body_length(struct fast_task_info *task)
 {
     SFCommonProtoHeader *header;
 
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->recv.ptr->data;
     if (!SF_PROTO_CHECK_MAGIC(header->magic)) {
         logError("file: "__FILE__", line: %d, "
                 "peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT
@@ -41,7 +41,7 @@ int sf_proto_set_body_length(struct fast_task_info *task)
         return EINVAL;
     }
 
-    task->length = buff2int(header->body_len); //set body length
+    task->recv.ptr->length = buff2int(header->body_len); //set body length
     return 0;
 }
 
@@ -655,18 +655,17 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         }
 
         if (ctx->response.header.status == 0) {
-            task->offset = task->length = 0;
             return sf_set_read_event(task);
         } else {
             return FC_NEGATIVE(ctx->response.header.status);
         }
     }
 
-    proto_header = (SFCommonProtoHeader *)task->data;
+    proto_header = (SFCommonProtoHeader *)task->send.ptr->data;
     if (!ctx->response_done) {
         ctx->response.header.body_len = ctx->response.error.length;
         if (ctx->response.error.length > 0) {
-            memcpy(task->data + sizeof(SFCommonProtoHeader),
+            memcpy(task->send.ptr->data + sizeof(SFCommonProtoHeader),
                     ctx->response.error.message, ctx->response.error.length);
         }
     }
@@ -675,7 +674,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
     short2buff(status, proto_header->status);
     proto_header->cmd = ctx->response.header.cmd;
     int2buff(ctx->response.header.body_len, proto_header->body_len);
-    task->length = sizeof(SFCommonProtoHeader) + ctx->response.header.body_len;
+    task->send.ptr->length = sizeof(SFCommonProtoHeader) +
+        ctx->response.header.body_len;
 
     r = sf_send_add_event(task);
     time_used = get_current_time_us() - ctx->req_start_time;
