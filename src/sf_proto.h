@@ -327,6 +327,104 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     }
 }
 
+/* task send and recv buffer operations */
+static inline int sf_set_task_send_buffer_size(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_set_buffer_size(task, task->send.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_recv_buffer_size(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_set_buffer_size(task, task->recv.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_send_max_buffer_size(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_set_max_buffer_size(task, task->send.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_recv_max_buffer_size(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_set_max_buffer_size(task, task->recv.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_send_buffer(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_realloc_buffer(task, task->send.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_recv_buffer(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_realloc_buffer(task, task->recv.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_send_max_buffer(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_realloc_max_buffer(task, task->send.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_recv_max_buffer(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_realloc_max_buffer(task, task->recv.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+
 static inline void sf_log_network_error_ex1(SFResponseInfo *response,
         const ConnectionInfo *conn, const char *service_name,
         const int result, const int log_level,
