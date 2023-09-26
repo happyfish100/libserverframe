@@ -582,6 +582,10 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
 
     task->send.ptr->offset += bytes;
     if (task->send.ptr->offset >= task->send.ptr->length) {
+        if (task->send.ptr != task->recv.ptr) {  //double buffers
+            task->send.ptr->offset = 0;
+            task->send.ptr->length = 0;
+        }
         *action = sf_comm_action_finish;
     } else {
         *action = sf_comm_action_continue;
@@ -979,6 +983,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
     total_write = 0;
     action = sf_comm_action_continue;
+    length = task->send.ptr->length;
     while (1) {
         fast_timer_modify(&task->thread_data->timer,
                 &task->event.timer, g_current_time +
@@ -992,12 +997,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
         total_write += bytes;
         if (action == sf_comm_action_finish) {
             release_iovec_buffer(task);
-
-            length = task->send.ptr->length;
-            if (task->free_queue->double_buffers) {
-                task->send.ptr->offset = 0;
-                task->send.ptr->length = 0;
-            }
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }

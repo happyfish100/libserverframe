@@ -352,7 +352,7 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
             result = 0;
             break;
         } else if (stage == SF_NIO_STAGE_CONTINUE) {
-            if (sf_nio_task_is_idle(task)) {
+            if (sf_nio_task_send_done(task)) {
                 if (((IdempotencyClientChannel *)task->arg)->established) {
                     report_req_receipt_request(task, true);
                 } else if (task->req_count > 0) {
@@ -408,7 +408,8 @@ static int receipt_deal_task(struct fast_task_info *task, const int stage)
 
         if (result == 0) {
             update_lru_chain(task);
-            sf_nio_reset_task_length(task);
+            task->recv.ptr->length = 0;
+            task->recv.ptr->offset = 0;
             report_req_receipt_request(task, false);
         }
     } while (0);
@@ -429,7 +430,7 @@ static void receipt_thread_check_heartbeat(
             break;
         }
 
-        if (sf_nio_task_is_idle(channel->task)) {
+        if (sf_nio_task_send_done(channel->task)) {
             channel->last_pkg_time = g_current_time;
             active_test_request(channel->task);
         }
@@ -443,7 +444,7 @@ static void receipt_thread_close_idle_channel(
     IdempotencyClientChannel *tmp;
 
     fc_list_for_each_entry_safe(channel, tmp, &thread_ctx->head, dlink) {
-        if (!sf_nio_task_is_idle(channel->task)) {
+        if (!sf_nio_task_send_done(channel->task)) {
             continue;
         }
 

@@ -296,7 +296,7 @@ static inline void sf_proto_init_task_magic(struct fast_task_info *task)
 {
     SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
                 task->send.ptr->data)->magic);
-    if (task->free_queue->double_buffers) {
+    if (task->recv.ptr != task->send.ptr) {
         SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
                     task->recv.ptr->data)->magic);
     }

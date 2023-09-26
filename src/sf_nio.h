@@ -85,15 +85,14 @@ static inline TaskCleanUpCallback sf_get_task_cleanup_callback_ex(
 #define sf_get_task_cleanup_callback() \
     sf_get_task_cleanup_callback_ex(&g_sf_context)
 
-#define sf_nio_task_is_idle(task) \
-    ((task->send.ptr->offset == 0 && task->send.ptr->length == 0) && \
-     (task->recv.ptr->offset == 0 && task->recv.ptr->length == 0))
+#define sf_nio_task_send_done(task) \
+    (task->send.ptr->offset == 0 && task->send.ptr->length == 0)
 
 static inline void sf_nio_reset_task_length(struct fast_task_info *task)
 {
     task->send.ptr->length = 0;
     task->send.ptr->offset = 0;
-    if (task->free_queue->double_buffers) {
+    if (task->recv.ptr != task->send.ptr) {
         task->recv.ptr->length = 0;
         task->recv.ptr->offset = 0;
     }
