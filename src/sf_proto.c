@@ -72,7 +72,7 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
 
         if (conn->comm_type == fc_comm_type_rdma) {
             memcpy(response->error.message, G_RDMA_CONNECTION_CALLBACKS.
-                    get_buffer(conn)->buff + sizeof(SFCommonProtoHeader),
+                    get_recv_buffer(conn)->buff + sizeof(SFCommonProtoHeader),
                     response->error.length);
             response->error.message[response->error.length] = '\0';
         } else if ((result=tcprecvdata_nb_ex(conn->sock, response->
@@ -106,7 +106,7 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
     SFCommonProtoHeader header_proto;
 
     if (conn->comm_type == fc_comm_type_rdma) {
-        buffer = G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn);
+        buffer = G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn);
         if (buffer->length < sizeof(SFCommonProtoHeader)) {
             response->error.length = sprintf(response->error.message,
                     "recv pkg length: %d < header size: %d",
@@ -217,8 +217,8 @@ int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
     }
 
     if (conn->comm_type == fc_comm_type_rdma) {
-        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
-                sizeof(SFCommonProtoHeader), response->header.body_len);
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
     } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
     {
@@ -260,8 +260,8 @@ int sf_send_and_recv_response_ex1(ConnectionInfo *conn, char *send_data,
     }
 
     if (conn->comm_type == fc_comm_type_rdma) {
-        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
-                sizeof(SFCommonProtoHeader), response->header.body_len);
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
         *body_len = response->header.body_len;
     } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, body_len)) != 0)
@@ -305,8 +305,8 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
     }
 
     if (conn->comm_type == fc_comm_type_rdma) {
-        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->buff +
-                sizeof(SFCommonProtoHeader), response->header.body_len);
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
     } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
                     network_timeout, &recv_bytes)) != 0)
     {
@@ -376,7 +376,7 @@ int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
     }
 
     if (conn->comm_type == fc_comm_type_rdma) {
-        memcpy(buffer->buff, G_RDMA_CONNECTION_CALLBACKS.get_buffer(conn)->
+        memcpy(buffer->buff, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
                 buff + sizeof(SFCommonProtoHeader), response->header.body_len);
     } else if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
