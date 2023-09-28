@@ -493,6 +493,7 @@ static int do_init(FCAddressPtrArray *address_array)
 {
     const int task_arg_size = 0;
     const bool double_buffers = false;
+    const bool explicit_post_recv = false;
     int result;
     int bytes;
     SFNetworkHandler *rdma_handler;
@@ -523,7 +524,8 @@ static int do_init(FCAddressPtrArray *address_array)
             NULL, sf_proto_set_body_length, NULL, NULL, receipt_deal_task,
             receipt_task_finish_cleanup, receipt_recv_timeout_callback,
             1000, sizeof(SFCommonProtoHeader), TASK_PADDING_SIZE,
-            task_arg_size, double_buffers, receipt_init_task, NULL);
+            task_arg_size, double_buffers, explicit_post_recv,
+            receipt_init_task, NULL);
 }
 
 int receipt_handler_init(FCAddressPtrArray *address_array)

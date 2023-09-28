@@ -144,7 +144,8 @@ int sf_socket_async_connect_server(struct fast_task_info *task);
 int sf_socket_async_connect_check(struct fast_task_info *task);
 
 ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action);
-ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action);
+ssize_t sf_socket_recv_data(struct fast_task_info *task,
+        const bool call_post_recv, SFCommAction *action);
 
 int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data);
 

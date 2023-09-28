@@ -569,14 +569,16 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
             logWarning("file: "__FILE__", line: %d, "
                     "client ip: %s, send fail, task offset: %d, length: %d, "
                     "errno: %d, error info: %s", __LINE__, task->client_ip,
-                    task->send.ptr->offset, task->send.ptr->length, errno, strerror(errno));
+                    task->send.ptr->offset, task->send.ptr->length,
+                    errno, strerror(errno));
             return -1;
         }
     } else if (bytes == 0) {
         logWarning("file: "__FILE__", line: %d, "
                 "client ip: %s, sock: %d, task length: %d, offset: %d, "
                 "send failed, connection disconnected", __LINE__,
-                task->client_ip, task->event.fd, task->send.ptr->length, task->send.ptr->offset);
+                task->client_ip, task->event.fd, task->send.ptr->length,
+                task->send.ptr->offset);
         return -1;
     }
 
@@ -623,7 +625,8 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
     return bytes;
 }
 
-ssize_t sf_socket_recv_data(struct fast_task_info *task, SFCommAction *action)
+ssize_t sf_socket_recv_data(struct fast_task_info *task,
+        const bool call_post_recv, SFCommAction *action)
 {
     int bytes;
     int recv_bytes;
@@ -852,7 +855,9 @@ int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
         if (task->canceled) {
             continue;
         }
-        if ((bytes=task->handler->recv_data(task, &action)) < 0) {
+        if ((bytes=task->handler->recv_data(task, !task->handler->
+                        explicit_post_recv, &action)) < 0)
+        {
             ioevent_add_to_deleted_list(task);
             continue;
         }
@@ -860,8 +865,13 @@ int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
         if (action == sf_comm_action_finish) {
             task->req_count++;
             task->nio_stages.current = SF_NIO_STAGE_SEND;
-            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
+            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {
+                /* fatal error */
                 ioevent_add_to_deleted_list(task);
+            } else if (task->handler->explicit_post_recv) {
+                if (task->handler->post_recv(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                }
             }
         } else {
             if (calc_iops_and_remove_polling(task) != 0) {
@@ -926,7 +936,9 @@ int sf_client_sock_read(int sock, short event, void *arg)
             &task->event.timer, g_current_time +
             task->network_timeout);
 
-        if ((bytes=task->handler->recv_data(task, &action)) < 0) {
+        if ((bytes=task->handler->recv_data(task, !task->handler->
+                        explicit_post_recv, &action)) < 0)
+        {
             ioevent_add_to_deleted_list(task);
             return -1;
         }
@@ -938,6 +950,11 @@ int sf_client_sock_read(int sock, short event, void *arg)
             if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
                 ioevent_add_to_deleted_list(task);
                 return -1;
+            } else if (task->handler->explicit_post_recv) {
+                if (task->handler->post_recv(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
             }
 
             if (SF_CTX->smart_polling.enabled) {

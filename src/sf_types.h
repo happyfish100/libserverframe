@@ -81,7 +81,8 @@ typedef void (*sf_close_connection_callback)(struct fast_task_info *task);
 typedef ssize_t (*sf_send_data_callback)(struct fast_task_info *task,
         SFCommAction *action);
 typedef ssize_t (*sf_recv_data_callback)(struct fast_task_info *task,
-        SFCommAction *action);
+        const bool call_post_recv, SFCommAction *action);
+typedef int (*sf_post_recv_callback)(struct fast_task_info *task);
 
 struct sf_network_handler;
 typedef struct sf_listener {
@@ -99,6 +100,7 @@ typedef struct sf_listener {
 struct sf_context;
 typedef struct sf_network_handler {
     bool enabled;
+    bool explicit_post_recv;
     FCCommunicationType comm_type;
     struct sf_context *ctx;
     struct ibv_pd *pd;
@@ -123,6 +125,7 @@ typedef struct sf_network_handler {
 
     sf_send_data_callback send_data;
     sf_recv_data_callback recv_data;
+    sf_post_recv_callback post_recv;  //for rdma
 } SFNetworkHandler;
 
 typedef struct sf_nio_callbacks {

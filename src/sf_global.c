@@ -462,6 +462,7 @@ static int load_rdma_apis(SFNetworkHandler *handler)
     LOAD_API(handler, close_connection);
     LOAD_API(handler, send_data);
     LOAD_API(handler, recv_data);
+    LOAD_API(handler, post_recv);
 
     return 0;
 }
@@ -474,6 +475,7 @@ static int init_network_handler(SFNetworkHandler *handler,
     handler->outer.handler = handler;
     handler->inner.is_inner = true;
     handler->outer.is_inner = false;
+    handler->explicit_post_recv = false;
 
     if (handler->comm_type == fc_comm_type_sock) {
         handler->inner.sock = -1;
@@ -486,6 +488,7 @@ static int init_network_handler(SFNetworkHandler *handler,
         handler->close_connection = sf_socket_close_connection;
         handler->send_data = sf_socket_send_data;
         handler->recv_data = sf_socket_recv_data;
+        handler->post_recv = NULL;
         return 0;
     } else {
         handler->inner.id = NULL;

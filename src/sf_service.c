@@ -108,8 +108,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
-        TaskInitCallback init_callback, sf_release_buffer_callback
-        release_buffer_callback)
+        const bool explicit_post_recv, TaskInitCallback init_callback,
+        sf_release_buffer_callback release_buffer_callback)
 {
     int result;
     int bytes;
@@ -130,6 +130,10 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             set_body_length_func, alloc_recv_buffer_func,
             send_done_callback, deal_func, task_cleanup_func,
             timeout_callback, release_buffer_callback);
+    if (explicit_post_recv) {
+        sf_context->handlers[SF_RDMACM_NETWORK_HANDLER_INDEX].
+            explicit_post_recv = true;
+    }
 
     if ((result=sf_init_free_queue(&sf_context->free_queue,
                     name, double_buffers, task_padding_size,
