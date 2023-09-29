@@ -985,7 +985,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
     int result;
     int bytes;
     int total_write;
-    int length;
     SFCommAction action;
     struct fast_task_info *task;
 
@@ -1007,7 +1006,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
     total_write = 0;
     action = sf_comm_action_continue;
-    length = task->send.ptr->length;
     while (1) {
         fast_timer_modify(&task->thread_data->timer,
                 &task->event.timer, g_current_time +
