@@ -542,6 +542,7 @@ static inline int check_task(struct fast_task_info *task,
 ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
 {
     int bytes;
+    int length;
 
     if (task->iovec_array.iovs != NULL) {
         bytes = writev(task->event.fd, task->iovec_array.iovs,
@@ -584,9 +585,15 @@ ssize_t sf_socket_send_data(struct fast_task_info *task, SFCommAction *action)
 
     task->send.ptr->offset += bytes;
     if (task->send.ptr->offset >= task->send.ptr->length) {
+        length = task->send.ptr->length;
         if (task->send.ptr != task->recv.ptr) {  //double buffers
             task->send.ptr->offset = 0;
             task->send.ptr->length = 0;
+        }
+        if (SF_CTX->callbacks.send_done != NULL) {
+            if (SF_CTX->callbacks.send_done(task, length) != 0) {
+                return -1;
+            }
         }
         *action = sf_comm_action_finish;
     } else {
@@ -1016,13 +1023,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
             release_iovec_buffer(task);
             if (sf_set_read_event(task) != 0) {
                 return -1;
-            }
-
-            if (SF_CTX->callbacks.send_done != NULL) {
-                if (SF_CTX->callbacks.send_done(task, length) != 0) {
-                    ioevent_add_to_deleted_list(task);
-                    return -1;
-                }
             }
 
             break;
