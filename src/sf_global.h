@@ -49,10 +49,13 @@ typedef struct sf_global_variables {
     int thread_stack_size;
 
     time_t up_time;
-    gid_t run_by_gid;
-    uid_t run_by_uid;
-    char run_by_group[32];
-    char run_by_user[32];
+    struct {
+        bool inited;
+        gid_t gid;
+        uid_t uid;
+        char group[32];
+        char user[32];
+    } run_by;
 
     SFLogConfig error_log;
     SFConnectionStat connection_stat;
@@ -85,6 +88,7 @@ extern SFContext                 g_sf_context;
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
 #define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
+#define SF_G_UP_TIME             g_sf_global_vars.up_time
 
 #define SF_G_SOCK_HANDLER        (g_sf_context.handlers + \
         SF_SOCKET_NETWORK_HANDLER_INDEX)
@@ -113,19 +117,20 @@ extern SFContext                 g_sf_context;
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
     do { \
-    if (!(g_sf_global_vars.run_by_gid == current_gid && \
-                g_sf_global_vars.run_by_uid == current_uid)) \
-    { \
-        if (chown(path, g_sf_global_vars.run_by_uid, \
-                    g_sf_global_vars.run_by_gid) != 0) \
+        if (g_sf_global_vars.run_by.inited && !(g_sf_global_vars.  \
+                    run_by.gid == current_gid && g_sf_global_vars. \
+                    run_by.uid == current_uid)) \
         { \
-            logError("file: "__FILE__", line: %d, " \
-                "chown \"%s\" fail, " \
-                "errno: %d, error info: %s", \
-                __LINE__, path, errno, STRERROR(errno)); \
-            return errno != 0 ? errno : EPERM; \
+            if (chown(path, g_sf_global_vars.run_by.uid, \
+                        g_sf_global_vars.run_by.gid) != 0) \
+            { \
+                logError("file: "__FILE__", line: %d, " \
+                        "chown \"%s\" fail, " \
+                        "errno: %d, error info: %s", \
+                        __LINE__, path, errno, STRERROR(errno)); \
+                return errno != 0 ? errno : EPERM; \
+            } \
         } \
-    } \
     } while (0)
 
 #define SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(path) \
@@ -134,19 +139,20 @@ extern SFContext                 g_sf_context;
 
 #define SF_FCHOWN_RETURN_ON_ERROR(fd, path, current_uid, current_gid) \
     do { \
-    if (!(g_sf_global_vars.run_by_gid == current_gid && \
-                g_sf_global_vars.run_by_uid == current_uid)) \
-    { \
-        if (fchown(fd, g_sf_global_vars.run_by_uid, \
-                    g_sf_global_vars.run_by_gid) != 0) \
+        if (g_sf_global_vars.run_by.inited && !(g_sf_global_vars.  \
+                    run_by.gid == current_gid && g_sf_global_vars. \
+                    run_by.uid == current_uid)) \
         { \
-            logError("file: "__FILE__", line: %d, " \
-                "fchown \"%s\" fail, " \
-                "errno: %d, error info: %s", \
-                __LINE__, path, errno, STRERROR(errno)); \
-            return errno != 0 ? errno : EPERM; \
+            if (fchown(fd, g_sf_global_vars.run_by.uid, \
+                        g_sf_global_vars.run_by.gid) != 0) \
+            { \
+                logError("file: "__FILE__", line: %d, " \
+                        "fchown \"%s\" fail, " \
+                        "errno: %d, error info: %s", \
+                        __LINE__, path, errno, STRERROR(errno)); \
+                return errno != 0 ? errno : EPERM; \
+            } \
         } \
-    } \
     } while (0)
 
 #define SF_FCHOWN_TO_RUNBY_RETURN_ON_ERROR(fd, path) \

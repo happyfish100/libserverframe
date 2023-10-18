@@ -40,8 +40,9 @@ SFGlobalVariables g_sf_global_vars = {
     {{'/', 't', 'm', 'p', '\0'}, false},
     true, true, false, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
-    SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
-    0, 0, 0, {'\0'}, {'\0'}, {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
+    SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE, 0,
+    {false, 0, 0, {'\0'}, {'\0'}},
+    {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
     {0, 0}, NULL, {NULL, 0}
 };
 
@@ -321,20 +322,20 @@ int sf_load_global_config_ex(const char *server_name,
     pRunByGroup = iniGetStrValue(NULL, "run_by_group", ini_ctx->context);
     pRunByUser = iniGetStrValue(NULL, "run_by_user", ini_ctx->context);
     if (pRunByGroup == NULL) {
-        *g_sf_global_vars.run_by_group = '\0';
+        *g_sf_global_vars.run_by.group = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_group,
-                sizeof(g_sf_global_vars.run_by_group),
+        snprintf(g_sf_global_vars.run_by.group,
+                sizeof(g_sf_global_vars.run_by.group),
                 "%s", pRunByGroup);
     }
-    if (*(g_sf_global_vars.run_by_group) == '\0') {
-        g_sf_global_vars.run_by_gid = getegid();
+    if (*(g_sf_global_vars.run_by.group) == '\0') {
+        g_sf_global_vars.run_by.gid = getegid();
     }
     else {
         struct group *pGroup;
 
-        pGroup = getgrnam(g_sf_global_vars.run_by_group);
+        pGroup = getgrnam(g_sf_global_vars.run_by.group);
         if (pGroup == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -344,24 +345,24 @@ int sf_load_global_config_ex(const char *server_name,
             return result;
         }
 
-        g_sf_global_vars.run_by_gid = pGroup->gr_gid;
+        g_sf_global_vars.run_by.gid = pGroup->gr_gid;
     }
 
     if (pRunByUser == NULL) {
-        *g_sf_global_vars.run_by_user = '\0';
+        *g_sf_global_vars.run_by.user = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_user,
-                sizeof(g_sf_global_vars.run_by_user),
+        snprintf(g_sf_global_vars.run_by.user,
+                sizeof(g_sf_global_vars.run_by.user),
                 "%s", pRunByUser);
     }
-    if (*(g_sf_global_vars.run_by_user) == '\0') {
-        g_sf_global_vars.run_by_uid = geteuid();
+    if (*(g_sf_global_vars.run_by.user) == '\0') {
+        g_sf_global_vars.run_by.uid = geteuid();
     }
     else {
         struct passwd *pUser;
 
-        pUser = getpwnam(g_sf_global_vars.run_by_user);
+        pUser = getpwnam(g_sf_global_vars.run_by.user);
         if (pUser == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -371,16 +372,17 @@ int sf_load_global_config_ex(const char *server_name,
             return result;
         }
 
-        g_sf_global_vars.run_by_uid = pUser->pw_uid;
+        g_sf_global_vars.run_by.uid = pUser->pw_uid;
     }
+    g_sf_global_vars.run_by.inited = true;
 
     if (SF_G_BASE_PATH_CREATED) {
         SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(SF_G_BASE_PATH_STR);
     }
 
     if (need_set_run_by) {
-        if ((result=set_run_by(g_sf_global_vars.run_by_group,
-                        g_sf_global_vars.run_by_user)) != 0)
+        if ((result=set_run_by(g_sf_global_vars.run_by.group,
+                        g_sf_global_vars.run_by.user)) != 0)
         {
             return result;
         }
@@ -740,8 +742,8 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             g_sf_global_vars.thread_stack_size / 1024,
             pkg_buff, g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
-            g_sf_global_vars.run_by_group,
-            g_sf_global_vars.run_by_user
+            g_sf_global_vars.run_by.group,
+            g_sf_global_vars.run_by.user
             );
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,
