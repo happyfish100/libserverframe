@@ -143,8 +143,6 @@ int sf_set_read_event(struct fast_task_info *task)
 {
     int result;
 
-    task->recv.ptr->offset = 0;
-    task->recv.ptr->length = 0;
     task->nio_stages.current = SF_NIO_STAGE_RECV;
     if (task->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
@@ -1019,6 +1017,8 @@ int sf_client_sock_write(int sock, short event, void *arg)
         total_write += bytes;
         if (action == sf_comm_action_finish) {
             release_iovec_buffer(task);
+            task->recv.ptr->offset = 0;
+            task->recv.ptr->length = 0;
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }
