@@ -139,7 +139,7 @@ static inline int set_write_event(struct fast_task_info *task)
     return 0;
 }
 
-int sf_set_read_event(struct fast_task_info *task)
+static inline int set_read_event(struct fast_task_info *task)
 {
     int result;
 
@@ -163,6 +163,13 @@ int sf_set_read_event(struct fast_task_info *task)
     }
 
     return 0;
+}
+
+int sf_set_read_event(struct fast_task_info *task)
+{
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
+    return set_read_event(task);
 }
 
 static inline int sf_ioevent_add(struct fast_task_info *task,
@@ -314,7 +321,7 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
             result = sf_async_connect_server(task);
             break;
         case SF_NIO_STAGE_RECV:
-            if ((result=sf_set_read_event(task)) == 0) {
+            if ((result=set_read_event(task)) == 0) {
                 if (sf_client_sock_read(task->event.fd,
                             IOEVENT_READ, task) < 0)
                 {
@@ -1017,8 +1024,6 @@ int sf_client_sock_write(int sock, short event, void *arg)
         total_write += bytes;
         if (action == sf_comm_action_finish) {
             release_iovec_buffer(task);
-            task->recv.ptr->offset = 0;
-            task->recv.ptr->length = 0;
             if (sf_set_read_event(task) != 0) {
                 return -1;
             }
