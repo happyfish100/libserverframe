@@ -46,7 +46,7 @@ typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
 typedef int (*sf_deal_task_callback)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 typedef int (*sf_send_done_callback)(struct fast_task_info *task,
-        const int length);
+        const int length, int *next_stage);
 typedef void (*sf_connect_done_callback)(struct fast_task_info *task,
         const int err_no);
 
@@ -79,7 +79,7 @@ typedef int (*sf_async_connect_check_callback)(struct fast_task_info *task);
 typedef void (*sf_close_connection_callback)(struct fast_task_info *task);
 
 typedef ssize_t (*sf_send_data_callback)(struct fast_task_info *task,
-        SFCommAction *action);
+        SFCommAction *action, bool *send_done);
 typedef ssize_t (*sf_recv_data_callback)(struct fast_task_info *task,
         const bool call_post_recv, SFCommAction *action);
 typedef int (*sf_post_recv_callback)(struct fast_task_info *task);
