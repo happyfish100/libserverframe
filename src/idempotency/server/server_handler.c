@@ -131,6 +131,7 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     SFProtoReportReqReceiptBody *body_part;
     SFProtoReportReqReceiptBody *body_end;
 
+    response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     if ((result=check_holder_channel(task_type, channel, response)) != 0) {
         return result;
     }
@@ -164,7 +165,6 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     }
 
     //logInfo("receipt count: %d, success: %d", count, success);
-    response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     return 0;
 }
 

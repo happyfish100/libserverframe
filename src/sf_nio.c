@@ -956,10 +956,12 @@ int sf_client_sock_read(int sock, short event, void *arg)
         if (action == sf_comm_action_finish) {
             task->req_count++;
             task->nio_stages.current = SF_NIO_STAGE_SEND;
-            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
+            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {
                 ioevent_add_to_deleted_list(task);
                 return -1;
-            } else if (task->handler->explicit_post_recv) {
+            }
+
+            if (task->handler->explicit_post_recv) {
                 if (task->handler->post_recv(task) != 0) {
                     ioevent_add_to_deleted_list(task);
                     return -1;
