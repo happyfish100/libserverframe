@@ -33,11 +33,13 @@ int sf_proto_set_body_length(struct fast_task_info *task)
     header = (SFCommonProtoHeader *)task->recv.ptr->data;
     if (!SF_PROTO_CHECK_MAGIC(header->magic)) {
         logError("file: "__FILE__", line: %d, "
-                "peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT
-                " is invalid, expect: "SF_PROTO_MAGIC_FORMAT,
-                __LINE__, task->client_ip, task->port,
+                "%s peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
+                "expect: "SF_PROTO_MAGIC_FORMAT", cmd: %d, body length: %d",
+                __LINE__, (task->handler != NULL ? task->handler->ctx->name :
+                    ""), task->client_ip, task->port,
                 SF_PROTO_MAGIC_PARAMS(header->magic),
-                SF_PROTO_MAGIC_EXPECT_PARAMS);
+                SF_PROTO_MAGIC_EXPECT_PARAMS, header->cmd,
+                buff2int(header->body_len));
         return EINVAL;
     }
 
