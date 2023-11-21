@@ -293,7 +293,7 @@ int sf_load_global_base_path(IniFullContext *ini_ctx)
     return 0;
 }
 
-int sf_load_global_config_ex(const char *server_name,
+int sf_load_global_config_ex(const char *log_filename_prefix,
         IniFullContext *ini_ctx, const bool load_network_params,
         const char *max_pkg_size_item_nm, const int fixed_buff_size,
         const int task_buffer_extra_size, const bool need_set_run_by)
@@ -402,8 +402,10 @@ int sf_load_global_config_ex(const char *server_name,
     ini_ctx->section_name = old_section_name;
 
     load_log_level(ini_ctx->context);
-    if (server_name != NULL) {
-        if ((result=log_set_prefix(SF_G_BASE_PATH_STR, server_name)) != 0) {
+    if (log_filename_prefix != NULL) {
+        if ((result=log_set_prefix(SF_G_BASE_PATH_STR,
+                        log_filename_prefix)) != 0)
+        {
             return result;
         }
     }
@@ -411,12 +413,12 @@ int sf_load_global_config_ex(const char *server_name,
     return 0;
 }
 
-int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
-        const int fixed_buff_size, const int task_buffer_extra_size,
-        const bool need_set_run_by)
+int sf_load_config_ex(const char *log_filename_prefix,
+        SFContextIniConfig *config, const int fixed_buff_size,
+        const int task_buffer_extra_size, const bool need_set_run_by)
 {
     int result;
-    if ((result=sf_load_global_config_ex(server_name, &config->ini_ctx,
+    if ((result=sf_load_global_config_ex(log_filename_prefix, &config->ini_ctx,
                     true, config->max_pkg_size_item_name, fixed_buff_size,
                     task_buffer_extra_size, need_set_run_by)) != 0)
     {

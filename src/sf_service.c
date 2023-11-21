@@ -798,6 +798,12 @@ void sf_set_current_time()
     srand(g_sf_global_vars.up_time);
 }
 
+int sf_global_init(const char *log_filename_prefix)
+{
+    sf_set_current_time();
+    return log_set_prefix(SF_G_BASE_PATH_STR, log_filename_prefix);
+}
+
 void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled)
 {
     struct nio_thread_data *thread_data;

@@ -101,6 +101,7 @@ int sf_startup_schedule(pthread_t *schedule_tid);
 int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx);
 
 void sf_set_current_time();
+int sf_global_init(const char *log_filename_prefix);
 
 int sf_socket_create_server(SFListener *listener,
         int af, const char *bind_addr);
