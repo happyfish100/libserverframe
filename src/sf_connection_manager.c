@@ -521,12 +521,13 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         connect_done_callback, void *args, FCServerConfig *server_cfg,
         const bool bg_thread_enabled)
 {
-    const int socket_domain = AF_INET;
+    const int socket_domain = AF_UNSPEC;
     struct {
         ConnectionExtraParams holder;
         ConnectionExtraParams *ptr;
     } extra_params;
     FCServerGroupInfo *server_group;
+
     int htable_init_capacity;
     int result;
 

@@ -190,6 +190,12 @@ static inline void sf_release_task(struct fast_task_info *task)
     }
 }
 
+// 判断当前服务器是否存在IPv4地址
+bool checkHostHasIPv4Addr();
+
+// 判断当前服务器是否存在IPv6地址
+bool checkHostHasIPv6Addr();
+
 static inline SFNetworkHandler *sf_get_first_network_handler_ex(
         SFContext *sf_context)
 {

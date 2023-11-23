@@ -25,6 +25,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
 #include "fastcommon/logger.h"
 #include "fastcommon/sockopt.h"
 #include "fastcommon/shared_func.h"
@@ -349,7 +350,22 @@ int sf_socket_create_server(SFListener *listener,
 {
     int result;
 
-    listener->sock = socketServer2(af, bind_addr, listener->port, &result);
+    // 如果bind_addr未设置
+    if (strlen(bind_addr) == 0) {
+        // 如果当前服务不存在IPv4地址，但是存在IPv6地址，则自动绑定IPv6地址
+        if(!checkHostHasIPv4Addr() && checkHostHasIPv6Addr()){
+            listener->sock = socketServerIPv6(bind_addr, port, &result);
+        }else{
+            listener->sock = socketServer(bind_addr, port, &result);
+        }
+    } else if (is_ipv6_addr(bind_addr))     // 通过判断IP地址是IPv4或者IPv6，根据结果进行初始化
+    {
+        listener->sock = socketServerIPv6(bind_addr, port, &result);
+    }else{
+        listener->sock = socketServer(bind_addr, port, &result);
+    }
+
+    // listener->sock = socketServer2(af, bind_addr, listener->port, &result);
     if (listener->sock < 0) {
         return result;
     }
@@ -839,4 +855,56 @@ void sf_notify_all_threads_ex(SFContext *sf_context)
 void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler)
 {
     sig_quit_handler = quit_handler;
+}
+
+// 判断当前服务器是否存在IPv4地址
+bool checkHostHasIPv4Addr(){
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == -1) {
+        return false;
+    }
+
+    bool hasIPv4 = false;
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+        if (strcmp(ifa->ifa_name, "lo") == 0) { // 排除lo接口
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            hasIPv4 = true;
+            break;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+
+    return hasIPv4;
+}
+
+// 判断当前服务器是否存在IPv6地址
+bool checkHostHasIPv6Addr(){
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == -1) {
+        return false;
+    }
+
+    bool hasIPv6 = false;
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+        if (strcmp(ifa->ifa_name, "lo") == 0) { // 排除lo接口
+            continue;
+        }
+        if (ifa->ifa_addr->sa_family == AF_INET6) {
+             hasIPv6 = true;
+            break;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+
+    return hasIPv6;
 }

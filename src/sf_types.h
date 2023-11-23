@@ -39,7 +39,7 @@
 #define SF_RDMACM_NETWORK_HANDLER_INDEX   1
 
 typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
-        const in_addr_t client_addr, const bool bInnerPort);
+        const in_addr_64_t client_addr, const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
 typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
         const int buff_size, bool *new_alloc);
