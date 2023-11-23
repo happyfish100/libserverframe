@@ -58,12 +58,6 @@ struct worker_thread_context {
     struct nio_thread_data *thread_data;
 };
 
-struct accept_thread_context {
-    SFContext *sf_context;
-    int server_sock;
-};
-
-
 int sf_init_task(struct fast_task_info *task)
 {
     task->connect_timeout = SF_G_CONNECT_TIMEOUT; //for client side
@@ -73,22 +67,15 @@ int sf_init_task(struct fast_task_info *task)
 
 static void *worker_thread_entrance(void *arg);
 
-static int sf_init_free_queues(const int task_arg_size,
+static int sf_init_free_queue(struct fast_task_queue *free_queue,
+        const char *name, const bool double_buffers,
+        const int task_padding_size, const int task_arg_size,
         TaskInitCallback init_callback)
 {
-#define ALLOC_CONNECTIONS_ONCE 1024
-
-    static bool sf_inited = false;
     int result;
     int m;
-    int init_connections;
     int alloc_conn_once;
 
-    if (sf_inited) {
-        return 0;
-    }
-
-    sf_inited = true;
     if ((result=set_rand_seed()) != 0) {
         logCrit("file: "__FILE__", line: %d, "
                 "set_rand_seed fail, program exit!", __LINE__);
@@ -101,19 +88,13 @@ static int sf_init_free_queues(const int task_arg_size,
     } else if (m > 16) {
         m = 16;
     }
-    alloc_conn_once = ALLOC_CONNECTIONS_ONCE / m;
-    init_connections = g_sf_global_vars.max_connections < alloc_conn_once ?
-        g_sf_global_vars.max_connections : alloc_conn_once;
-    if ((result=free_queue_init_ex2(g_sf_global_vars.max_connections,
-                    init_connections, alloc_conn_once, g_sf_global_vars.
-                    min_buff_size, g_sf_global_vars.max_buff_size,
-                    task_arg_size, init_callback != NULL ?
-                    init_callback : sf_init_task)) != 0)
-    {
-        return result;
-    }
-
-    return 0;
+    alloc_conn_once = 256 / m;
+    return free_queue_init_ex2(free_queue, name, double_buffers,
+            g_sf_global_vars.max_connections, alloc_conn_once,
+            g_sf_global_vars.min_buff_size, g_sf_global_vars.
+            max_buff_size, task_padding_size, task_arg_size,
+            (init_callback != NULL ? init_callback :
+             sf_init_task));
 }
 
 int sf_service_init_ex2(SFContext *sf_context, const char *name,
@@ -124,11 +105,12 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
-        const int proto_header_size, const int task_arg_size,
-        TaskInitCallback init_callback, sf_release_buffer_callback
-        release_buffer_callback)
+        const int proto_header_size, const int task_padding_size,
+        const int task_arg_size, const bool double_buffers,
+        const bool explicit_post_recv, TaskInitCallback init_callback,
+        sf_release_buffer_callback release_buffer_callback)
 {
     int result;
     int bytes;
@@ -141,15 +123,23 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     pthread_attr_t thread_attr;
 
     snprintf(sf_context->name, sizeof(sf_context->name), "%s", name);
+    sf_context->connect_need_log = true;
     sf_context->realloc_task_buffer = g_sf_global_vars.
                     min_buff_size < g_sf_global_vars.max_buff_size;
-    sf_context->accept_done_func = accept_done_callback;
+    sf_context->callbacks.accept_done = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size,
             set_body_length_func, alloc_recv_buffer_func,
             send_done_callback, deal_func, task_cleanup_func,
             timeout_callback, release_buffer_callback);
+    if (explicit_post_recv) {
+        sf_context->handlers[SF_RDMACM_NETWORK_HANDLER_INDEX].
+            explicit_post_recv = true;
+    }
 
-    if ((result=sf_init_free_queues(task_arg_size, init_callback)) != 0) {
+    if ((result=sf_init_free_queue(&sf_context->free_queue,
+                    name, double_buffers, task_padding_size,
+                    task_arg_size, init_callback)) != 0)
+    {
         return result;
     }
 
@@ -192,6 +182,15 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     for (thread_data=sf_context->thread_data,thread_ctx=thread_contexts;
             thread_data<data_end; thread_data++,thread_ctx++)
     {
+        thread_data->timeout_ms = net_timeout_ms;
+        FC_INIT_LIST_HEAD(&thread_data->polling_queue);
+        if (sf_context->smart_polling.enabled) {
+            thread_data->busy_polling_callback =
+                sf_rdma_busy_polling_callback;
+        } else {
+            thread_data->busy_polling_callback = NULL;
+        }
+
         thread_data->thread_loop_callback = thread_loop_callback;
         if (alloc_thread_extra_data_callback != NULL) {
             thread_data->arg = alloc_thread_extra_data_callback(
@@ -278,7 +277,7 @@ int sf_service_destroy_ex(SFContext *sf_context)
 {
     struct nio_thread_data *data_end, *thread_data;
 
-    free_queue_destroy();
+    free_queue_destroy(&sf_context->free_queue);
     data_end = sf_context->thread_data + sf_context->work_threads;
     for (thread_data=sf_context->thread_data; thread_data<data_end;
             thread_data++)
@@ -331,7 +330,7 @@ static void *worker_thread_entrance(void *arg)
 
     ioevent_loop(thread_ctx->thread_data,
             sf_recv_notify_read,
-            thread_ctx->sf_context->task_cleanup_func,
+            thread_ctx->sf_context->callbacks.task_cleanup,
             &g_sf_global_vars.continue_flag);
     ioevent_destroy(&thread_ctx->thread_data->ev_puller);
 
@@ -346,31 +345,32 @@ static void *worker_thread_entrance(void *arg)
     return NULL;
 }
 
-static int _socket_server(const char *bind_addr, int port, int *sock)
+int sf_socket_create_server(SFListener *listener,
+        int af, const char *bind_addr)
 {
     int result;
 
     // 如果bind_addr未设置
-    if(strlen(bind_addr) == 0){
-
+    if (strlen(bind_addr) == 0) {
         // 如果当前服务不存在IPv4地址，但是存在IPv6地址，则自动绑定IPv6地址
         if(!checkHostHasIPv4Addr() && checkHostHasIPv6Addr()){
-            *sock = socketServerIPv6(bind_addr, port, &result);
+            listener->sock = socketServerIPv6(bind_addr, port, &result);
         }else{
-            *sock = socketServer(bind_addr, port, &result);
+            listener->sock = socketServer(bind_addr, port, &result);
         }
-    }else if (is_ipv6_addr(bind_addr))     // 通过判断IP地址是IPv4或者IPv6，根据结果进行初始化
+    } else if (is_ipv6_addr(bind_addr))     // 通过判断IP地址是IPv4或者IPv6，根据结果进行初始化
     {
-        *sock = socketServerIPv6(bind_addr, port, &result);
+        listener->sock = socketServerIPv6(bind_addr, port, &result);
     }else{
-        *sock = socketServer(bind_addr, port, &result);
+        listener->sock = socketServer(bind_addr, port, &result);
     }
 
-    if (*sock < 0) {
+    // listener->sock = socketServer2(af, bind_addr, listener->port, &result);
+    if (listener->sock < 0) {
         return result;
     }
 
-    if ((result=tcpsetserveropt(*sock, SF_G_NETWORK_TIMEOUT)) != 0) {
+    if ((result=tcpsetserveropt(listener->sock, SF_G_NETWORK_TIMEOUT)) != 0) {
         return result;
     }
 
@@ -380,133 +380,201 @@ static int _socket_server(const char *bind_addr, int port, int *sock)
 int sf_socket_server_ex(SFContext *sf_context)
 {
     int result;
+    int af = AF_INET;
+    bool dual_ports;
     const char *bind_addr;
+    SFNetworkHandler *handler;
+    SFNetworkHandler *end;
 
-    sf_context->inner_sock = sf_context->outer_sock = -1;
-    if (sf_context->outer_port == sf_context->inner_port) {
-        if (*sf_context->outer_bind_addr == '\0' ||
-                *sf_context->inner_bind_addr == '\0') {
-            bind_addr = "";
-            return _socket_server(bind_addr, sf_context->outer_port,
-                    &sf_context->outer_sock);
-        } else if (strcmp(sf_context->outer_bind_addr,
-                    sf_context->inner_bind_addr) == 0) {
-            bind_addr = sf_context->outer_bind_addr;
-            if (is_private_ip(bind_addr)) {
-                return _socket_server(bind_addr, sf_context->
-                        inner_port, &sf_context->inner_sock);
-            } else {
-                return _socket_server(bind_addr, sf_context->
-                        outer_port, &sf_context->outer_sock);
-            }
+    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
+    for (handler=sf_context->handlers; handler<end; handler++) {
+        if (!handler->enabled) {
+            continue;
         }
-    }
 
-    if ((result=_socket_server(sf_context->outer_bind_addr,
-                    sf_context->outer_port, &sf_context->outer_sock)) != 0)
-    {
-        return result;
-    }
+        handler->inner.enabled = false;
+        handler->outer.enabled = false;
+        if (handler->outer.port == handler->inner.port) {
+            if (*sf_context->outer_bind_addr == '\0' ||
+                    *sf_context->inner_bind_addr == '\0') {
+                bind_addr = "";
+                if ((result=handler->create_server(&handler->
+                                outer, af, bind_addr)) != 0)
+                {
+                    return result;
+                }
+                handler->outer.enabled = true;
+                dual_ports = false;
+            } else if (strcmp(sf_context->outer_bind_addr,
+                        sf_context->inner_bind_addr) == 0) {
+                bind_addr = sf_context->outer_bind_addr;
+                if (is_private_ip(bind_addr)) {
+                    if ((result=handler->create_server(&handler->
+                                    inner, af, bind_addr)) != 0)
+                    {
+                        return result;
+                    }
+                    handler->inner.enabled = true;
+                } else {
+                    if ((result=handler->create_server(&handler->
+                                    outer, af, bind_addr)) != 0)
+                    {
+                        return result;
+                    }
+                    handler->outer.enabled = true;
+                }
+                dual_ports = false;
+            } else {
+                dual_ports = true;
+            }
+        } else {
+            dual_ports = true;
+        }
 
-    if ((result=_socket_server(sf_context->inner_bind_addr,
-                    sf_context->inner_port, &sf_context->inner_sock)) != 0)
-    {
-        return result;
+        if (dual_ports) {
+            if ((result=handler->create_server(&handler->outer, af,
+                            sf_context->outer_bind_addr)) != 0)
+            {
+                return result;
+            }
+
+            if ((result=handler->create_server(&handler->inner, af,
+                            sf_context->inner_bind_addr)) != 0)
+            {
+                return result;
+            }
+            handler->inner.enabled = true;
+            handler->outer.enabled = true;
+        }
+
+        /*
+        logInfo("%p [%d] inner {port: %d, enabled: %d}, "
+                "outer {port: %d, enabled: %d}", sf_context,
+                (int)(handler-sf_context->handlers),
+                handler->inner.port, handler->inner.enabled,
+                handler->outer.port, handler->outer.enabled);
+                */
     }
 
     return 0;
 }
 
-void sf_socket_close_ex(SFContext *sf_context)
+void sf_socket_close_server(SFListener *listener)
 {
-    if (sf_context->inner_sock >= 0) {
-        close(sf_context->inner_sock);
-        sf_context->inner_sock = -1;
-    }
-
-    if (sf_context->outer_sock >= 0) {
-        close(sf_context->outer_sock);
-        sf_context->outer_sock = -1;
+    if (listener->sock >= 0) {
+        close(listener->sock);
+        listener->sock = -1;
     }
 }
 
-static void accept_run(struct accept_thread_context *accept_context)
+struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
 {
     int incomesock;
     int port;
-    struct sockaddr_in inaddr;
     socklen_t sockaddr_len;
     struct fast_task_info *task;
 
+    sockaddr_len = sizeof(listener->inaddr);
+    incomesock = accept(listener->sock, (struct sockaddr *)
+            &listener->inaddr, &sockaddr_len);
+    if (incomesock < 0) { //error
+        if (!(errno == EINTR || errno == EAGAIN)) {
+            logError("file: "__FILE__", line: %d, "
+                    "accept fail, errno: %d, error info: %s",
+                    __LINE__, errno, strerror(errno));
+        }
+
+        return NULL;
+    }
+
+    if (tcpsetnonblockopt(incomesock) != 0) {
+        close(incomesock);
+        return NULL;
+    }
+    FC_SET_CLOEXEC(incomesock);
+
+    if ((task=sf_alloc_init_task(listener->handler, incomesock)) == NULL) {
+        close(incomesock);
+        return NULL;
+    }
+
+    getPeerIpAddPort(incomesock, task->client_ip,
+            sizeof(task->client_ip), &port);
+    task->port = port;
+    return task;
+}
+
+void sf_socket_close_connection(struct fast_task_info *task)
+{
+    close(task->event.fd);
+    task->event.fd = -1;
+}
+
+void sf_socket_close_ex(SFContext *sf_context)
+{
+    SFNetworkHandler *handler;
+    SFNetworkHandler *end;
+
+    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
+    for (handler=sf_context->handlers; handler<end; handler++) {
+        if (!handler->enabled) {
+            continue;
+        }
+        if (handler->outer.enabled) {
+            handler->close_server(&handler->outer);
+        }
+        if (handler->inner.enabled) {
+            handler->close_server(&handler->inner);
+        }
+    }
+}
+
+static void accept_run(SFListener *listener)
+{
+    struct fast_task_info *task;
+
     while (g_sf_global_vars.continue_flag) {
-        sockaddr_len = sizeof(inaddr);
-        incomesock = accept(accept_context->server_sock,
-                (struct sockaddr*)&inaddr, &sockaddr_len);
-        if (incomesock < 0) { //error
-            if (!(errno == EINTR || errno == EAGAIN)) {
-                logError("file: "__FILE__", line: %d, "
-                        "accept fail, errno: %d, error info: %s",
-                        __LINE__, errno, strerror(errno));
-            }
-
+        if ((task=listener->handler->accept_connection(listener)) == NULL) {
             continue;
         }
 
-        if (tcpsetnonblockopt(incomesock) != 0) {
-            close(incomesock);
-            continue;
-        }
-        FC_SET_CLOEXEC(incomesock);
-
-        if ((task=sf_alloc_init_task(accept_context->
-                        sf_context, incomesock)) == NULL)
-        {
-            close(incomesock);
-            continue;
-        }
-
-        getPeerIpAddPort(incomesock, task->client_ip,
-                sizeof(task->client_ip), &port);
-        task->port = port;
-        task->thread_data = accept_context->sf_context->thread_data +
-            incomesock % accept_context->sf_context->work_threads;
-        if (accept_context->sf_context->accept_done_func != NULL) {
-            if (accept_context->sf_context->accept_done_func(task,
-                        inaddr.sin_addr.s_addr,
-                        accept_context->server_sock ==
-                        accept_context->sf_context->inner_sock) != 0)
+        task->thread_data = listener->handler->ctx->thread_data +
+            task->event.fd % listener->handler->ctx->work_threads;
+        if (listener->handler->ctx->callbacks.accept_done != NULL) {
+            if (listener->handler->ctx->callbacks.accept_done(task,
+                        listener->inaddr.sin_addr.s_addr,
+                        listener->is_inner) != 0)
             {
-                close(incomesock);
+                listener->handler->close_connection(task);
                 sf_release_task(task);
                 continue;
             }
         }
 
         if (sf_nio_notify(task, SF_NIO_STAGE_INIT) != 0) {
-            close(incomesock);
+            listener->handler->close_connection(task);
             sf_release_task(task);
         }
     }
 }
 
-static void *accept_thread_entrance(struct accept_thread_context
-        *accept_context)
+static void *accept_thread_entrance(SFListener *listener)
 {
 #ifdef OS_LINUX
     {
         char thread_name[32];
-        snprintf(thread_name, sizeof(thread_name), "%s-listen",
-                accept_context->sf_context->name);
+        snprintf(thread_name, sizeof(thread_name), "%s-%s-listen",
+                listener->handler->comm_type == fc_comm_type_sock ?
+                "sock" : "rdma", listener->handler->ctx->name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif
 
-    accept_run(accept_context);
+    accept_run(listener);
     return NULL;
 }
 
-void _accept_loop(struct accept_thread_context *accept_context,
-        const int accept_threads)
+int _accept_loop(SFListener *listener, const int accept_threads)
 {
     pthread_t tid;
     pthread_attr_t thread_attr;
@@ -514,7 +582,7 @@ void _accept_loop(struct accept_thread_context *accept_context,
     int i;
 
     if (accept_threads <= 0) {
-       return;
+        return 0;
     }
 
     if ((result=init_pthread_attr(&thread_attr, g_sf_global_vars.
@@ -522,68 +590,73 @@ void _accept_loop(struct accept_thread_context *accept_context,
     {
         logWarning("file: "__FILE__", line: %d, "
                 "init_pthread_attr fail!", __LINE__);
+        return result;
     }
-    else {
-        for (i=0; i<accept_threads; i++) {
-            if ((result=pthread_create(&tid, &thread_attr,
-                            (void * (*)(void *))accept_thread_entrance,
-                            accept_context)) != 0)
-            {
-                logError("file: "__FILE__", line: %d, "
-                        "create thread failed, startup threads: %d, "
-                        "errno: %d, error info: %s",
-                        __LINE__, i, result, strerror(result));
-                break;
-            }
-        }
 
-        pthread_attr_destroy(&thread_attr);
+    for (i=0; i<accept_threads; i++) {
+        if ((result=pthread_create(&tid, &thread_attr,
+                        (void * (*)(void *))accept_thread_entrance,
+                        listener)) != 0)
+        {
+            logError("file: "__FILE__", line: %d, "
+                    "create thread failed, startup threads: %d, "
+                    "errno: %d, error info: %s",
+                    __LINE__, i, result, strerror(result));
+            return result;
+        }
     }
+
+    pthread_attr_destroy(&thread_attr);
+    return 0;
 }
 
-void sf_accept_loop_ex(SFContext *sf_context, const bool block)
+int sf_accept_loop_ex(SFContext *sf_context, const bool blocked)
 {
-    struct accept_thread_context *accept_contexts;
-    int count;
-    int bytes;
+    SFNetworkHandler *handler;
+    SFNetworkHandler *hend;
+    SFListener *listeners[SF_NETWORK_HANDLER_COUNT * 2];
+    SFListener **listener;
+    SFListener **last;
+    SFListener **lend;
 
-    if (sf_context->outer_sock >= 0) {
-        count = 2;
+    listener = listeners;
+    hend = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
+    for (handler=sf_context->handlers; handler<hend; handler++) {
+        if (!handler->enabled) {
+            continue;
+        }
+
+        if (handler->inner.enabled) {
+            *listener++ = &handler->inner;
+        }
+        if (handler->outer.enabled) {
+            *listener++ = &handler->outer;
+        }
+    }
+
+    if (listener == listeners) {
+        logError("file: "__FILE__", line: %d, "
+                "no listener!", __LINE__);
+        return ENOENT;
+    }
+
+    last = listener - 1;
+    if (blocked) {
+        lend = listener - 1;
     } else {
-        count = 1;
+        lend = listener;
     }
 
-    bytes = sizeof(struct accept_thread_context) * count;
-    accept_contexts = (struct accept_thread_context *)fc_malloc(bytes);
-    if (accept_contexts == NULL) {
-        return;
+    for (listener=listeners; listener<lend; listener++) {
+        _accept_loop(*listener, sf_context->accept_threads);
     }
 
-    accept_contexts[0].sf_context = sf_context;
-    accept_contexts[0].server_sock = sf_context->inner_sock;
-
-    if (sf_context->outer_sock >= 0) {
-        accept_contexts[1].sf_context = sf_context;
-        accept_contexts[1].server_sock = sf_context->outer_sock;
-
-        if (sf_context->inner_sock >= 0) {
-            _accept_loop(accept_contexts, sf_context->accept_threads);
-        }
-
-        if (block) {
-            _accept_loop(accept_contexts + 1, sf_context->accept_threads - 1);
-            accept_run(accept_contexts + 1);
-        } else {
-            _accept_loop(accept_contexts + 1, sf_context->accept_threads);
-        }
-    } else {
-        if (block) {
-            _accept_loop(accept_contexts, sf_context->accept_threads - 1);
-            accept_run(accept_contexts);
-        } else {
-            _accept_loop(accept_contexts, sf_context->accept_threads);
-        }
+    if (blocked) {
+        _accept_loop(*last, sf_context->accept_threads - 1);
+        accept_run(*last);
     }
+
+    return 0;
 }
 
 #if defined(DEBUG_FLAG)
@@ -739,6 +812,12 @@ void sf_set_current_time()
     g_current_time = time(NULL);
     g_sf_global_vars.up_time = g_current_time;
     srand(g_sf_global_vars.up_time);
+}
+
+int sf_global_init(const char *log_filename_prefix)
+{
+    sf_set_current_time();
+    return log_set_prefix(SF_G_BASE_PATH_STR, log_filename_prefix);
 }
 
 void sf_enable_thread_notify_ex(SFContext *sf_context, const bool enabled)

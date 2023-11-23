@@ -522,6 +522,12 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         const bool bg_thread_enabled)
 {
     const int socket_domain = AF_UNSPEC;
+    struct {
+        ConnectionExtraParams holder;
+        ConnectionExtraParams *ptr;
+    } extra_params;
+    FCServerGroupInfo *server_group;
+
     int htable_init_capacity;
     int result;
 
@@ -529,11 +535,29 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     if (htable_init_capacity < 256) {
         htable_init_capacity = 256;
     }
+
+    if ((server_group=fc_server_get_group_by_index(server_cfg,
+                    server_group_index)) == NULL)
+    {
+        return ENOENT;
+    }
+
+    if (server_group->comm_type == fc_comm_type_sock) {
+        extra_params.ptr = NULL;
+    } else {
+        if ((result=conn_pool_set_rdma_extra_params(&extra_params.holder,
+                        server_cfg, server_group_index)) != 0)
+        {
+            return result;
+        }
+        extra_params.ptr = &extra_params.holder;
+    }
     if ((result=conn_pool_init_ex1(&cm->cpool, common_cfg->connect_timeout,
                     max_count_per_entry, max_idle_time, socket_domain,
                     htable_init_capacity, connect_done_callback, args,
                     sf_cm_validate_connection_callback, cm,
-                    sizeof(SFConnectionParameters))) != 0)
+                    sizeof(SFConnectionParameters),
+                    extra_params.ptr)) != 0)
     {
         return result;
     }

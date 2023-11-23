@@ -38,7 +38,6 @@
 #include "fastcommon/fast_task_queue.h"
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_atomic.h"
-#include "sf_global.h"
 #include "sf_service.h"
 #include "sf_nio.h"
 
@@ -46,18 +45,18 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback cleanup_func,
         sf_recv_timeout_callback timeout_callback, sf_release_buffer_callback
         release_buffer_callback)
 {
     sf_context->header_size = header_size;
-    sf_context->set_body_length = set_body_length_func;
-    sf_context->alloc_recv_buffer = alloc_recv_buffer_func;
-    sf_context->send_done_callback = send_done_callback;
-    sf_context->deal_task = deal_func;
-    sf_context->task_cleanup_func = cleanup_func;
-    sf_context->timeout_callback = timeout_callback;
-    sf_context->release_buffer_callback = release_buffer_callback;
+    sf_context->callbacks.set_body_length = set_body_length_func;
+    sf_context->callbacks.alloc_recv_buffer = alloc_recv_buffer_func;
+    sf_context->callbacks.send_done = send_done_callback;
+    sf_context->callbacks.deal_task = deal_func;
+    sf_context->callbacks.task_cleanup = cleanup_func;
+    sf_context->callbacks.task_timeout = timeout_callback;
+    sf_context->callbacks.release_buffer = release_buffer_callback;
 }
 
 void sf_task_detach_thread(struct fast_task_info *task)
@@ -85,8 +84,8 @@ void sf_task_switch_thread(struct fast_task_info *task,
 static inline void release_iovec_buffer(struct fast_task_info *task)
 {
     if (task->iovec_array.iovs != NULL) {
-        if (SF_CTX->release_buffer_callback != NULL) {
-            SF_CTX->release_buffer_callback(task);
+        if (SF_CTX->callbacks.release_buffer != NULL) {
+            SF_CTX->callbacks.release_buffer(task);
         }
         task->iovec_array.iovs = NULL;
         task->iovec_array.count = 0;
@@ -111,10 +110,8 @@ void sf_task_finish_clean_up(struct fast_task_info *task)
     }
 
     release_iovec_buffer(task);
-
     sf_task_detach_thread(task);
-    close(task->event.fd);
-    task->event.fd = -1;
+    task->handler->close_connection(task);
 
     __sync_fetch_and_sub(&g_sf_global_vars.connection_stat.current_count, 1);
     sf_release_task(task);
@@ -130,25 +127,22 @@ static inline int set_write_event(struct fast_task_info *task)
 
     task->event.callback = (IOEventCallback)sf_client_sock_write;
     if (ioevent_modify(&task->thread_data->ev_puller,
-        task->event.fd, IOEVENT_WRITE, task) != 0)
+                task->event.fd, IOEVENT_WRITE, task) != 0)
     {
         result = errno != 0 ? errno : ENOENT;
-        ioevent_add_to_deleted_list(task);
-
         logError("file: "__FILE__", line: %d, "
-            "ioevent_modify fail, "
-            "errno: %d, error info: %s",
-            __LINE__, result, strerror(result));
+                "ioevent_modify fail, "
+                "errno: %d, error info: %s",
+                __LINE__, result, strerror(result));
         return result;
     }
     return 0;
 }
 
-int sf_set_read_event(struct fast_task_info *task)
+static inline int set_read_event(struct fast_task_info *task)
 {
     int result;
 
-    task->nio_stages.current = SF_NIO_STAGE_RECV;
     if (task->event.callback == (IOEventCallback)sf_client_sock_read) {
         return 0;
     }
@@ -170,6 +164,14 @@ int sf_set_read_event(struct fast_task_info *task)
     return 0;
 }
 
+int sf_set_read_event(struct fast_task_info *task)
+{
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
+    task->nio_stages.current = SF_NIO_STAGE_RECV;
+    return set_read_event(task);
+}
+
 static inline int sf_ioevent_add(struct fast_task_info *task,
         IOEventCallback callback, const int timeout)
 {
@@ -180,87 +182,128 @@ static inline int sf_ioevent_add(struct fast_task_info *task,
     return result > 0 ? -1 * result : result;
 }
 
-static inline int sf_nio_init(struct fast_task_info *task)
+static inline void inc_connection_current_count()
 {
     int current_connections;
 
-    current_connections = __sync_add_and_fetch(
-            &g_sf_global_vars.connection_stat.current_count, 1);
+    current_connections = FC_ATOMIC_INC(g_sf_global_vars.
+            connection_stat.current_count);
     if (current_connections > g_sf_global_vars.connection_stat.max_count) {
         g_sf_global_vars.connection_stat.max_count = current_connections;
     }
+}
 
+static inline int sf_nio_init(struct fast_task_info *task)
+{
+    inc_connection_current_count();
     return sf_ioevent_add(task, (IOEventCallback)sf_client_sock_read,
             task->network_timeout);
 }
 
-static int sf_client_sock_connect(int sock, short event, void *arg)
+int sf_socket_async_connect_check(struct fast_task_info *task)
 {
     int result;
     socklen_t len;
+
+    len = sizeof(result);
+    if (getsockopt(task->event.fd, SOL_SOCKET, SO_ERROR, &result, &len) < 0) {
+        result = errno != 0 ? errno : EACCES;
+    }
+    return result;
+}
+
+static int sf_client_connect_done(int sock, short event, void *arg)
+{
+    int result;
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
+    if (task->canceled) {
+        return ENOTCONN;
+    }
+
     if (event & IOEVENT_TIMEOUT) {
         result = ETIMEDOUT;
     } else {
-        len = sizeof(result);
-        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &result, &len) < 0) {
-            result = errno != 0 ? errno : EACCES;
+        result = task->handler->async_connect_check(task);
+        if (result == EINPROGRESS) {
+            return 0;
         }
     }
 
+    if (SF_CTX->callbacks.connect_done != NULL) {
+        SF_CTX->callbacks.connect_done(task, result);
+    }
+
     if (result != 0) {
-        logError("file: "__FILE__", line: %d, "
-                "connect to server %s:%u fail, errno: %d, "
-                "error info: %s", __LINE__, task->server_ip,
-                task->port, result, STRERROR(result));
+        if (SF_CTX->connect_need_log) {
+            logError("file: "__FILE__", line: %d, "
+                    "connect to server %s:%u fail, errno: %d, "
+                    "error info: %s", __LINE__, task->server_ip,
+                    task->port, result, STRERROR(result));
+        }
         ioevent_add_to_deleted_list(task);
         return -1;
     }
 
-    logInfo("file: "__FILE__", line: %d, "
-            "connect to server %s:%u successfully",
-            __LINE__, task->server_ip, task->port);
-    return SF_CTX->deal_task(task, SF_NIO_STAGE_HANDSHAKE);
+    if (SF_CTX->connect_need_log) {
+        logInfo("file: "__FILE__", line: %d, "
+                "connect to server %s:%u successfully",
+                __LINE__, task->server_ip, task->port);
+    }
+    return SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_HANDSHAKE);
 }
 
-static int sf_connect_server(struct fast_task_info *task)
+int sf_socket_async_connect_server(struct fast_task_info *task)
 {
     int result;
-
     if ((task->event.fd=socketCreateEx2(AF_UNSPEC, task->server_ip,
                     O_NONBLOCK, NULL, &result)) < 0)
     {
         return result > 0 ? -1 * result : result;
     }
 
-    result = asyncconnectserverbyip(task->event.fd,
+    return asyncconnectserverbyip(task->event.fd,
             task->server_ip, task->port);
-    if (result == 0) {
-        if ((result=sf_ioevent_add(task, (IOEventCallback)
-                sf_client_sock_read, task->network_timeout)) != 0)
-        {
-            return result;
-        }
+}
 
-        logInfo("file: "__FILE__", line: %d, "
-                "connect to server %s:%u successfully",
-                __LINE__, task->server_ip, task->port);
-        return SF_CTX->deal_task(task, SF_NIO_STAGE_HANDSHAKE);
-    } else if (result == EINPROGRESS) {
+static int sf_async_connect_server(struct fast_task_info *task)
+{
+    int result;
+
+    if ((result=task->handler->async_connect_server(task)) == EINPROGRESS) {
         result = ioevent_set(task, task->thread_data, task->event.fd,
                 IOEVENT_READ | IOEVENT_WRITE, (IOEventCallback)
-                sf_client_sock_connect, task->connect_timeout);
+                sf_client_connect_done, task->connect_timeout);
         return result > 0 ? -1 * result : result;
     } else {
-        close(task->event.fd);
-        task->event.fd = -1;
-        logError("file: "__FILE__", line: %d, "
-                "connect to server %s:%u fail, errno: %d, "
-                "error info: %s", __LINE__, task->server_ip,
-                task->port, result, STRERROR(result));
-        return result > 0 ? -1 * result : result;
+        if (SF_CTX->callbacks.connect_done != NULL) {
+            SF_CTX->callbacks.connect_done(task, result);
+        }
+
+        if (result == 0) {
+            if ((result=sf_ioevent_add(task, (IOEventCallback)
+                            sf_client_sock_read, task->network_timeout)) != 0)
+            {
+                return result;
+            }
+
+            if (SF_CTX->connect_need_log) {
+                logInfo("file: "__FILE__", line: %d, "
+                        "connect to server %s:%u successfully",
+                        __LINE__, task->server_ip, task->port);
+            }
+            return SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_HANDSHAKE);
+        } else {
+            task->handler->close_connection(task);
+            if (SF_CTX->connect_need_log) {
+                logError("file: "__FILE__", line: %d, "
+                        "connect to server %s:%u fail, errno: %d, "
+                        "error info: %s", __LINE__, task->server_ip,
+                        task->port, result, STRERROR(result));
+            }
+            return result > 0 ? -1 * result : result;
+        }
     }
 }
 
@@ -269,15 +312,17 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
     int result;
 
     switch (stage) {
-        case SF_NIO_STAGE_INIT:
+        case SF_NIO_STAGE_INIT:    //for server init
             task->nio_stages.current = SF_NIO_STAGE_RECV;
             result = sf_nio_init(task);
             break;
-        case SF_NIO_STAGE_CONNECT:
-            result = sf_connect_server(task);
+        case SF_NIO_STAGE_CONNECT:  //for client init
+            inc_connection_current_count();
+            result = sf_async_connect_server(task);
             break;
         case SF_NIO_STAGE_RECV:
-            if ((result=sf_set_read_event(task)) == 0) {
+            task->nio_stages.current = SF_NIO_STAGE_RECV;
+            if ((result=set_read_event(task)) == 0) {
                 if (sf_client_sock_read(task->event.fd,
                             IOEVENT_READ, task) < 0)
                 {
@@ -289,14 +334,14 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
             result = sf_send_add_event(task);
             break;
         case SF_NIO_STAGE_CONTINUE:   //continue deal
-            result = SF_CTX->deal_task(task, SF_NIO_STAGE_CONTINUE);
+            result = SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_CONTINUE);
             break;
         case SF_NIO_STAGE_FORWARDED:  //forward by other thread
             if ((result=sf_ioevent_add(task, (IOEventCallback)
                             sf_client_sock_read,
                             task->network_timeout)) == 0)
             {
-                result = SF_CTX->deal_task(task, SF_NIO_STAGE_SEND);
+                result = SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND);
             }
             break;
         case SF_NIO_STAGE_CLOSE:
@@ -451,8 +496,8 @@ void sf_recv_notify_read(int sock, short event, void *arg)
 
 int sf_send_add_event(struct fast_task_info *task)
 {
-    task->offset = 0;
-    if (task->length > 0) {
+    task->send.ptr->offset = 0;
+    if (task->send.ptr->length > 0) {
         /* direct send */
         task->nio_stages.current = SF_NIO_STAGE_SEND;
         if (sf_client_sock_write(task->event.fd, IOEVENT_WRITE, task) < 0) {
@@ -484,308 +529,77 @@ static inline int check_task(struct fast_task_info *task,
         return 0;
     }
 
-    if (tcp_socket_connected(task->event.fd)) {
-        return EAGAIN;
+    if (task->handler->comm_type == fc_comm_type_sock) {
+        if (tcp_socket_connected(task->event.fd)) {
+            return EAGAIN;
+        } else {
+            logDebug("file: "__FILE__", line: %d, "
+                    "client ip: %s, connection is closed",
+                    __LINE__, task->client_ip);
+
+            ioevent_add_to_deleted_list(task);
+            return -1;
+        }
     } else {
-        logDebug("file: "__FILE__", line: %d, "
-                "client ip: %s, connection is closed",
-                __LINE__, task->client_ip);
-
-        ioevent_add_to_deleted_list(task);
-        return -1;
+        return EAGAIN;
     }
 }
 
-int sf_client_sock_read(int sock, short event, void *arg)
+ssize_t sf_socket_send_data(struct fast_task_info *task,
+        SFCommAction *action, bool *send_done)
 {
-    int result;
     int bytes;
-    int recv_bytes;
-    int total_read;
-    bool new_alloc;
-    struct fast_task_info *task;
 
-    task = (struct fast_task_info *)arg;
-    if ((result=check_task(task, event, SF_NIO_STAGE_RECV)) != 0) {
-        return result >= 0 ? 0 : -1;
+    if (task->iovec_array.iovs != NULL) {
+        bytes = writev(task->event.fd, task->iovec_array.iovs,
+                FC_MIN(task->iovec_array.count, IOV_MAX));
+    } else {
+        bytes = write(task->event.fd, task->send.ptr->data +
+                task->send.ptr->offset, task->send.ptr->length -
+                task->send.ptr->offset);
     }
-
-    if (event & IOEVENT_TIMEOUT) {
-        if (task->offset == 0 && task->req_count > 0) {
-            if (SF_CTX->timeout_callback != NULL) {
-                if (SF_CTX->timeout_callback(task) != 0) {
-                    ioevent_add_to_deleted_list(task);
-                    return -1;
-                }
+    if (bytes < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            if (set_write_event(task) != 0) {
+                return -1;
             }
-
-            task->event.timer.expires = g_current_time +
-                task->network_timeout;
-            fast_timer_add(&task->thread_data->timer,
-                &task->event.timer);
-        } else {
-            if (task->length > 0) {
-                logWarning("file: "__FILE__", line: %d, "
-                        "client ip: %s, recv timeout, "
-                        "recv offset: %d, expect length: %d",
-                        __LINE__, task->client_ip,
-                        task->offset, task->length);
-            } else {
-                logWarning("file: "__FILE__", line: %d, "
-                        "client ip: %s, req_count: %"PRId64", recv timeout",
-                        __LINE__, task->client_ip,  task->req_count);
-            }
-
-            ioevent_add_to_deleted_list(task);
-            return -1;
-        }
-
-        return 0;
-    }
-
-    total_read = 0;
-    while (1) {
-        fast_timer_modify(&task->thread_data->timer,
-            &task->event.timer, g_current_time +
-            task->network_timeout);
-        if (task->length == 0) { //recv header
-            recv_bytes = SF_CTX->header_size - task->offset;
-            bytes = read(sock, task->data + task->offset, recv_bytes);
-        } else {
-            recv_bytes = task->length - task->offset;
-            if (task->recv_body == NULL) {
-                bytes = read(sock, task->data + task->offset, recv_bytes);
-            } else {
-                bytes = read(sock, task->recv_body + (task->offset -
-                            SF_CTX->header_size), recv_bytes);
-            }
-        }
-
-        if (bytes < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            } else if (errno == EINTR) {  //should retry
-                logDebug("file: "__FILE__", line: %d, "
+            *action = sf_comm_action_break;
+            return 0;
+        } else if (errno == EINTR) {  //should retry
+            logDebug("file: "__FILE__", line: %d, "
                     "client ip: %s, ignore interupt signal",
                     __LINE__, task->client_ip);
-                continue;
-            } else {
-                logWarning("file: "__FILE__", line: %d, "
-                    "client ip: %s, recv fail, "
-                    "errno: %d, error info: %s",
-                    __LINE__, task->client_ip,
-                    errno, strerror(errno));
-
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-        } else if (bytes == 0) {
-            if (task->offset > 0) {
-                if (task->length > 0) {
-                    logWarning("file: "__FILE__", line: %d, "
-                            "client ip: %s, connection disconnected, "
-                            "expect pkg length: %d, recv pkg length: %d",
-                            __LINE__, task->client_ip, task->length,
-                            task->offset);
-                } else {
-                    logWarning("file: "__FILE__", line: %d, "
-                            "client ip: %s, connection "
-                            "disconnected, recv pkg length: %d",
-                            __LINE__, task->client_ip,
-                            task->offset);
-                }
-            } else {
-                logDebug("file: "__FILE__", line: %d, "
-                        "client ip: %s, sock: %d, recv fail, "
-                        "connection disconnected", __LINE__,
-                        task->client_ip, sock);
-            }
-
-            ioevent_add_to_deleted_list(task);
-            return -1;
-        }
-
-        TCP_SET_QUICK_ACK(sock);
-        total_read += bytes;
-        task->offset += bytes;
-        if (task->length == 0) { //pkg header
-            if (task->offset < SF_CTX->header_size) {
-                continue;
-            }
-
-            if (SF_CTX->set_body_length(task) != 0) {
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-            if (task->length < 0) {
-                logError("file: "__FILE__", line: %d, "
-                    "client ip: %s, pkg length: %d < 0",
-                    __LINE__, task->client_ip,
-                    task->length);
-
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-
-            task->length += SF_CTX->header_size;
-            if (task->length > g_sf_global_vars.max_pkg_size) {
-                logError("file: "__FILE__", line: %d, "
-                    "client ip: %s, pkg length: %d > "
-                    "max pkg size: %d", __LINE__,
-                    task->client_ip, task->length,
-                    g_sf_global_vars.max_pkg_size);
-
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-
-            if (SF_CTX->alloc_recv_buffer != NULL) {
-                task->recv_body = SF_CTX->alloc_recv_buffer(task,
-                        task->length - SF_CTX->header_size, &new_alloc);
-                if (new_alloc && task->recv_body == NULL) {
-                    ioevent_add_to_deleted_list(task);
-                    return -1;
-                }
-            } else {
-                new_alloc = false;
-            }
-
-            if (!new_alloc) {
-                if (task->length > task->size) {
-                    int old_size;
-
-                    if (!SF_CTX->realloc_task_buffer) {
-                        logError("file: "__FILE__", line: %d, "
-                                "client ip: %s, pkg length: %d exceeds "
-                                "task size: %d, but realloc buffer disabled",
-                                __LINE__, task->client_ip, task->size,
-                                task->length);
-
-                        ioevent_add_to_deleted_list(task);
-                        return -1;
-                    }
-
-                    old_size = task->size;
-                    if (free_queue_realloc_buffer(task, task->length) != 0) {
-                        logError("file: "__FILE__", line: %d, "
-                                "client ip: %s, realloc buffer size "
-                                "from %d to %d fail", __LINE__,
-                                task->client_ip, task->size, task->length);
-
-                        ioevent_add_to_deleted_list(task);
-                        return -1;
-                    }
-
-                    logDebug("file: "__FILE__", line: %d, "
-                            "client ip: %s, task length: %d, realloc buffer "
-                            "size from %d to %d", __LINE__, task->client_ip,
-                            task->length, old_size, task->size);
-                }
-            }
-        }
-
-        if (task->offset >= task->length) { //recv done
-            task->req_count++;
-            task->nio_stages.current = SF_NIO_STAGE_SEND;
-            if (SF_CTX->deal_task(task, SF_NIO_STAGE_SEND) < 0) {  //fatal error
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-            break;
-        }
-    }
-
-    return total_read;
-}
-
-int sf_client_sock_write(int sock, short event, void *arg)
-{
-    int result;
-    int bytes;
-    int total_write;
-    int length;
-    struct fast_task_info *task;
-
-    task = (struct fast_task_info *)arg;
-    if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
-        return result >= 0 ? 0 : -1;
-    }
-
-    if (event & IOEVENT_TIMEOUT) {
-        logError("file: "__FILE__", line: %d, "
-            "client ip: %s, send timeout. total length: %d, offset: %d, "
-            "remain: %d", __LINE__, task->client_ip, task->length,
-            task->offset, task->length - task->offset);
-
-        ioevent_add_to_deleted_list(task);
-        return -1;
-    }
-
-    total_write = 0;
-    while (1) {
-        fast_timer_modify(&task->thread_data->timer,
-            &task->event.timer, g_current_time +
-            task->network_timeout);
-
-        if (task->iovec_array.iovs != NULL) {
-            bytes = writev(sock, task->iovec_array.iovs,
-                    FC_MIN(task->iovec_array.count, IOV_MAX));
+            *action = sf_comm_action_continue;
+            return 0;
         } else {
-            bytes = write(sock, task->data + task->offset,
-                    task->length - task->offset);
-        }
-        if (bytes < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-            {
-                if (set_write_event(task) != 0) {
-                    return -1;
-                }
-                break;
-            } else if (errno == EINTR) {  //should retry
-                logDebug("file: "__FILE__", line: %d, "
-                    "client ip: %s, ignore interupt signal",
-                    __LINE__, task->client_ip);
-                continue;
-            } else {
-                logWarning("file: "__FILE__", line: %d, "
+            logWarning("file: "__FILE__", line: %d, "
                     "client ip: %s, send fail, task offset: %d, length: %d, "
                     "errno: %d, error info: %s", __LINE__, task->client_ip,
-                    task->offset, task->length, errno, strerror(errno));
-
-                ioevent_add_to_deleted_list(task);
-                return -1;
-            }
-        } else if (bytes == 0) {
-            logWarning("file: "__FILE__", line: %d, "
-                "client ip: %s, sock: %d, task length: %d, offset: %d, "
-                "send failed, connection disconnected", __LINE__,
-                task->client_ip, sock, task->length, task->offset);
-
-            ioevent_add_to_deleted_list(task);
+                    task->send.ptr->offset, task->send.ptr->length,
+                    errno, strerror(errno));
             return -1;
         }
+    } else if (bytes == 0) {
+        logWarning("file: "__FILE__", line: %d, "
+                "client ip: %s, sock: %d, task length: %d, offset: %d, "
+                "send failed, connection disconnected", __LINE__,
+                task->client_ip, task->event.fd, task->send.ptr->length,
+                task->send.ptr->offset);
+        return -1;
+    }
 
-        total_write += bytes;
-        task->offset += bytes;
-        if (task->offset >= task->length) {
-            release_iovec_buffer(task);
-
-            length = task->length;
-            task->offset = 0;
-            task->length = 0;
-            if (sf_set_read_event(task) != 0) {
-                return -1;
-            }
-
-            if (SF_CTX->send_done_callback != NULL) {
-                if (SF_CTX->send_done_callback(task, length) != 0) {
-                    ioevent_add_to_deleted_list(task);
-                    return -1;
-                }
-            }
-
-            break;
+    task->send.ptr->offset += bytes;
+    if (task->send.ptr->offset >= task->send.ptr->length) {
+        if (task->send.ptr != task->recv.ptr) {  //double buffers
+            task->send.ptr->offset = 0;
+            task->send.ptr->length = 0;
         }
+        *action = sf_comm_action_finish;
+        *send_done = true;
+    } else {
+        *action = sf_comm_action_continue;
+        *send_done = false;
 
         /* set next writev iovec array */
         if (task->iovec_array.iovs != NULL) {
@@ -814,6 +628,428 @@ int sf_client_sock_write(int sock, short event, void *arg)
 
             task->iovec_array.iovs = iov;
             task->iovec_array.count = end - iov;
+        }
+    }
+
+    return bytes;
+}
+
+ssize_t sf_socket_recv_data(struct fast_task_info *task,
+        const bool call_post_recv, SFCommAction *action)
+{
+    int bytes;
+    int recv_bytes;
+    bool new_alloc;
+
+    if (task->recv.ptr->length == 0) { //recv header
+        recv_bytes = SF_CTX->header_size - task->recv.ptr->offset;
+        bytes = read(task->event.fd, task->recv.ptr->data +
+                task->recv.ptr->offset, recv_bytes);
+    } else {
+        recv_bytes = task->recv.ptr->length - task->recv.ptr->offset;
+        if (task->recv_body == NULL) {
+            bytes = read(task->event.fd, task->recv.ptr->data +
+                    task->recv.ptr->offset, recv_bytes);
+        } else {
+            bytes = read(task->event.fd, task->recv_body +
+                    (task->recv.ptr->offset - SF_CTX->
+                     header_size), recv_bytes);
+        }
+    }
+
+    if (bytes < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            *action = sf_comm_action_break;
+            return 0;
+        } else if (errno == EINTR) {  //should retry
+            logDebug("file: "__FILE__", line: %d, "
+                    "client ip: %s, ignore interupt signal",
+                    __LINE__, task->client_ip);
+            *action = sf_comm_action_continue;
+            return 0;
+        } else {
+            logWarning("file: "__FILE__", line: %d, "
+                    "client ip: %s, recv fail, "
+                    "errno: %d, error info: %s",
+                    __LINE__, task->client_ip,
+                    errno, strerror(errno));
+            return -1;
+        }
+    } else if (bytes == 0) {
+        if (task->recv.ptr->offset > 0) {
+            if (task->recv.ptr->length > 0) {
+                logWarning("file: "__FILE__", line: %d, "
+                        "client ip: %s, connection disconnected, "
+                        "expect pkg length: %d, recv pkg length: %d",
+                        __LINE__, task->client_ip, task->recv.ptr->length,
+                        task->recv.ptr->offset);
+            } else {
+                logWarning("file: "__FILE__", line: %d, "
+                        "client ip: %s, connection "
+                        "disconnected, recv pkg length: %d",
+                        __LINE__, task->client_ip,
+                        task->recv.ptr->offset);
+            }
+        } else {
+            logDebug("file: "__FILE__", line: %d, "
+                    "client ip: %s, sock: %d, recv fail, "
+                    "connection disconnected", __LINE__,
+                    task->client_ip, task->event.fd);
+        }
+
+        return -1;
+    }
+
+    TCP_SET_QUICK_ACK(task->event.fd);
+    task->recv.ptr->offset += bytes;
+    if (task->recv.ptr->length == 0) { //pkg header
+        if (task->recv.ptr->offset < SF_CTX->header_size) {
+            *action = sf_comm_action_continue;
+            return bytes;
+        }
+
+        if (sf_set_body_length(task) != 0) {
+            return -1;
+        }
+
+        if (SF_CTX->callbacks.alloc_recv_buffer != NULL) {
+            task->recv_body = SF_CTX->callbacks.alloc_recv_buffer(task,
+                    task->recv.ptr->length - SF_CTX->header_size, &new_alloc);
+            if (new_alloc && task->recv_body == NULL) {
+                return -1;
+            }
+        } else {
+            new_alloc = false;
+        }
+
+        if (!new_alloc) {
+            if (task->recv.ptr->length > task->recv.ptr->size) {
+                int old_size;
+
+                if (!SF_CTX->realloc_task_buffer) {
+                    logError("file: "__FILE__", line: %d, "
+                            "client ip: %s, pkg length: %d exceeds "
+                            "task size: %d, but realloc buffer disabled",
+                            __LINE__, task->client_ip, task->recv.ptr->size,
+                            task->recv.ptr->length);
+                    return -1;
+                }
+
+                old_size = task->recv.ptr->size;
+                if (free_queue_realloc_recv_buffer(task, task->
+                            recv.ptr->length) != 0)
+                {
+                    logError("file: "__FILE__", line: %d, "
+                            "client ip: %s, realloc buffer size from %d "
+                            "to %d fail", __LINE__, task->client_ip,
+                            task->recv.ptr->size, task->recv.ptr->length);
+                    return -1;
+                }
+
+                logDebug("file: "__FILE__", line: %d, "
+                        "client ip: %s, task length: %d, realloc buffer "
+                        "size from %d to %d", __LINE__, task->client_ip,
+                        task->recv.ptr->length, old_size, task->recv.ptr->size);
+            }
+        }
+    }
+
+    if (task->recv.ptr->offset >= task->recv.ptr->length) { //recv done
+        *action = sf_comm_action_finish;
+    } else {
+        *action = sf_comm_action_continue;
+    }
+
+    return bytes;
+}
+
+static int calc_iops_and_trigger_polling(struct fast_task_info *task)
+{
+    int time_distance;
+    int result = 0;
+
+    time_distance = g_current_time - task->polling.last_calc_time;
+    if (time_distance > 0) {
+        if ((task->req_count - task->polling.last_req_count) /
+                time_distance >= SF_CTX->smart_polling.switch_on_iops)
+        {
+            task->polling.continuous_count++;
+            if (task->polling.continuous_count >= SF_CTX->
+                    smart_polling.switch_on_count)
+            {
+                task->polling.continuous_count = 0;
+                task->polling.in_queue = true;
+                result = ioevent_detach(&task->thread_data->
+                        ev_puller, task->event.fd);
+                fast_timer_remove(&task->thread_data->timer,
+                        &task->event.timer);
+
+                if (fc_list_empty(&task->thread_data->polling_queue)) {
+                    ioevent_set_timeout(&task->thread_data->
+                            ev_puller, 0);
+                }
+                fc_list_add_tail(&task->polling.dlink,
+                        &task->thread_data->polling_queue);
+
+                logInfo("file: "__FILE__", line: %d, client: %s:%u, "
+                        "trigger polling iops: %"PRId64, __LINE__,
+                        task->client_ip, task->port, (task->req_count -
+                            task->polling.last_req_count) / time_distance);
+            }
+        } else {
+            if (task->polling.continuous_count > 0) {
+                task->polling.continuous_count = 0;
+            }
+        }
+
+        task->polling.last_calc_time = g_current_time;
+        task->polling.last_req_count = task->req_count;
+    }
+
+    return result;
+}
+
+static int calc_iops_and_remove_polling(struct fast_task_info *task)
+{
+    int time_distance;
+    int result = 0;
+
+    time_distance = g_current_time - task->polling.last_calc_time;
+    if (time_distance > 0) {
+        if ((task->req_count - task->polling.last_req_count) /
+                time_distance < SF_CTX->smart_polling.switch_on_iops)
+        {
+            task->polling.continuous_count++;
+            if (task->polling.continuous_count >= SF_CTX->
+                    smart_polling.switch_on_count)
+            {
+                task->polling.continuous_count = 0;
+                task->polling.in_queue = false;
+                fc_list_del_init(&task->polling.dlink);
+                if (fc_list_empty(&task->thread_data->polling_queue)) {
+                    ioevent_set_timeout(&task->thread_data->ev_puller,
+                            task->thread_data->timeout_ms);
+                }
+                result = sf_ioevent_add(task, (IOEventCallback)
+                        sf_client_sock_read, task->network_timeout);
+
+                logInfo("file: "__FILE__", line: %d, client: %s:%u, "
+                        "remove polling iops: %"PRId64, __LINE__,
+                        task->client_ip, task->port, (task->req_count -
+                            task->polling.last_req_count) / time_distance);
+            }
+        } else {
+            if (task->polling.continuous_count > 0) {
+                task->polling.continuous_count = 0;
+            }
+        }
+
+        task->polling.last_calc_time = g_current_time;
+        task->polling.last_req_count = task->req_count;
+    }
+
+    return result;
+}
+
+int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
+{
+    struct fast_task_info *task;
+    struct fast_task_info *tmp;
+    int bytes;
+    SFCommAction action;
+
+    fc_list_for_each_entry_safe(task, tmp, &thread_data->
+            polling_queue, polling.dlink)
+    {
+        if (task->canceled) {
+            continue;
+        }
+        if ((bytes=task->handler->recv_data(task, !task->handler->
+                        explicit_post_recv, &action)) < 0)
+        {
+            ioevent_add_to_deleted_list(task);
+            continue;
+        }
+
+        if (action == sf_comm_action_finish) {
+            task->req_count++;
+            task->nio_stages.current = SF_NIO_STAGE_SEND;
+            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {
+                /* fatal error */
+                ioevent_add_to_deleted_list(task);
+            } else if (task->handler->explicit_post_recv) {
+                if (task->handler->post_recv(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                }
+            }
+        } else {
+            if (calc_iops_and_remove_polling(task) != 0) {
+                ioevent_add_to_deleted_list(task);
+            }
+        }
+    }
+
+    return 0;
+}
+
+int sf_client_sock_read(int sock, short event, void *arg)
+{
+    int result;
+    int bytes;
+    int total_read;
+    SFCommAction action;
+    struct fast_task_info *task;
+
+    task = (struct fast_task_info *)arg;
+    if ((result=check_task(task, event, SF_NIO_STAGE_RECV)) != 0) {
+        return result >= 0 ? 0 : -1;
+    }
+
+    if (event & IOEVENT_TIMEOUT) {
+        if (task->recv.ptr->offset == 0 && task->req_count > 0) {
+            if (SF_CTX->callbacks.task_timeout != NULL) {
+                if (SF_CTX->callbacks.task_timeout(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
+            }
+
+            task->event.timer.expires = g_current_time +
+                task->network_timeout;
+            fast_timer_add(&task->thread_data->timer,
+                &task->event.timer);
+        } else {
+            if (task->recv.ptr->length > 0) {
+                logWarning("file: "__FILE__", line: %d, "
+                        "client ip: %s, recv timeout, recv "
+                        "offset: %d, expect length: %d", __LINE__,
+                        task->client_ip, task->recv.ptr->offset,
+                        task->recv.ptr->length);
+            } else {
+                logWarning("file: "__FILE__", line: %d, "
+                        "client ip: %s, req_count: %"PRId64", recv timeout",
+                        __LINE__, task->client_ip,  task->req_count);
+            }
+
+            ioevent_add_to_deleted_list(task);
+            return -1;
+        }
+
+        return 0;
+    }
+
+    total_read = 0;
+    action = sf_comm_action_continue;
+    while (1) {
+        fast_timer_modify(&task->thread_data->timer,
+            &task->event.timer, g_current_time +
+            task->network_timeout);
+
+        if ((bytes=task->handler->recv_data(task, !task->handler->
+                        explicit_post_recv, &action)) < 0)
+        {
+            ioevent_add_to_deleted_list(task);
+            return -1;
+        }
+
+        total_read += bytes;
+        if (action == sf_comm_action_finish) {
+            task->req_count++;
+            task->nio_stages.current = SF_NIO_STAGE_SEND;
+            if (SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND) < 0) {
+                ioevent_add_to_deleted_list(task);
+                return -1;
+            }
+
+            if (task->handler->explicit_post_recv) {
+                if (task->handler->post_recv(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
+            }
+
+            if (SF_CTX->smart_polling.enabled) {
+                if (calc_iops_and_trigger_polling(task) != 0) {
+                    ioevent_add_to_deleted_list(task);
+                    return -1;
+                }
+            }
+
+            break;
+        } else if (action == sf_comm_action_break) {
+            break;
+        }
+    }
+
+    return total_read;
+}
+
+int sf_client_sock_write(int sock, short event, void *arg)
+{
+    int result;
+    int bytes;
+    int total_write;
+    int length;
+    int next_stage;
+    SFCommAction action;
+    bool send_done;
+    struct fast_task_info *task;
+
+    task = (struct fast_task_info *)arg;
+    if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
+        return result >= 0 ? 0 : -1;
+    }
+
+    if (event & IOEVENT_TIMEOUT) {
+        logError("file: "__FILE__", line: %d, "
+            "client ip: %s, send timeout. total length: %d, offset: %d, "
+            "remain: %d", __LINE__, task->client_ip, task->send.ptr->length,
+            task->send.ptr->offset, task->send.ptr->length -
+            task->send.ptr->offset);
+
+        ioevent_add_to_deleted_list(task);
+        return -1;
+    }
+
+    total_write = 0;
+    length = task->send.ptr->length;
+    action = sf_comm_action_continue;
+    while (1) {
+        fast_timer_modify(&task->thread_data->timer,
+                &task->event.timer, g_current_time +
+                task->network_timeout);
+
+        if ((bytes=task->handler->send_data(task, &action, &send_done)) < 0) {
+            ioevent_add_to_deleted_list(task);
+            return -1;
+        }
+
+        total_write += bytes;
+        if (action == sf_comm_action_finish) {
+            release_iovec_buffer(task);
+            task->recv.ptr->offset = 0;
+            task->recv.ptr->length = 0;
+            if (set_read_event(task) != 0) {
+                return -1;
+            }
+
+            if (SF_CTX->callbacks.send_done == NULL || !send_done) {
+                task->nio_stages.current = SF_NIO_STAGE_RECV;
+            } else {
+                if (SF_CTX->callbacks.send_done(task,
+                            length, &next_stage) != 0)
+                {
+                    return -1;
+                }
+
+                if (task->nio_stages.current != next_stage) {
+                    task->nio_stages.current = next_stage;
+                }
+            }
+
+            break;
+        } else if (action == sf_comm_action_break) {
+            break;
         }
     }
 

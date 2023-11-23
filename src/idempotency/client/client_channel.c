@@ -31,11 +31,11 @@
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/fc_queue.h"
-#include "../../sf_util.h"
-#include "../../sf_func.h"
-#include "../../sf_nio.h"
-#include "../../sf_global.h"
-#include "../../sf_service.h"
+#include "sf/sf_util.h"
+#include "sf/sf_func.h"
+#include "sf/sf_nio.h"
+#include "sf/sf_global.h"
+#include "sf/sf_service.h"
 #include "client_channel.h"
 
 typedef struct {
@@ -171,12 +171,18 @@ void client_channel_destroy()
 }
 
 static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
-        *channel, const uint32_t hash_code, const char *server_ip,
-        const uint16_t port, int *err_no)
+        *channel, const uint32_t hash_code, const FCCommunicationType comm_type,
+        const char *server_ip, const uint16_t port, int *err_no)
 {
     struct fast_task_info *task;
+    SFNetworkHandler *handler;
 
-    if ((task=sf_alloc_init_task(&g_sf_context, -1)) == NULL) {
+    if (comm_type == fc_comm_type_sock) {
+        handler = g_sf_context.handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    } else {
+        handler = g_sf_context.handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    }
+    if ((task=sf_alloc_init_task(handler, -1)) == NULL) {
         *err_no = ENOMEM;
         return NULL;
     }
@@ -226,8 +232,8 @@ int idempotency_client_channel_check_reconnect(
 }
 
 struct idempotency_client_channel *idempotency_client_channel_get(
-        const char *server_ip, const uint16_t server_port,
-        const int timeout, int *err_no)
+        const FCCommunicationType comm_type, const char *server_ip,
+        const uint16_t server_port, const int timeout, int *err_no)
 {
     int r;
     int key_len;
@@ -239,7 +245,7 @@ struct idempotency_client_channel *idempotency_client_channel_get(
     IdempotencyClientChannel *current;
     IdempotencyClientChannel *channel;
 
-    key_len = snprintf(key, sizeof(key), "%s_%u", server_ip, server_port);
+    key_len = snprintf(key, sizeof(key), "%s-%u", server_ip, server_port);
     hash_code = fc_simple_hash(key, key_len);
     bucket = channel_context.htable.buckets +
         hash_code % channel_context.htable.capacity;
@@ -277,8 +283,8 @@ struct idempotency_client_channel *idempotency_client_channel_get(
             break;
         }
 
-        channel->task = alloc_channel_task(channel,
-                hash_code, server_ip, server_port, err_no);
+        channel->task = alloc_channel_task(channel, hash_code,
+                comm_type, server_ip, server_port, err_no);
         if (channel->task == NULL) {
             fast_mblock_free_object(&channel_context.
                     channel_allocator, channel);

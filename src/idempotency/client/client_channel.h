@@ -22,6 +22,7 @@
 #include "fastcommon/pthread_func.h"
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/fc_atomic.h"
+#include "sf/sf_types.h"
 #include "client_types.h"
 
 #ifdef __cplusplus
@@ -40,8 +41,8 @@ void idempotency_client_channel_config_to_string_ex(
         char *output, const int size, const bool add_comma);
 
 struct idempotency_client_channel *idempotency_client_channel_get(
-        const char *server_ip, const uint16_t server_port,
-        const int timeout, int *err_no);
+        const FCCommunicationType comm_type, const char *server_ip,
+        const uint16_t server_port, const int timeout, int *err_no);
 
 static inline uint64_t idempotency_client_channel_next_seq_id(
         struct idempotency_client_channel *channel)

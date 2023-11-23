@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -31,6 +32,7 @@
 #include "fastcommon/process_ctrl.h"
 #include "fastcommon/logger.h"
 #include "sf_nio.h"
+#include "sf_service.h"
 #include "sf_global.h"
 
 SFGlobalVariables g_sf_global_vars = {
@@ -38,15 +40,16 @@ SFGlobalVariables g_sf_global_vars = {
     {{'/', 't', 'm', 'p', '\0'}, false},
     true, true, false, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
-    SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE,
-    0, 0, 0, {'\0'}, {'\0'}, {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
+    SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE, 0,
+    {false, 0, 0, {'\0'}, {'\0'}},
+    {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {
-    {'\0'}, NULL, 0, -1, -1, 0, 0, 1, DEFAULT_WORK_THREADS, 
-    {'\0'}, {'\0'}, 0, true, true, NULL, NULL, NULL, NULL,
-    NULL, sf_task_finish_clean_up, NULL
+SFContext g_sf_context = {{'\0'}, NULL, 0,
+    {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}},
+    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, true,
+    {false, 0, 0}, {sf_task_finish_clean_up}
 };
 
 static inline void set_config_str_value(const char *value,
@@ -60,10 +63,11 @@ static inline void set_config_str_value(const char *value,
 }
 
 static int load_network_parameters(IniFullContext *ini_ctx,
-        const char *max_pkg_size_item_nm,
+        const char *max_pkg_size_item_nm, const int fixed_buff_size,
         const int task_buffer_extra_size)
 {
     int result;
+    int padding_buff_size;
     char *pMinBuffSize;
     char *pMaxBuffSize;
 
@@ -91,6 +95,14 @@ static int load_network_parameters(IniFullContext *ini_ctx,
                     max_connections)) != 0)
     {
         return result;
+    }
+
+    if (fixed_buff_size > 0) {
+        padding_buff_size = fixed_buff_size + task_buffer_extra_size;
+        g_sf_global_vars.min_buff_size = padding_buff_size;
+        g_sf_global_vars.max_buff_size = padding_buff_size;
+        g_sf_global_vars.max_pkg_size = padding_buff_size;
+        return 0;
     }
 
     g_sf_global_vars.max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
@@ -281,10 +293,10 @@ int sf_load_global_base_path(IniFullContext *ini_ctx)
     return 0;
 }
 
-int sf_load_global_config_ex(const char *server_name,
+int sf_load_global_config_ex(const char *log_filename_prefix,
         IniFullContext *ini_ctx, const bool load_network_params,
-        const char *max_pkg_size_item_nm, const int task_buffer_extra_size,
-        const bool need_set_run_by)
+        const char *max_pkg_size_item_nm, const int fixed_buff_size,
+        const int task_buffer_extra_size, const bool need_set_run_by)
 {
     int result;
     const char *old_section_name;
@@ -301,7 +313,7 @@ int sf_load_global_config_ex(const char *server_name,
     tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
     if (load_network_params) {
         if ((result=load_network_parameters(ini_ctx, max_pkg_size_item_nm,
-                        task_buffer_extra_size)) != 0)
+                        fixed_buff_size, task_buffer_extra_size)) != 0)
         {
             return result;
         }
@@ -310,20 +322,20 @@ int sf_load_global_config_ex(const char *server_name,
     pRunByGroup = iniGetStrValue(NULL, "run_by_group", ini_ctx->context);
     pRunByUser = iniGetStrValue(NULL, "run_by_user", ini_ctx->context);
     if (pRunByGroup == NULL) {
-        *g_sf_global_vars.run_by_group = '\0';
+        *g_sf_global_vars.run_by.group = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_group,
-                sizeof(g_sf_global_vars.run_by_group),
+        snprintf(g_sf_global_vars.run_by.group,
+                sizeof(g_sf_global_vars.run_by.group),
                 "%s", pRunByGroup);
     }
-    if (*(g_sf_global_vars.run_by_group) == '\0') {
-        g_sf_global_vars.run_by_gid = getegid();
+    if (*(g_sf_global_vars.run_by.group) == '\0') {
+        g_sf_global_vars.run_by.gid = getegid();
     }
     else {
         struct group *pGroup;
 
-        pGroup = getgrnam(g_sf_global_vars.run_by_group);
+        pGroup = getgrnam(g_sf_global_vars.run_by.group);
         if (pGroup == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -333,24 +345,24 @@ int sf_load_global_config_ex(const char *server_name,
             return result;
         }
 
-        g_sf_global_vars.run_by_gid = pGroup->gr_gid;
+        g_sf_global_vars.run_by.gid = pGroup->gr_gid;
     }
 
     if (pRunByUser == NULL) {
-        *g_sf_global_vars.run_by_user = '\0';
+        *g_sf_global_vars.run_by.user = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by_user,
-                sizeof(g_sf_global_vars.run_by_user),
+        snprintf(g_sf_global_vars.run_by.user,
+                sizeof(g_sf_global_vars.run_by.user),
                 "%s", pRunByUser);
     }
-    if (*(g_sf_global_vars.run_by_user) == '\0') {
-        g_sf_global_vars.run_by_uid = geteuid();
+    if (*(g_sf_global_vars.run_by.user) == '\0') {
+        g_sf_global_vars.run_by.uid = geteuid();
     }
     else {
         struct passwd *pUser;
 
-        pUser = getpwnam(g_sf_global_vars.run_by_user);
+        pUser = getpwnam(g_sf_global_vars.run_by.user);
         if (pUser == NULL) {
             result = errno != 0 ? errno : ENOENT;
             logError("file: "__FILE__", line: %d, "
@@ -360,16 +372,17 @@ int sf_load_global_config_ex(const char *server_name,
             return result;
         }
 
-        g_sf_global_vars.run_by_uid = pUser->pw_uid;
+        g_sf_global_vars.run_by.uid = pUser->pw_uid;
     }
+    g_sf_global_vars.run_by.inited = true;
 
     if (SF_G_BASE_PATH_CREATED) {
         SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(SF_G_BASE_PATH_STR);
     }
 
     if (need_set_run_by) {
-        if ((result=set_run_by(g_sf_global_vars.run_by_group,
-                        g_sf_global_vars.run_by_user)) != 0)
+        if ((result=set_run_by(g_sf_global_vars.run_by.group,
+                        g_sf_global_vars.run_by.user)) != 0)
         {
             return result;
         }
@@ -389,8 +402,10 @@ int sf_load_global_config_ex(const char *server_name,
     ini_ctx->section_name = old_section_name;
 
     load_log_level(ini_ctx->context);
-    if (server_name != NULL) {
-        if ((result=log_set_prefix(SF_G_BASE_PATH_STR, server_name)) != 0) {
+    if (log_filename_prefix != NULL) {
+        if ((result=log_set_prefix(SF_G_BASE_PATH_STR,
+                        log_filename_prefix)) != 0)
+        {
             return result;
         }
     }
@@ -398,12 +413,13 @@ int sf_load_global_config_ex(const char *server_name,
     return 0;
 }
 
-int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
+int sf_load_config_ex(const char *log_filename_prefix,
+        SFContextIniConfig *config, const int fixed_buff_size,
         const int task_buffer_extra_size, const bool need_set_run_by)
 {
     int result;
-    if ((result=sf_load_global_config_ex(server_name, &config->ini_ctx,
-                    true, config->max_pkg_size_item_name,
+    if ((result=sf_load_global_config_ex(log_filename_prefix, &config->ini_ctx,
+                    true, config->max_pkg_size_item_name, fixed_buff_size,
                     task_buffer_extra_size, need_set_run_by)) != 0)
     {
         return result;
@@ -411,17 +427,118 @@ int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
     return sf_load_context_from_config_ex(&g_sf_context, config);
 }
 
+#define API_PREFIX_NAME  "fast_rdma_"
+
+#define LOAD_API_EX(handler, prefix, fname) \
+    do { \
+        handler->fname = dlsym(dlhandle, API_PREFIX_NAME#prefix#fname); \
+        if (handler->fname == NULL) {  \
+            logError("file: "__FILE__", line: %d, "  \
+                    "dlsym api %s fail, error info: %s", \
+                    __LINE__, API_PREFIX_NAME#prefix#fname, dlerror()); \
+            return ENOENT; \
+        } \
+    } while (0)
+
+#define LOAD_API(handler, fname)  LOAD_API_EX(handler, server_, fname)
+
+static int load_rdma_apis(SFNetworkHandler *handler)
+{
+    const char *library = "libfastrdma.so";
+    void *dlhandle;
+
+    dlhandle = dlopen(library, RTLD_LAZY);
+    if (dlhandle == NULL) {
+        logError("file: "__FILE__", line: %d, "
+                "dlopen %s fail, error info: %s",
+                __LINE__, library, dlerror());
+        return EFAULT;
+    }
+
+    LOAD_API(handler, get_connection_size);
+    LOAD_API(handler, init_connection);
+    LOAD_API(handler, alloc_pd);
+    LOAD_API_EX(handler, , create_server);
+    LOAD_API_EX(handler, , close_server);
+    LOAD_API(handler, accept_connection);
+    LOAD_API_EX(handler, , async_connect_server);
+    LOAD_API_EX(handler, , async_connect_check);
+    LOAD_API(handler, close_connection);
+    LOAD_API(handler, send_data);
+    LOAD_API(handler, recv_data);
+    LOAD_API(handler, post_recv);
+
+    return 0;
+}
+
+static int init_network_handler(SFNetworkHandler *handler,
+        SFContext *sf_context)
+{
+    handler->ctx = sf_context;
+    handler->inner.handler = handler;
+    handler->outer.handler = handler;
+    handler->inner.is_inner = true;
+    handler->outer.is_inner = false;
+    handler->explicit_post_recv = false;
+
+    if (handler->comm_type == fc_comm_type_sock) {
+        handler->inner.sock = -1;
+        handler->outer.sock = -1;
+        handler->create_server = sf_socket_create_server;
+        handler->close_server = sf_socket_close_server;
+        handler->accept_connection = sf_socket_accept_connection;
+        handler->async_connect_server = sf_socket_async_connect_server;
+        handler->async_connect_check = sf_socket_async_connect_check;
+        handler->close_connection = sf_socket_close_connection;
+        handler->send_data = sf_socket_send_data;
+        handler->recv_data = sf_socket_recv_data;
+        handler->post_recv = NULL;
+        return 0;
+    } else {
+        handler->inner.id = NULL;
+        handler->outer.id = NULL;
+        return load_rdma_apis(handler);
+    }
+}
+
 int sf_load_context_from_config_ex(SFContext *sf_context,
         SFContextIniConfig *config)
 {
+    SFNetworkHandler *sock_handler;
+    SFNetworkHandler *rdma_handler;
     char *inner_port;
     char *outer_port;
     char *inner_bind_addr;
     char *outer_bind_addr;
     char *bind_addr;
     int port;
+    int i;
+    int result;
 
-    sf_context->inner_port = sf_context->outer_port = 0;
+    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    rdma_handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    sock_handler->comm_type = fc_comm_type_sock;
+    rdma_handler->comm_type = fc_comm_type_rdma;
+    if (config->comm_type == fc_comm_type_sock) {
+        sock_handler->enabled = true;
+        rdma_handler->enabled = false;
+    } else if (config->comm_type == fc_comm_type_rdma) {
+        sock_handler->enabled = false;
+        rdma_handler->enabled = true;
+    } else if (config->comm_type == fc_comm_type_both) {
+        sock_handler->enabled = true;
+        rdma_handler->enabled = true;
+    }
+    for (i=0; i<SF_NETWORK_HANDLER_COUNT; i++) {
+        if (!sf_context->handlers[i].enabled) {
+            continue;
+        }
+        if ((result=init_network_handler(sf_context->handlers + i,
+                        sf_context)) != 0)
+        {
+            return result;
+        }
+    }
 
     inner_port = iniGetStrValue(config->ini_ctx.section_name,
             "inner_port", config->ini_ctx.context);
@@ -431,23 +548,36 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         port = iniGetIntValue(config->ini_ctx.section_name,
                 "port", config->ini_ctx.context, 0);
         if (port > 0) {
-            sf_context->inner_port = sf_context->outer_port = port;
+            sock_handler->inner.port = sock_handler->outer.port = port;
         }
     } else {
         if (inner_port != NULL) {
-            sf_context->inner_port = atoi(inner_port);
+            sock_handler->inner.port = strtol(inner_port, NULL, 10);
         }
         if (outer_port != NULL) {
-            sf_context->outer_port = atoi(outer_port);
+            sock_handler->outer.port = strtol(outer_port, NULL, 10);
         }
     }
 
-    if (sf_context->inner_port <= 0) {
-        sf_context->inner_port = config->default_inner_port;
+    if (sock_handler->inner.port <= 0) {
+        sock_handler->inner.port = config->default_inner_port;
     }
-    if (sf_context->outer_port <= 0) {
-        sf_context->outer_port = config->default_outer_port;
+    if (sock_handler->outer.port <= 0) {
+        sock_handler->outer.port = config->default_outer_port;
     }
+
+    if (sock_handler->inner.port == sock_handler->outer.port) {
+        sock_handler->inner.enabled = true;
+        sock_handler->outer.enabled = false;
+    } else {
+        sock_handler->inner.enabled = true;
+        sock_handler->outer.enabled = true;
+    }
+
+    rdma_handler->inner.port = sock_handler->inner.port;
+    rdma_handler->inner.enabled = sock_handler->inner.enabled;
+    rdma_handler->outer.port = sock_handler->outer.port;
+    rdma_handler->outer.enabled = sock_handler->outer.enabled;
 
     inner_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
             "inner_bind_addr", config->ini_ctx.context);
@@ -492,26 +622,44 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     return 0;
 }
 
+int sf_alloc_rdma_pd(SFContext *sf_context,
+        FCAddressPtrArray *address_array)
+{
+    SFNetworkHandler *handler;
+    int result;
+
+    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    if (!handler->enabled) {
+        return 0;
+    }
+
+    handler->pd = fc_alloc_rdma_pd(handler->alloc_pd,
+            address_array, &result);
+    return result;
+}
+
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)
 {
+    const SFNetworkHandler *sock_handler;
     int len;
 
+    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
     len = 0;
-    if ((sf_context->inner_port == sf_context->outer_port) &&
+    if ((sock_handler->inner.port == sock_handler->outer.port) &&
             (strcmp(sf_context->inner_bind_addr,
                     sf_context->outer_bind_addr) == 0))
     {
         len += snprintf(output + len, size - len,
                 "port=%u, bind_addr=%s",
-                sf_context->inner_port,
+                sock_handler->inner.port,
                 sf_context->inner_bind_addr);
     } else {
         len += snprintf(output + len, size - len,
                 "inner_port=%u, inner_bind_addr=%s, "
                 "outer_port=%u, outer_bind_addr=%s",
-                sf_context->inner_port, sf_context->inner_bind_addr,
-                sf_context->outer_port, sf_context->outer_bind_addr);
+                sock_handler->inner.port, sf_context->inner_bind_addr,
+                sock_handler->outer.port, sf_context->outer_bind_addr);
     }
 
     len += snprintf(output + len, size - len,
@@ -596,8 +744,8 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             g_sf_global_vars.thread_stack_size / 1024,
             pkg_buff, g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),
-            g_sf_global_vars.run_by_group,
-            g_sf_global_vars.run_by_user
+            g_sf_global_vars.run_by.group,
+            g_sf_global_vars.run_by.user
             );
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,

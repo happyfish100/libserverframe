@@ -37,9 +37,6 @@
 #include "server_channel.h"
 #include "server_handler.h"
 
-#define SF_TASK_BODY_LENGTH(task) \
-    (task->length - sizeof(SFCommonProtoHeader))
-
 int sf_server_deal_setup_channel(struct fast_task_info *task,
         int *task_type, const int server_id, IdempotencyChannel
         **channel, SFResponseInfo *response)
@@ -52,13 +49,13 @@ int sf_server_deal_setup_channel(struct fast_task_info *task,
 
     response->header.cmd = SF_SERVICE_PROTO_SETUP_CHANNEL_RESP;
     if ((result=sf_server_expect_body_length(response,
-                    SF_TASK_BODY_LENGTH(task),
+                    SF_RECV_BODY_LENGTH(task),
                     sizeof(SFProtoSetupChannelReq))) != 0)
     {
         return result;
     }
 
-    req = (SFProtoSetupChannelReq *)(task->data + sizeof(SFCommonProtoHeader));
+    req = (SFProtoSetupChannelReq *)SF_PROTO_RECV_BODY(task);
     channel_id = buff2int(req->channel_id);
     key = buff2int(req->key);
     if (*channel != NULL) {
@@ -76,12 +73,11 @@ int sf_server_deal_setup_channel(struct fast_task_info *task,
     }
     *task_type = SF_SERVER_TASK_TYPE_CHANNEL_HOLDER;
 
-    resp = (SFProtoSetupChannelResp *)(task->data +
-            sizeof(SFCommonProtoHeader));
+    resp = (SFProtoSetupChannelResp *)SF_PROTO_SEND_BODY(task);
     int2buff((*channel)->id, resp->channel_id);
     int2buff((*channel)->key, resp->key);
     int2buff(server_id, resp->server_id);
-    int2buff(task->size, resp->buffer_size);
+    int2buff(task->send.ptr->size, resp->buffer_size);
     response->header.body_len = sizeof(SFProtoSetupChannelResp);
     return 0;
 }
@@ -135,19 +131,19 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     SFProtoReportReqReceiptBody *body_part;
     SFProtoReportReqReceiptBody *body_end;
 
+    response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     if ((result=check_holder_channel(task_type, channel, response)) != 0) {
         return result;
     }
 
-    body_len = SF_TASK_BODY_LENGTH(task);
+    body_len = SF_RECV_BODY_LENGTH(task);
     if ((result=sf_server_check_min_body_length(response, body_len,
                     sizeof(SFProtoReportReqReceiptHeader))) != 0)
     {
         return result;
     }
 
-    body_header = (SFProtoReportReqReceiptHeader *)
-    (task->data + sizeof(SFCommonProtoHeader));
+    body_header = (SFProtoReportReqReceiptHeader *)SF_PROTO_RECV_BODY(task);
     count = buff2int(body_header->count);
     calc_body_len = sizeof(SFProtoReportReqReceiptHeader) +
         sizeof(SFProtoReportReqReceiptBody) * count;
@@ -169,7 +165,6 @@ int sf_server_deal_report_req_receipt(struct fast_task_info *task,
     }
 
     //logInfo("receipt count: %d, success: %d", count, success);
-    response->header.cmd = SF_SERVICE_PROTO_REPORT_REQ_RECEIPT_RESP;
     return 0;
 }
 
@@ -220,7 +215,7 @@ int sf_server_deal_rebind_channel(struct fast_task_info *task,
     SFProtoRebindChannelReq *req;
 
     if ((result=sf_server_expect_body_length(response,
-                    SF_TASK_BODY_LENGTH(task),
+                    SF_RECV_BODY_LENGTH(task),
                     sizeof(SFProtoRebindChannelReq))) != 0)
     {
         return result;
@@ -240,7 +235,7 @@ int sf_server_deal_rebind_channel(struct fast_task_info *task,
     }
     idempotency_channel_release(*channel, false);
 
-    req = (SFProtoRebindChannelReq *)(task->data + sizeof(SFCommonProtoHeader));
+    req = (SFProtoRebindChannelReq *)SF_PROTO_RECV_BODY(task);
     channel_id = buff2int(req->channel_id);
     key = buff2int(req->key);
     *channel = idempotency_channel_find_and_hold(channel_id, key, &result);

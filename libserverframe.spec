@@ -2,7 +2,7 @@
 %define CommitVersion %(echo $COMMIT_VERSION)
 
 Name: libserverframe
-Version: 1.1.29
+Version: 1.2.0
 Release: 1%{?dist}
 Summary: network framework library
 License: AGPL v3.0
@@ -10,11 +10,11 @@ Group: Arch/Tech
 URL:  http://github.com/happyfish100/libserverframe/
 Source: http://github.com/happyfish100/libserverframe/%{name}-%{version}.tar.gz
 
-BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n) 
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires: libfastcommon-devel >= 1.0.69
+BuildRequires: libfastcommon-devel >= 1.0.70
 Requires: %__cp %__mv %__chmod %__grep %__mkdir %__install %__id
-Requires: libfastcommon >= 1.0.69
+Requires: libfastcommon >= 1.0.70
 
 %description
 common framework library 

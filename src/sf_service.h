@@ -41,11 +41,12 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_set_body_length_callback set_body_length_func,
         sf_alloc_recv_buffer_callback alloc_recv_buffer_func,
         sf_send_done_callback send_done_callback,
-        sf_deal_task_func deal_func, TaskCleanUpCallback task_cleanup_func,
+        sf_deal_task_callback deal_func, TaskCleanUpCallback task_cleanup_func,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
-        const int proto_header_size, const int task_arg_size,
-        TaskInitCallback init_callback, sf_release_buffer_callback
-        release_buffer_callback);
+        const int proto_header_size, const int task_padding_size,
+        const int task_arg_size, const bool double_buffers,
+        const bool explicit_post_recv, TaskInitCallback init_callback,
+        sf_release_buffer_callback release_buffer_callback);
 
 #define sf_service_init_ex(sf_context, name, alloc_thread_extra_data_callback,\
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -55,16 +56,17 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         thread_loop_callback, accept_done_callback, set_body_length_func,     \
         NULL, send_done_callback, deal_func, task_cleanup_func, \
         timeout_callback, net_timeout_ms, proto_header_size, \
-        task_arg_size, NULL, NULL)
+        0, task_arg_size, false, false, NULL, NULL)
 
 #define sf_service_init(name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
         send_done_callback, deal_func, task_cleanup_func, timeout_callback, \
         net_timeout_ms, proto_header_size, task_arg_size) \
-    sf_service_init_ex2(&g_sf_context, name, alloc_thread_extra_data_callback,  \
-        thread_loop_callback, accept_done_callback, set_body_length_func, NULL, \
+    sf_service_init_ex2(&g_sf_context, name, alloc_thread_extra_data_callback, \
+        thread_loop_callback, accept_done_callback, set_body_length_func, NULL,\
         send_done_callback, deal_func, task_cleanup_func, timeout_callback, \
-        net_timeout_ms, proto_header_size, task_arg_size, NULL, NULL)
+        net_timeout_ms, proto_header_size, 0, task_arg_size, false, false,  \
+        NULL, NULL)
 
 int sf_service_destroy_ex(SFContext *sf_context);
 
@@ -76,12 +78,37 @@ void sf_service_set_thread_loop_callback_ex(SFContext *sf_context,
 #define sf_service_set_thread_loop_callback(thread_loop_callback) \
     sf_service_set_thread_loop_callback_ex(&g_sf_context, thread_loop_callback)
 
+static inline void sf_service_set_smart_polling_ex(SFContext *sf_context,
+        const FCSmartPollingConfig *smart_polling)
+{
+    sf_context->smart_polling = *smart_polling;
+}
+#define sf_service_set_smart_polling(smart_polling) \
+    sf_service_set_smart_polling_ex(&g_sf_context, smart_polling)
+
+static inline void sf_service_set_connect_need_log_ex(
+        SFContext *sf_context, const bool need_log)
+{
+    sf_context->connect_need_log = need_log;
+}
+#define sf_service_set_connect_need_log(need_log) \
+    sf_service_set_connect_need_log_ex(&g_sf_context, need_log)
+
+
 int sf_setup_signal_handler();
 
 int sf_startup_schedule(pthread_t *schedule_tid);
 int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx);
 
 void sf_set_current_time();
+int sf_global_init(const char *log_filename_prefix);
+
+int sf_socket_create_server(SFListener *listener,
+        int af, const char *bind_addr);
+void sf_socket_close_server(SFListener *listener);
+struct fast_task_info *sf_socket_accept_connection(SFListener *listener);
+
+void sf_socket_close_connection(struct fast_task_info *task);
 
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)
@@ -89,7 +116,7 @@ int sf_socket_server_ex(SFContext *sf_context);
 void sf_socket_close_ex(SFContext *sf_context);
 #define sf_socket_close() sf_socket_close_ex(&g_sf_context)
 
-void sf_accept_loop_ex(SFContext *sf_context, const bool block);
+int sf_accept_loop_ex(SFContext *sf_context, const bool blocked);
 
 #define sf_accept_loop()  sf_accept_loop_ex(&g_sf_context, true)
 
@@ -123,12 +150,13 @@ void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
 int sf_init_task(struct fast_task_info *task);
 
-static inline struct fast_task_info *sf_alloc_init_task(
-        SFContext *sf_context, const int sock)
+static inline struct fast_task_info *sf_alloc_init_task_ex(
+        SFNetworkHandler *handler, const int fd,
+        const int reffer_count)
 {
     struct fast_task_info *task;
 
-    task = free_queue_pop();
+    task = free_queue_pop(&handler->ctx->free_queue);
     if (task == NULL) {
         logError("file: "__FILE__", line: %d, "
                 "malloc task buff failed, you should "
@@ -136,15 +164,16 @@ static inline struct fast_task_info *sf_alloc_init_task(
                 __LINE__);
         return NULL;
     }
-    __sync_add_and_fetch(&task->reffer_count, 1);
-    __sync_bool_compare_and_swap(&task->canceled, 1, 0);
-    task->ctx = sf_context;
-    task->event.fd = sock;
 
+    __sync_add_and_fetch(&task->reffer_count, reffer_count);
+    __sync_bool_compare_and_swap(&task->canceled, 1, 0);
+    task->handler = handler;
+    task->event.fd = fd;
     return task;
 }
 
 #define sf_hold_task(task) __sync_add_and_fetch(&task->reffer_count, 1)
+#define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
 
 static inline void sf_release_task(struct fast_task_info *task)
 {
@@ -166,6 +195,60 @@ bool checkHostHasIPv4Addr();
 
 // 判断当前服务器是否存在IPv6地址
 bool checkHostHasIPv6Addr();
+
+static inline SFNetworkHandler *sf_get_first_network_handler_ex(
+        SFContext *sf_context)
+{
+    SFNetworkHandler *handler;
+    SFNetworkHandler *end;
+
+    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
+    for (handler=sf_context->handlers; handler<end; handler++) {
+        if (handler->enabled) {
+            return handler;
+        }
+    }
+
+    return NULL;
+}
+#define sf_get_first_network_handler() \
+    sf_get_first_network_handler_ex(&g_sf_context)
+
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler(
+        SFContext *sf_context)
+{
+    SFNetworkHandler *handler;
+
+    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+    return (handler->enabled ? handler : NULL);
+}
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler2(
+        SFContext *sf_context1, SFContext *sf_context2)
+{
+    SFNetworkHandler *handler;
+
+    if ((handler=sf_get_rdma_network_handler(sf_context1)) != NULL) {
+        return handler;
+    }
+    return sf_get_rdma_network_handler(sf_context2);
+}
+
+static inline SFNetworkHandler *sf_get_rdma_network_handler3(
+        SFContext *sf_context1, SFContext *sf_context2,
+        SFContext *sf_context3)
+{
+    SFNetworkHandler *handler;
+
+    if ((handler=sf_get_rdma_network_handler(sf_context1)) != NULL) {
+        return handler;
+    }
+    if ((handler=sf_get_rdma_network_handler(sf_context2)) != NULL) {
+        return handler;
+    }
+    return sf_get_rdma_network_handler(sf_context3);
+}
 
 #ifdef __cplusplus
 }

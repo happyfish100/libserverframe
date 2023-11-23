@@ -89,8 +89,18 @@
         int2buff((resp_header).body_len, (proto_header)->body_len);\
     } while (0)
 
-#define SF_PROTO_RESP_BODY(task)  \
-    (task->data + sizeof(SFCommonProtoHeader))
+
+#define SF_PROTO_SEND_BODY(task)  \
+    (task->send.ptr->data + sizeof(SFCommonProtoHeader))
+
+#define SF_PROTO_RECV_BODY(task) \
+    (task->recv.ptr->data + sizeof(SFCommonProtoHeader))
+
+#define SF_RECV_BODY_LENGTH(task) \
+    (task->recv.ptr->length - sizeof(SFCommonProtoHeader))
+
+#define SF_SEND_BUFF_END(task) (task->send.ptr->data + task->send.ptr->size)
+#define SF_RECV_BUFF_END(task) (task->recv.ptr->data + task->recv.ptr->size)
 
 #define SF_PROTO_UPDATE_EXTRA_BODY_SIZE \
     sizeof(SFProtoIdempotencyAdditionalHeader) + FCFS_AUTH_SESSION_ID_LEN
@@ -280,7 +290,17 @@ int sf_proto_set_body_length(struct fast_task_info *task);
 const char *sf_get_cmd_caption(const int cmd);
 
 int sf_proto_deal_task_done(struct fast_task_info *task,
-        SFCommonTaskContext *ctx);
+        const char *service_name, SFCommonTaskContext *ctx);
+
+static inline void sf_proto_init_task_magic(struct fast_task_info *task)
+{
+    SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                task->send.ptr->data)->magic);
+    if (task->recv.ptr != task->send.ptr) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+}
 
 static inline void sf_proto_init_task_context(struct fast_task_info *task,
         SFCommonTaskContext *ctx)
@@ -295,16 +315,115 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     ctx->response_done = false;
     ctx->need_response = true;
 
-    ctx->request.header.cmd = ((SFCommonProtoHeader *)task->data)->cmd;
-    ctx->request.header.body_len = task->length - sizeof(SFCommonProtoHeader);
+    ctx->request.header.cmd = ((SFCommonProtoHeader *)
+            task->recv.ptr->data)->cmd;
+    ctx->request.header.body_len = SF_RECV_BODY_LENGTH(task);
     ctx->request.header.status = buff2short(((SFCommonProtoHeader *)
-                task->data)->status);
+                task->recv.ptr->data)->status);
     if (task->recv_body != NULL) {
         ctx->request.body = task->recv_body;
     } else {
-        ctx->request.body = task->data + sizeof(SFCommonProtoHeader);
+        ctx->request.body = SF_PROTO_RECV_BODY(task);
     }
 }
+
+/* task send and recv buffer operations */
+static inline int sf_set_task_send_buffer_size(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_set_buffer_size(task, task->send.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_recv_buffer_size(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_set_buffer_size(task, task->recv.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_send_max_buffer_size(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_set_max_buffer_size(task, task->send.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_set_task_recv_max_buffer_size(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_set_max_buffer_size(task, task->recv.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_send_buffer(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_realloc_buffer(task, task->send.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_recv_buffer(
+        struct fast_task_info *task, const int expect_size)
+{
+    int result;
+    if ((result=free_queue_realloc_buffer(task, task->recv.ptr,
+                    expect_size)) == 0)
+    {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_send_max_buffer(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_realloc_max_buffer(task, task->send.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->send.ptr->data)->magic);
+    }
+    return result;
+}
+
+static inline int sf_realloc_task_recv_max_buffer(
+        struct fast_task_info *task)
+{
+    int result;
+    if ((result=free_queue_realloc_max_buffer(task, task->recv.ptr)) == 0) {
+        SF_PROTO_SET_MAGIC(((SFCommonProtoHeader *)
+                    task->recv.ptr->data)->magic);
+    }
+    return result;
+}
+
 
 static inline void sf_log_network_error_ex1(SFResponseInfo *response,
         const ConnectionInfo *conn, const char *service_name,
@@ -475,6 +594,27 @@ static inline void sf_free_recv_buffer(SFProtoRecvBuffer *buffer)
     }
 }
 
+static inline int sf_proto_send_buf1(ConnectionInfo *conn, char *data,
+        const int len, SFResponseInfo *response, const int network_timeout)
+{
+    int result;
+
+    if (conn->comm_type == fc_comm_type_rdma) {
+        result = G_RDMA_CONNECTION_CALLBACKS.request_by_buf1(
+                conn, data, len, network_timeout * 1000);
+    } else {
+        result = tcpsenddata_nb(conn->sock, data, len, network_timeout);
+    }
+    if (result != 0) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "send data fail, errno: %d, error info: %s",
+                result, STRERROR(result));
+    }
+
+    return result;
+}
+
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
         const int len, SFResponseInfo *response, const int network_timeout);
 
@@ -535,16 +675,27 @@ int sf_send_and_recv_vary_response(ConnectionInfo *conn,
         const int network_timeout, const unsigned char expect_cmd,
         SFProtoRecvBuffer *buffer, const int min_body_len);
 
-static inline void sf_proto_extract_header(const SFCommonProtoHeader
-        *header_proto, SFHeaderInfo *header_info)
+static inline int sf_proto_parse_header(const SFCommonProtoHeader
+        *header_proto, SFResponseInfo *response)
 {
-    header_info->cmd = header_proto->cmd;
-    header_info->body_len = buff2int(header_proto->body_len);
-    header_info->flags = buff2short(header_proto->flags);
-    header_info->status = buff2short(header_proto->status);
-    if (header_info->status > 255) {
-        header_info->status = sf_localize_errno(header_info->status);
+    if (!SF_PROTO_CHECK_MAGIC(header_proto->magic)) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
+                "expect: "SF_PROTO_MAGIC_FORMAT,
+                SF_PROTO_MAGIC_PARAMS(header_proto->magic),
+                SF_PROTO_MAGIC_EXPECT_PARAMS);
+        return EINVAL;
     }
+
+    response->header.cmd = header_proto->cmd;
+    response->header.body_len = buff2int(header_proto->body_len);
+    response->header.flags = buff2short(header_proto->flags);
+    response->header.status = buff2short(header_proto->status);
+    if (response->header.status > 255) {
+        response->header.status = sf_localize_errno(response->header.status);
+    }
+    return 0;
 }
 
 static inline void sf_proto_pack_limit(const SFListLimitInfo

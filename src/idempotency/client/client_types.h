@@ -63,6 +63,15 @@ typedef struct idempotency_receipt_thread_context {
     } last_check_times;
 } IdempotencyReceiptThreadContext;
 
+typedef struct idempotency_receipt_global_vars {
+    struct {
+        int task_padding_size;
+        sf_init_connection_callback init_connection;
+        struct ibv_pd *pd;
+    } rdma;
+    IdempotencyReceiptThreadContext *thread_contexts;
+} IdempotencyReceiptGlobalVars;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -34,30 +34,120 @@
 #define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
 #define SF_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
+#define SF_NETWORK_HANDLER_COUNT          2
+#define SF_SOCKET_NETWORK_HANDLER_INDEX   0
+#define SF_RDMACM_NETWORK_HANDLER_INDEX   1
+
 typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
         const in_addr_64_t client_addr, const bool bInnerPort);
 typedef int (*sf_set_body_length_callback)(struct fast_task_info *task);
 typedef char *(*sf_alloc_recv_buffer_callback)(struct fast_task_info *task,
         const int buff_size, bool *new_alloc);
-typedef int (*sf_deal_task_func)(struct fast_task_info *task, const int stage);
+typedef int (*sf_deal_task_callback)(struct fast_task_info *task, const int stage);
 typedef int (*sf_recv_timeout_callback)(struct fast_task_info *task);
 typedef int (*sf_send_done_callback)(struct fast_task_info *task,
-        const int length);
+        const int length, int *next_stage);
+typedef void (*sf_connect_done_callback)(struct fast_task_info *task,
+        const int err_no);
 
 /* calback for release iovec buffer */
 typedef void (*sf_release_buffer_callback)(struct fast_task_info *task);
 
 typedef int (*sf_error_handler_callback)(const int errnum);
 
+typedef enum {
+    sf_comm_action_continue = 'c',
+    sf_comm_action_break = 'b',
+    sf_comm_action_finish = 'f'
+} SFCommAction;
+
+struct ibv_pd;
+struct sf_listener;
+
+typedef int (*sf_get_connection_size_callback)();
+typedef int (*sf_init_connection_callback)(
+        struct fast_task_info *task, void *arg);
+#define sf_alloc_pd_callback fc_alloc_pd_callback
+
+typedef int (*sf_create_server_callback)(struct sf_listener
+        *listener, int af, const char *bind_addr);
+typedef void (*sf_close_server_callback)(struct sf_listener *listener);
+typedef struct fast_task_info * (*sf_accept_connection_callback)(
+        struct sf_listener *listener);
+typedef int (*sf_async_connect_server_callback)(struct fast_task_info *task);
+typedef int (*sf_async_connect_check_callback)(struct fast_task_info *task);
+typedef void (*sf_close_connection_callback)(struct fast_task_info *task);
+
+typedef ssize_t (*sf_send_data_callback)(struct fast_task_info *task,
+        SFCommAction *action, bool *send_done);
+typedef ssize_t (*sf_recv_data_callback)(struct fast_task_info *task,
+        const bool call_post_recv, SFCommAction *action);
+typedef int (*sf_post_recv_callback)(struct fast_task_info *task);
+
+struct sf_network_handler;
+typedef struct sf_listener {
+    struct sf_network_handler *handler;
+    int port;
+    bool enabled;
+    bool is_inner;
+    union {
+        int sock;  //for socket
+        void *id;  //for rdma_cm
+    };
+    struct sockaddr_in inaddr;  //for accept
+} SFListener;
+
+struct sf_context;
+typedef struct sf_network_handler {
+    bool enabled;
+    bool explicit_post_recv;
+    FCCommunicationType comm_type;
+    struct sf_context *ctx;
+    struct ibv_pd *pd;
+
+    SFListener inner;
+    SFListener outer;
+
+    /* for server side */
+    sf_get_connection_size_callback get_connection_size;
+    sf_init_connection_callback init_connection;
+    sf_alloc_pd_callback alloc_pd;
+    sf_create_server_callback create_server;
+    sf_close_server_callback close_server;
+    sf_accept_connection_callback accept_connection;
+
+    /* for client side */
+    sf_async_connect_server_callback async_connect_server;
+    sf_async_connect_check_callback  async_connect_check;
+
+    /* server and client both */
+    sf_close_connection_callback close_connection;
+
+    sf_send_data_callback send_data;
+    sf_recv_data_callback recv_data;
+    sf_post_recv_callback post_recv;  //for rdma
+} SFNetworkHandler;
+
+typedef struct sf_nio_callbacks {
+    TaskCleanUpCallback task_cleanup;
+    sf_deal_task_callback deal_task;
+    sf_set_body_length_callback set_body_length;
+    sf_alloc_recv_buffer_callback alloc_recv_buffer;
+    sf_accept_done_callback accept_done;
+    sf_connect_done_callback connect_done;
+    sf_send_done_callback send_done;
+    sf_recv_timeout_callback task_timeout;
+    sf_release_buffer_callback release_buffer;
+} SFNIOCallbacks;
+
 typedef struct sf_context {
     char name[64];
     struct nio_thread_data *thread_data;
     volatile int thread_count;
-    int outer_sock;
-    int inner_sock;
 
-    int outer_port;
-    int inner_port;
+    //int rdma_port_offset;
+    SFNetworkHandler handlers[SF_NETWORK_HANDLER_COUNT];
+
     int accept_threads;
     int work_threads;
 
@@ -67,14 +157,11 @@ typedef struct sf_context {
     int header_size;
     bool remove_from_ready_list;
     bool realloc_task_buffer;
-    sf_deal_task_func deal_task;
-    sf_set_body_length_callback set_body_length;
-    sf_alloc_recv_buffer_callback alloc_recv_buffer;
-    sf_accept_done_callback accept_done_func;
-    sf_send_done_callback send_done_callback;
-    TaskCleanUpCallback task_cleanup_func;
-    sf_recv_timeout_callback timeout_callback;
-    sf_release_buffer_callback release_buffer_callback;
+    bool connect_need_log;  //for client connect
+    FCSmartPollingConfig smart_polling;
+
+    SFNIOCallbacks callbacks;
+    struct fast_task_queue free_queue;
 } SFContext;
 
 typedef struct {

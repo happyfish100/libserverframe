@@ -49,10 +49,13 @@ typedef struct sf_global_variables {
     int thread_stack_size;
 
     time_t up_time;
-    gid_t run_by_gid;
-    uid_t run_by_uid;
-    char run_by_group[32];
-    char run_by_user[32];
+    struct {
+        bool inited;
+        gid_t gid;
+        uid_t uid;
+        char group[32];
+        char user[32];
+    } run_by;
 
     SFLogConfig error_log;
     SFConnectionStat connection_stat;
@@ -66,6 +69,7 @@ typedef struct sf_context_ini_config {
     int default_inner_port;
     int default_outer_port;
     int default_work_threads;
+    FCCommunicationType comm_type;
     const char *max_pkg_size_item_name;
 } SFContextIniConfig;
 
@@ -84,9 +88,12 @@ extern SFContext                 g_sf_context;
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
 #define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
+#define SF_G_UP_TIME             g_sf_global_vars.up_time
 
-#define SF_G_OUTER_PORT          g_sf_context.outer_port
-#define SF_G_INNER_PORT          g_sf_context.inner_port
+#define SF_G_SOCK_HANDLER        (g_sf_context.handlers + \
+        SF_SOCKET_NETWORK_HANDLER_INDEX)
+#define SF_G_OUTER_PORT          SF_G_SOCK_HANDLER->outer.port
+#define SF_G_INNER_PORT          SF_G_SOCK_HANDLER->inner.port
 #define SF_G_OUTER_BIND_ADDR     g_sf_context.outer_bind_addr
 #define SF_G_INNER_BIND_ADDR     g_sf_context.inner_bind_addr
 
@@ -110,19 +117,20 @@ extern SFContext                 g_sf_context;
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
     do { \
-    if (!(g_sf_global_vars.run_by_gid == current_gid && \
-                g_sf_global_vars.run_by_uid == current_uid)) \
-    { \
-        if (chown(path, g_sf_global_vars.run_by_uid, \
-                    g_sf_global_vars.run_by_gid) != 0) \
+        if (g_sf_global_vars.run_by.inited && !(g_sf_global_vars.  \
+                    run_by.gid == current_gid && g_sf_global_vars. \
+                    run_by.uid == current_uid)) \
         { \
-            logError("file: "__FILE__", line: %d, " \
-                "chown \"%s\" fail, " \
-                "errno: %d, error info: %s", \
-                __LINE__, path, errno, STRERROR(errno)); \
-            return errno != 0 ? errno : EPERM; \
+            if (chown(path, g_sf_global_vars.run_by.uid, \
+                        g_sf_global_vars.run_by.gid) != 0) \
+            { \
+                logError("file: "__FILE__", line: %d, " \
+                        "chown \"%s\" fail, " \
+                        "errno: %d, error info: %s", \
+                        __LINE__, path, errno, STRERROR(errno)); \
+                return errno != 0 ? errno : EPERM; \
+            } \
         } \
-    } \
     } while (0)
 
 #define SF_CHOWN_TO_RUNBY_RETURN_ON_ERROR(path) \
@@ -131,74 +139,82 @@ extern SFContext                 g_sf_context;
 
 #define SF_FCHOWN_RETURN_ON_ERROR(fd, path, current_uid, current_gid) \
     do { \
-    if (!(g_sf_global_vars.run_by_gid == current_gid && \
-                g_sf_global_vars.run_by_uid == current_uid)) \
-    { \
-        if (fchown(fd, g_sf_global_vars.run_by_uid, \
-                    g_sf_global_vars.run_by_gid) != 0) \
+        if (g_sf_global_vars.run_by.inited && !(g_sf_global_vars.  \
+                    run_by.gid == current_gid && g_sf_global_vars. \
+                    run_by.uid == current_uid)) \
         { \
-            logError("file: "__FILE__", line: %d, " \
-                "fchown \"%s\" fail, " \
-                "errno: %d, error info: %s", \
-                __LINE__, path, errno, STRERROR(errno)); \
-            return errno != 0 ? errno : EPERM; \
+            if (fchown(fd, g_sf_global_vars.run_by.uid, \
+                        g_sf_global_vars.run_by.gid) != 0) \
+            { \
+                logError("file: "__FILE__", line: %d, " \
+                        "fchown \"%s\" fail, " \
+                        "errno: %d, error info: %s", \
+                        __LINE__, path, errno, STRERROR(errno)); \
+                return errno != 0 ? errno : EPERM; \
+            } \
         } \
-    } \
     } while (0)
 
 #define SF_FCHOWN_TO_RUNBY_RETURN_ON_ERROR(fd, path) \
     SF_FCHOWN_RETURN_ON_ERROR(fd, path, geteuid(), getegid())
 
-#define SF_SET_CONTEXT_INI_CONFIG_EX(config, filename, pIniContext,     \
-        section_name, def_inner_port, def_outer_port, def_work_threads, \
-        max_pkg_size_item_nm) \
+#define SF_SET_CONTEXT_INI_CONFIG_EX(config, the_comm_type, filename,   \
+        pIniContext, section_name, def_inner_port, def_outer_port, \
+        def_work_threads, max_pkg_size_item_nm) \
     do { \
         FAST_INI_SET_FULL_CTX_EX(config.ini_ctx, filename, \
                 section_name, pIniContext);   \
+        config.comm_type = the_comm_type; \
         config.default_inner_port = def_inner_port; \
         config.default_outer_port = def_outer_port; \
         config.default_work_threads = def_work_threads; \
         config.max_pkg_size_item_name = max_pkg_size_item_nm; \
     } while (0)
 
-#define SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext, \
-        section_name, def_inner_port, def_outer_port, def_work_threads) \
-     SF_SET_CONTEXT_INI_CONFIG_EX(config, filename, pIniContext,     \
-        section_name, def_inner_port, def_outer_port, def_work_threads, \
-        "max_pkg_size")
+#define SF_SET_CONTEXT_INI_CONFIG(config, the_comm_type,     \
+        filename, pIniContext, section_name, def_inner_port, \
+        def_outer_port, def_work_threads) \
+     SF_SET_CONTEXT_INI_CONFIG_EX(config, the_comm_type, filename, \
+             pIniContext, section_name, def_inner_port, def_outer_port, \
+             def_work_threads, "max_pkg_size")
 
-int sf_load_global_config_ex(const char *server_name,
+int sf_load_global_config_ex(const char *log_filename_prefix,
         IniFullContext *ini_ctx, const bool load_network_params,
-        const char *max_pkg_size_item_nm, const int task_buffer_extra_size,
-        const bool need_set_run_by);
+        const char *max_pkg_size_item_nm, const int fixed_buff_size,
+        const int task_buffer_extra_size, const bool need_set_run_by);
 
-static inline int sf_load_global_config(const char *server_name,
+static inline int sf_load_global_config(const char *log_filename_prefix,
         IniFullContext *ini_ctx)
 {
     const bool load_network_params = true;
     const char *max_pkg_size_item_nm = "max_pkg_size";
+    const int fixed_buff_size = 0;
     const int task_buffer_extra_size = 0;
     const bool need_set_run_by = true;
 
-    return sf_load_global_config_ex(server_name, ini_ctx, load_network_params,
-            max_pkg_size_item_nm, task_buffer_extra_size, need_set_run_by);
+    return sf_load_global_config_ex(log_filename_prefix, ini_ctx,
+            load_network_params, max_pkg_size_item_nm, fixed_buff_size,
+            task_buffer_extra_size, need_set_run_by);
 }
 
-int sf_load_config_ex(const char *server_name, SFContextIniConfig *config,
+int sf_load_config_ex(const char *log_filename_prefix,
+        SFContextIniConfig *config, const int fixed_buff_size,
         const int task_buffer_extra_size, const bool need_set_run_by);
 
-static inline int sf_load_config(const char *server_name,
+static inline int sf_load_config(const char *log_filename_prefix,
+        const FCCommunicationType comm_type,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
-        const int default_outer_port, const int task_buffer_extra_size)
+        const int default_outer_port, const int fixed_buff_size,
+        const int task_buffer_extra_size)
 {
     const bool need_set_run_by = true;
     SFContextIniConfig config;
 
-    SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext,
+    SF_SET_CONTEXT_INI_CONFIG(config, comm_type, filename, pIniContext,
             section_name, default_inner_port, default_outer_port,
             DEFAULT_WORK_THREADS);
-    return sf_load_config_ex(server_name, &config,
+    return sf_load_config_ex(log_filename_prefix, &config, fixed_buff_size,
             task_buffer_extra_size, need_set_run_by);
 }
 
@@ -206,17 +222,21 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         SFContextIniConfig *config);
 
 static inline int sf_load_context_from_config(SFContext *sf_context,
+        const FCCommunicationType comm_type,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
         const int default_outer_port)
 {
     SFContextIniConfig config;
 
-    SF_SET_CONTEXT_INI_CONFIG(config, filename, pIniContext,
+    SF_SET_CONTEXT_INI_CONFIG(config, comm_type, filename, pIniContext,
             section_name, default_inner_port, default_outer_port,
             DEFAULT_WORK_THREADS);
     return sf_load_context_from_config_ex(sf_context, &config);
 }
+
+int sf_alloc_rdma_pd(SFContext *sf_context,
+        FCAddressPtrArray *address_array);
 
 int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
         SFLogConfig *log_cfg);

@@ -30,18 +30,20 @@ int sf_proto_set_body_length(struct fast_task_info *task)
 {
     SFCommonProtoHeader *header;
 
-    header = (SFCommonProtoHeader *)task->data;
+    header = (SFCommonProtoHeader *)task->recv.ptr->data;
     if (!SF_PROTO_CHECK_MAGIC(header->magic)) {
         logError("file: "__FILE__", line: %d, "
-                "peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT
-                " is invalid, expect: "SF_PROTO_MAGIC_FORMAT,
-                __LINE__, task->client_ip, task->port,
+                "%s peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
+                "expect: "SF_PROTO_MAGIC_FORMAT", cmd: %d, body length: %d",
+                __LINE__, (task->handler != NULL ? task->handler->ctx->name :
+                    ""), task->client_ip, task->port,
                 SF_PROTO_MAGIC_PARAMS(header->magic),
-                SF_PROTO_MAGIC_EXPECT_PARAMS);
+                SF_PROTO_MAGIC_EXPECT_PARAMS, header->cmd,
+                buff2int(header->body_len));
         return EINVAL;
     }
 
-    task->length = buff2int(header->body_len); //set body length
+    task->recv.ptr->length = buff2int(header->body_len); //set body length
     return 0;
 }
 
@@ -70,8 +72,14 @@ int sf_check_response(ConnectionInfo *conn, SFResponseInfo *response,
             response->error.length = response->header.body_len;
         }
 
-        if ((result=tcprecvdata_nb_ex(conn->sock, response->error.message,
-                response->error.length, network_timeout, &recv_bytes)) == 0)
+        if (conn->comm_type == fc_comm_type_rdma) {
+            memcpy(response->error.message, G_RDMA_CONNECTION_CALLBACKS.
+                    get_recv_buffer(conn)->buff + sizeof(SFCommonProtoHeader),
+                    response->error.length);
+            response->error.message[response->error.length] = '\0';
+        } else if ((result=tcprecvdata_nb_ex(conn->sock, response->
+                        error.message, response->error.length,
+                        network_timeout, &recv_bytes)) == 0)
         {
             response->error.message[response->error.length] = '\0';
         } else {
@@ -96,30 +104,48 @@ static inline int sf_recv_response_header(ConnectionInfo *conn,
         SFResponseInfo *response, const int network_timeout)
 {
     int result;
+    BufferInfo *buffer;
     SFCommonProtoHeader header_proto;
 
-    if ((result=tcprecvdata_nb(conn->sock, &header_proto,
-            sizeof(SFCommonProtoHeader), network_timeout)) != 0)
-    {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "recv data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
-        return result;
-    }
+    if (conn->comm_type == fc_comm_type_rdma) {
+        buffer = G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn);
+        if (buffer->length < sizeof(SFCommonProtoHeader)) {
+            response->error.length = sprintf(response->error.message,
+                    "recv pkg length: %d < header size: %d",
+                    buffer->length, (int)sizeof(SFCommonProtoHeader));
+            return EINVAL;
+        }
 
-    if (!SF_PROTO_CHECK_MAGIC(header_proto.magic)) {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
-                "expect: "SF_PROTO_MAGIC_FORMAT,
-                SF_PROTO_MAGIC_PARAMS(header_proto.magic),
-                SF_PROTO_MAGIC_EXPECT_PARAMS);
-        return EINVAL;
-    }
+        if ((result=sf_proto_parse_header((SFCommonProtoHeader *)
+                        buffer->buff, response)) != 0)
+        {
+            return result;
+        }
 
-    sf_proto_extract_header(&header_proto, &response->header);
-    return 0;
+        if (buffer->length != (sizeof(SFCommonProtoHeader) +
+                    response->header.body_len))
+        {
+            response->error.length = snprintf(response->error.message,
+                    sizeof(response->error.message),
+                    "recv package length: %d != calculate: %d",
+                    buffer->length, (int)(sizeof(SFCommonProtoHeader) +
+                        response->header.body_len));
+            return EINVAL;
+        }
+
+        return 0;
+    } else {
+        if ((result=tcprecvdata_nb(conn->sock, &header_proto,
+                        sizeof(SFCommonProtoHeader), network_timeout)) != 0)
+        {
+            response->error.length = snprintf(response->error.message,
+                    sizeof(response->error.message),
+                    "recv data fail, errno: %d, error info: %s",
+                    result, STRERROR(result));
+            return result;
+        }
+        return sf_proto_parse_header(&header_proto, response);
+    }
 }
 
 int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
@@ -127,11 +153,9 @@ int sf_send_and_recv_response_header(ConnectionInfo *conn, char *data,
 {
     int result;
 
-    if ((result=tcpsenddata_nb(conn->sock, data, len, network_timeout)) != 0) {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "send data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
+    if ((result=sf_proto_send_buf1(conn, data, len,
+                    response, network_timeout)) != 0)
+    {
         return result;
     }
 
@@ -194,7 +218,10 @@ int sf_send_and_recv_response_ex(ConnectionInfo *conn, char *send_data,
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -234,7 +261,11 @@ int sf_send_and_recv_response_ex1(ConnectionInfo *conn, char *send_data,
         return EOVERFLOW;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
+        *body_len = response->header.body_len;
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, response->
                     header.body_len, network_timeout, body_len)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -275,7 +306,10 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
         return 0;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(recv_data, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, recv_data, expect_body_len,
                     network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -343,7 +377,10 @@ int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
         buffer->alloc_size = alloc_size;
     }
 
-    if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
+    if (conn->comm_type == fc_comm_type_rdma) {
+        memcpy(buffer->buff, G_RDMA_CONNECTION_CALLBACKS.get_recv_buffer(conn)->
+                buff + sizeof(SFCommonProtoHeader), response->header.body_len);
+    } else if ((result=tcprecvdata_nb_ex(conn->sock, buffer->buff, response->
                     header.body_len, network_timeout, &recv_bytes)) != 0)
     {
         response->error.length = snprintf(response->error.message,
@@ -364,13 +401,9 @@ int sf_send_and_recv_vary_response(ConnectionInfo *conn,
 {
     int result;
 
-    if ((result=tcpsenddata_nb(conn->sock, send_data,
-                    send_len, network_timeout)) != 0)
+    if ((result=sf_proto_send_buf1(conn, send_data, send_len,
+                    response, network_timeout)) != 0)
     {
-        response->error.length = snprintf(response->error.message,
-                sizeof(response->error.message),
-                "send data fail, errno: %d, error info: %s",
-                result, STRERROR(result));
         return result;
     }
 
@@ -577,6 +610,7 @@ int sf_proto_get_leader(ConnectionInfo *conn, const char *service_name,
         memcpy(leader->conn.ip_addr, server_resp.ip_addr, IP_ADDRESS_SIZE);
         *(leader->conn.ip_addr + IP_ADDRESS_SIZE - 1) = '\0';
         leader->conn.port = buff2short(server_resp.port);
+        leader->conn.comm_type = conn->comm_type;
     }
 
     return result;
@@ -589,7 +623,7 @@ void sf_proto_set_handler_context(const SFHandlerContext *ctx)
 }
 
 int sf_proto_deal_task_done(struct fast_task_info *task,
-        SFCommonTaskContext *ctx)
+        const char *service_name, SFCommonTaskContext *ctx)
 {
     SFCommonProtoHeader *proto_header;
     int status;
@@ -600,10 +634,10 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
 
     if (ctx->log_level != LOG_NOTHING && ctx->response.error.length > 0) {
         log_it_ex(&g_log_context, ctx->log_level,
-                "file: "__FILE__", line: %d, "
+                "file: "__FILE__", line: %d, %s "
                 "peer %s:%u, cmd: %d (%s), req body length: %d, "
-                "resp status: %d, %s", __LINE__, task->client_ip,
-                task->port, ctx->request.header.cmd,
+                "resp status: %d, %s", __LINE__, service_name,
+                task->client_ip, task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.status,
                 ctx->response.error.message);
@@ -614,8 +648,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
             time_used = get_current_time_us() - ctx->req_start_time;
             log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
             log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
-                    "client %s:%u, req cmd: %d (%s), req body_len: %d, "
-                    "resp status: %d, time used: %s us", __LINE__,
+                    "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
+                    "resp status: %d, time used: %s us", __LINE__, service_name,
                     task->client_ip, task->port, ctx->request.header.cmd,
                     GET_CMD_CAPTION(ctx->request.header.cmd),
                     ctx->request.header.body_len, ctx->response.header.status,
@@ -623,18 +657,17 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         }
 
         if (ctx->response.header.status == 0) {
-            task->offset = task->length = 0;
             return sf_set_read_event(task);
         } else {
             return FC_NEGATIVE(ctx->response.header.status);
         }
     }
 
-    proto_header = (SFCommonProtoHeader *)task->data;
+    proto_header = (SFCommonProtoHeader *)task->send.ptr->data;
     if (!ctx->response_done) {
         ctx->response.header.body_len = ctx->response.error.length;
         if (ctx->response.error.length > 0) {
-            memcpy(task->data + sizeof(SFCommonProtoHeader),
+            memcpy(task->send.ptr->data + sizeof(SFCommonProtoHeader),
                     ctx->response.error.message, ctx->response.error.length);
         }
     }
@@ -643,7 +676,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
     short2buff(status, proto_header->status);
     proto_header->cmd = ctx->response.header.cmd;
     int2buff(ctx->response.header.body_len, proto_header->body_len);
-    task->length = sizeof(SFCommonProtoHeader) + ctx->response.header.body_len;
+    task->send.ptr->length = sizeof(SFCommonProtoHeader) +
+        ctx->response.header.body_len;
 
     r = sf_send_add_event(task);
     time_used = get_current_time_us() - ctx->req_start_time;
@@ -653,11 +687,11 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         char buff[256];
         int blen;
 
-        blen = sprintf(buff, "timed used: %s us, client %s:%u, "
+        blen = sprintf(buff, "timed used: %s us, %s client %s:%u, "
                 "req cmd: %d (%s), req body len: %d, resp cmd: %d (%s), "
                 "status: %d, resp body len: %d", long_to_comma_str(time_used,
-                    time_buff), task->client_ip, task->port, ctx->request.
-                header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
+                    time_buff), service_name, task->client_ip, task->port, ctx->
+                request.header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
                 GET_CMD_CAPTION(ctx->response.header.cmd),
                 ctx->response.header.status, ctx->response.header.body_len);
@@ -667,9 +701,9 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
     if (sf_handler_ctx.callbacks.get_cmd_log_level != NULL) {
         log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
         log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
-                "client %s:%u, req cmd: %d (%s), req body_len: %d, "
+                "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
                 "resp cmd: %d (%s), status: %d, resp body_len: %d, "
-                "time used: %s us", __LINE__,
+                "time used: %s us", __LINE__, service_name,
                 task->client_ip, task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
