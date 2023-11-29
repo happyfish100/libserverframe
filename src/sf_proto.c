@@ -35,8 +35,8 @@ int sf_proto_set_body_length(struct fast_task_info *task)
         logError("file: "__FILE__", line: %d, "
                 "%s peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
                 "expect: "SF_PROTO_MAGIC_FORMAT", cmd: %d, body length: %d",
-                __LINE__, (task->handler != NULL ? task->handler->ctx->name :
-                    ""), task->client_ip, task->port,
+                __LINE__, (task->handler != NULL ? task->handler->fh->ctx->
+                    name : ""), task->client_ip, task->port,
                 SF_PROTO_MAGIC_PARAMS(header->magic),
                 SF_PROTO_MAGIC_EXPECT_PARAMS, header->cmd,
                 buff2int(header->body_len));

@@ -30,6 +30,7 @@
 #include "fastcommon/common_define.h"
 #include "fastcommon/shared_func.h"
 #include "fastcommon/process_ctrl.h"
+#include "fastcommon/local_ip_func.h"
 #include "fastcommon/logger.h"
 #include "sf_nio.h"
 #include "sf_service.h"
@@ -46,21 +47,12 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {{'\0'}, NULL, 0,
-    {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}},
-    1, DEFAULT_WORK_THREADS, {'\0'}, {'\0'}, 0, true, true, true,
-    {false, 0, 0}, {sf_task_finish_clean_up}
+SFContext g_sf_context = {{'\0'}, NULL, 0, sf_address_family_auto,
+    {{AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}},
+        {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},
+    1, DEFAULT_WORK_THREADS, 0, true, true, true, {false, 0, 0},
+    {sf_task_finish_clean_up}
 };
-
-static inline void set_config_str_value(const char *value,
-        char *dest, const int dest_size)
-{
-    if (value == NULL) {
-        *dest = '\0';
-    } else {
-        snprintf(dest, dest_size, "%s", value);
-    }
-}
 
 static int load_network_parameters(IniFullContext *ini_ctx,
         const char *max_pkg_size_item_nm, const int fixed_buff_size,
@@ -472,9 +464,9 @@ static int load_rdma_apis(SFNetworkHandler *handler)
 }
 
 static int init_network_handler(SFNetworkHandler *handler,
-        SFContext *sf_context)
+        SFAddressFamilyHandler *fh)
 {
-    handler->ctx = sf_context;
+    handler->fh = fh;
     handler->inner.handler = handler;
     handler->outer.handler = handler;
     handler->inner.is_inner = true;
@@ -501,83 +493,46 @@ static int init_network_handler(SFNetworkHandler *handler,
     }
 }
 
-int sf_load_context_from_config_ex(SFContext *sf_context,
+static void set_bind_address(const char *bind_addr, char *ipv4_bind_addr,
+        char *ipv6_bind_addr, const int addr_size)
+{
+    char new_bind_addr[2 * IP_ADDRESS_SIZE];
+    char *cols[2];
+    char *ip_addr;
+    int count;
+    int len;
+    int i;
+
+    if (bind_addr == NULL || *bind_addr == '\0') {
+        *ipv4_bind_addr = *ipv6_bind_addr = '\0';
+        return;
+    }
+
+    snprintf(new_bind_addr, sizeof(new_bind_addr), "%s", bind_addr);
+    count = splitEx(new_bind_addr, ',', cols, 2);
+    for (i=0; i<count; i++) {
+        ip_addr = cols[i];
+        if (is_ipv6_addr(ip_addr)) {
+            len = strlen(ip_addr);
+            if (*ip_addr == '[' && *(ip_addr + (len - 1)) == ']') {
+                ++ip_addr;
+                len -= 2;
+            }
+            snprintf(ipv6_bind_addr, addr_size, "%.*s", len, ip_addr);
+        } else {
+            snprintf(ipv4_bind_addr, addr_size, "%s", ip_addr);
+        }
+    }
+}
+
+static int load_bind_address(SFContext *sf_context,
         SFContextIniConfig *config)
 {
-    SFNetworkHandler *sock_handler;
-    SFNetworkHandler *rdma_handler;
-    char *inner_port;
-    char *outer_port;
     char *inner_bind_addr;
     char *outer_bind_addr;
     char *bind_addr;
-    int port;
-    int i;
-    int result;
-
-    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
-    rdma_handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
-    sock_handler->comm_type = fc_comm_type_sock;
-    rdma_handler->comm_type = fc_comm_type_rdma;
-    if (config->comm_type == fc_comm_type_sock) {
-        sock_handler->enabled = true;
-        rdma_handler->enabled = false;
-    } else if (config->comm_type == fc_comm_type_rdma) {
-        sock_handler->enabled = false;
-        rdma_handler->enabled = true;
-    } else if (config->comm_type == fc_comm_type_both) {
-        sock_handler->enabled = true;
-        rdma_handler->enabled = true;
-    }
-    for (i=0; i<SF_NETWORK_HANDLER_COUNT; i++) {
-        if (!sf_context->handlers[i].enabled) {
-            continue;
-        }
-        if ((result=init_network_handler(sf_context->handlers + i,
-                        sf_context)) != 0)
-        {
-            return result;
-        }
-    }
-
-    inner_port = iniGetStrValue(config->ini_ctx.section_name,
-            "inner_port", config->ini_ctx.context);
-    outer_port = iniGetStrValue(config->ini_ctx.section_name,
-            "outer_port", config->ini_ctx.context);
-    if (inner_port == NULL && outer_port == NULL) {
-        port = iniGetIntValue(config->ini_ctx.section_name,
-                "port", config->ini_ctx.context, 0);
-        if (port > 0) {
-            sock_handler->inner.port = sock_handler->outer.port = port;
-        }
-    } else {
-        if (inner_port != NULL) {
-            sock_handler->inner.port = strtol(inner_port, NULL, 10);
-        }
-        if (outer_port != NULL) {
-            sock_handler->outer.port = strtol(outer_port, NULL, 10);
-        }
-    }
-
-    if (sock_handler->inner.port <= 0) {
-        sock_handler->inner.port = config->default_inner_port;
-    }
-    if (sock_handler->outer.port <= 0) {
-        sock_handler->outer.port = config->default_outer_port;
-    }
-
-    if (sock_handler->inner.port == sock_handler->outer.port) {
-        sock_handler->inner.enabled = true;
-        sock_handler->outer.enabled = false;
-    } else {
-        sock_handler->inner.enabled = true;
-        sock_handler->outer.enabled = true;
-    }
-
-    rdma_handler->inner.port = sock_handler->inner.port;
-    rdma_handler->inner.enabled = sock_handler->inner.enabled;
-    rdma_handler->outer.port = sock_handler->outer.port;
-    rdma_handler->outer.enabled = sock_handler->outer.enabled;
+    SFAddressFamilyHandler *ipv4_handler;
+    SFAddressFamilyHandler *ipv6_handler;
 
     inner_bind_addr = iniGetStrValue(config->ini_ctx.section_name,
             "inner_bind_addr", config->ini_ctx.context);
@@ -590,10 +545,192 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
             inner_bind_addr = outer_bind_addr = bind_addr;
         }
     }
-    set_config_str_value(inner_bind_addr, sf_context->inner_bind_addr,
-                sizeof(sf_context->inner_bind_addr));
-    set_config_str_value(outer_bind_addr, sf_context->outer_bind_addr,
-                sizeof(sf_context->outer_bind_addr));
+
+    ipv4_handler = sf_context->handlers + SF_IPV4_ADDRESS_FAMILY_INDEX;
+    ipv6_handler = sf_context->handlers + SF_IPV6_ADDRESS_FAMILY_INDEX;
+    set_bind_address(inner_bind_addr, ipv4_handler->inner_bind_addr,
+            ipv6_handler->inner_bind_addr,
+            sizeof(ipv4_handler->inner_bind_addr));
+    set_bind_address(outer_bind_addr, ipv4_handler->outer_bind_addr,
+            ipv6_handler->outer_bind_addr,
+            sizeof(ipv4_handler->outer_bind_addr));
+    return 0;
+}
+
+static int load_address_family(SFContext *sf_context,
+        SFContextIniConfig *config)
+{
+    char *address_family_str;
+    SFAddressFamily address_family;
+    SFAddressFamilyHandler *ipv4_handler;
+    SFAddressFamilyHandler *ipv6_handler;
+    bool ipv4_bound;
+    bool ipv6_bound;
+
+    address_family_str = iniGetStrValue(config->ini_ctx.section_name,
+            "address_family", config->ini_ctx.context);
+    if (address_family_str == NULL) {
+        sf_context->address_family = sf_address_family_auto;
+    } else if (strcasecmp(address_family_str, "auto") == 0) {
+        sf_context->address_family = sf_address_family_auto;
+    } else if (strcasecmp(address_family_str, "IPv4") == 0) {
+        sf_context->address_family = sf_address_family_ipv4;
+    } else if (strcasecmp(address_family_str, "IPv6") == 0) {
+        sf_context->address_family = sf_address_family_ipv6;
+    } else if (strcasecmp(address_family_str, "both") == 0) {
+        sf_context->address_family = sf_address_family_both;
+    } else {
+        logError("file: "__FILE__", line: %d, "
+                "config file: %s, section: %s, address_family: %s "
+                "is invalid!", __LINE__, config->ini_ctx.filename,
+                config->ini_ctx.section_name, address_family_str);
+        return EINVAL;
+    }
+
+    ipv4_handler = sf_context->handlers + SF_IPV4_ADDRESS_FAMILY_INDEX;
+    ipv6_handler = sf_context->handlers + SF_IPV6_ADDRESS_FAMILY_INDEX;
+    if (sf_context->address_family == sf_address_family_auto) {
+        ipv4_bound = (*ipv4_handler->inner_bind_addr != '\0' ||
+                *ipv4_handler->outer_bind_addr != '\0');
+        ipv6_bound = (*ipv6_handler->inner_bind_addr != '\0' ||
+                *ipv6_handler->outer_bind_addr != '\0');
+        if (ipv4_bound) {
+            if (ipv6_bound) {
+                address_family = sf_address_family_both;
+            } else {
+                address_family = sf_address_family_ipv4;
+            }
+        } else {
+            if (ipv6_bound) {
+                address_family = sf_address_family_ipv6;
+            } else {
+                int ipv4_count;
+                int ipv6_count;
+                stat_local_host_ip(&ipv4_count, &ipv6_count);
+                if (ipv4_count > 0) {
+                    address_family = sf_address_family_ipv4;
+                } else {
+                    address_family = sf_address_family_ipv6;
+                }
+            }
+        }
+    } else {
+        address_family = sf_context->address_family;
+    }
+
+    switch (address_family) {
+        case sf_address_family_ipv4:
+            ipv4_handler->af = AF_INET;
+            ipv6_handler->af = AF_UNSPEC;
+            break;
+        case sf_address_family_ipv6:
+            ipv4_handler->af = AF_UNSPEC;
+            ipv6_handler->af = AF_INET6;
+            break;
+        case sf_address_family_both:
+            ipv4_handler->af = AF_INET;
+            ipv6_handler->af = AF_INET6;
+            break;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+int sf_load_context_from_config_ex(SFContext *sf_context,
+        SFContextIniConfig *config)
+{
+    SFAddressFamilyHandler *fh;
+    SFNetworkHandler *sock_handler;
+    SFNetworkHandler *rdma_handler;
+    SFNetworkHandler *handler;
+    SFNetworkHandler *end;
+    char *inner_port_str;
+    char *outer_port_str;
+    int inner_port;
+    int outer_port;
+    int port;
+    int i;
+    int result;
+
+    inner_port_str = iniGetStrValue(config->ini_ctx.section_name,
+            "inner_port", config->ini_ctx.context);
+    outer_port_str = iniGetStrValue(config->ini_ctx.section_name,
+            "outer_port", config->ini_ctx.context);
+    if (inner_port_str == NULL && outer_port_str == NULL) {
+        port = iniGetIntValue(config->ini_ctx.section_name,
+                "port", config->ini_ctx.context, 0);
+        if (port > 0) {
+            inner_port = outer_port = port;
+        } else {
+            inner_port = outer_port = 0;
+        }
+    } else {
+        if (inner_port_str != NULL) {
+            inner_port = strtol(inner_port_str, NULL, 10);
+        } else {
+            inner_port = 0;
+        }
+
+        if (outer_port_str != NULL) {
+            outer_port = strtol(outer_port_str, NULL, 10);
+        } else {
+            outer_port = 0;
+        }
+    }
+
+    if (inner_port <= 0) {
+        inner_port = config->default_inner_port;
+    }
+    if (outer_port <= 0) {
+        outer_port = config->default_outer_port;
+    }
+
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        fh = sf_context->handlers + i;
+        fh->ctx = sf_context;
+        sock_handler = fh->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+        rdma_handler = fh->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+        sock_handler->comm_type = fc_comm_type_sock;
+        rdma_handler->comm_type = fc_comm_type_rdma;
+        if (config->comm_type == fc_comm_type_sock) {
+            sock_handler->enabled = true;
+            rdma_handler->enabled = false;
+        } else if (config->comm_type == fc_comm_type_rdma) {
+            sock_handler->enabled = false;
+            rdma_handler->enabled = true;
+        } else if (config->comm_type == fc_comm_type_both) {
+            sock_handler->enabled = true;
+            rdma_handler->enabled = true;
+        }
+
+        end = fh->handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=fh->handlers; handler<end; handler++) {
+            if (!handler->enabled) {
+                continue;
+            }
+            if ((result=init_network_handler(handler, fh)) != 0) {
+                return result;
+            }
+        }
+
+        sock_handler->inner.port = inner_port;
+        sock_handler->outer.port = outer_port;
+        if (sock_handler->inner.port == sock_handler->outer.port) {
+            sock_handler->inner.enabled = true;
+            sock_handler->outer.enabled = false;
+        } else {
+            sock_handler->inner.enabled = true;
+            sock_handler->outer.enabled = true;
+        }
+
+        rdma_handler->inner.port = sock_handler->inner.port;
+        rdma_handler->inner.enabled = sock_handler->inner.enabled;
+        rdma_handler->outer.port = sock_handler->outer.port;
+        rdma_handler->outer.enabled = sock_handler->outer.enabled;
+
+    }
 
     sf_context->accept_threads = iniGetIntValue(
             config->ini_ctx.section_name,
@@ -619,51 +756,123 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         return EINVAL;
     }
 
+    if ((result=load_bind_address(sf_context, config)) != 0) {
+        return result;
+    }
+
+    if ((result=load_address_family(sf_context, config)) != 0) {
+        return result;
+    }
+
     return 0;
 }
 
 int sf_alloc_rdma_pd(SFContext *sf_context,
         FCAddressPtrArray *address_array)
 {
+    SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
+    int i;
     int result;
 
-    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
-    if (!handler->enabled) {
-        return 0;
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        fh = sf_context->handlers + i;
+        if (fh->af == AF_UNSPEC) {
+            continue;
+        }
+
+        handler = fh->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+        if (handler->enabled) {
+            if ((handler->pd=fc_alloc_rdma_pd(handler->alloc_pd,
+                            address_array, &result)) == NULL)
+            {
+                return result;
+            }
+        }
     }
 
-    handler->pd = fc_alloc_rdma_pd(handler->alloc_pd,
-            address_array, &result);
-    return result;
+    return 0;
+}
+
+static void combine_bind_addr(char *bind_addr, const char *ip_addr)
+{
+    char *p;
+
+    if (*bind_addr == '\0') {
+        p = bind_addr;
+    } else {
+        p = bind_addr + strlen(bind_addr);
+        *p++ = ',';
+    }
+
+    sprintf(p, "%s", ip_addr);
+}
+
+static const char *get_address_family_caption(
+        const SFAddressFamily address_family)
+{
+    switch (address_family) {
+        case sf_address_family_auto:
+            return "auto";
+        case sf_address_family_ipv4:
+            return "IPv4";
+        case sf_address_family_ipv6:
+            return "IPv6";
+        case sf_address_family_both:
+            return "both";
+        default:
+            return "unkown";
+    }
 }
 
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)
 {
+    const SFAddressFamilyHandler *fh;
     const SFNetworkHandler *sock_handler;
+    char inner_bind_addr[2 * IP_ADDRESS_SIZE + 2];
+    char outer_bind_addr[2 * IP_ADDRESS_SIZE + 2];
+    int i;
     int len;
 
-    sock_handler = sf_context->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    *inner_bind_addr = '\0';
+    *outer_bind_addr = '\0';
+    sock_handler = NULL;
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        fh = sf_context->handlers + i;
+        if (fh->af == AF_UNSPEC) {
+            continue;
+        }
+
+        if (*(fh->inner_bind_addr) != '\0') {
+            combine_bind_addr(inner_bind_addr, fh->inner_bind_addr);
+        }
+        if (*(fh->outer_bind_addr) != '\0') {
+            combine_bind_addr(outer_bind_addr, fh->outer_bind_addr);
+        }
+
+        sock_handler = fh->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    }
+
     len = 0;
     if ((sock_handler->inner.port == sock_handler->outer.port) &&
-            (strcmp(sf_context->inner_bind_addr,
-                    sf_context->outer_bind_addr) == 0))
+            (strcmp(inner_bind_addr, outer_bind_addr) == 0))
     {
         len += snprintf(output + len, size - len,
                 "port=%u, bind_addr=%s",
                 sock_handler->inner.port,
-                sf_context->inner_bind_addr);
+                inner_bind_addr);
     } else {
         len += snprintf(output + len, size - len,
                 "inner_port=%u, inner_bind_addr=%s, "
                 "outer_port=%u, outer_bind_addr=%s",
-                sock_handler->inner.port, sf_context->inner_bind_addr,
-                sock_handler->outer.port, sf_context->outer_bind_addr);
+                sock_handler->inner.port, inner_bind_addr,
+                sock_handler->outer.port, outer_bind_addr);
     }
 
     len += snprintf(output + len, size - len,
-            ", accept_threads=%d, work_threads=%d",
+            ", address_family=%s, accept_threads=%d, work_threads=%d",
+            get_address_family_caption(sf_context->address_family),
             sf_context->accept_threads, sf_context->work_threads);
 }
 

@@ -175,12 +175,19 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
         const char *server_ip, const uint16_t port, int *err_no)
 {
     struct fast_task_info *task;
+    SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
 
-    if (comm_type == fc_comm_type_sock) {
-        handler = g_sf_context.handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    if (is_ipv6_addr(server_ip)) {
+        fh = g_sf_context.handlers + SF_IPV6_ADDRESS_FAMILY_INDEX;
     } else {
-        handler = g_sf_context.handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
+        fh = g_sf_context.handlers + SF_IPV4_ADDRESS_FAMILY_INDEX;
+    }
+
+    if (comm_type == fc_comm_type_sock) {
+        handler = fh->handlers + SF_SOCKET_NETWORK_HANDLER_INDEX;
+    } else {
+        handler = fh->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
     }
     if ((task=sf_alloc_init_task(handler, -1)) == NULL) {
         *err_no = ENOMEM;

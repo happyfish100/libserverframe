@@ -34,6 +34,10 @@
 #define SF_SERVER_TASK_TYPE_CHANNEL_HOLDER     101   //for request idempotency
 #define SF_SERVER_TASK_TYPE_CHANNEL_USER       102   //for request idempotency
 
+#define SF_ADDRESS_FAMILY_COUNT           2
+#define SF_IPV4_ADDRESS_FAMILY_INDEX      0
+#define SF_IPV6_ADDRESS_FAMILY_INDEX      1
+
 #define SF_NETWORK_HANDLER_COUNT          2
 #define SF_SOCKET_NETWORK_HANDLER_INDEX   0
 #define SF_RDMACM_NETWORK_HANDLER_INDEX   1
@@ -60,6 +64,13 @@ typedef enum {
     sf_comm_action_break = 'b',
     sf_comm_action_finish = 'f'
 } SFCommAction;
+
+typedef enum {
+    sf_address_family_auto = 0,
+    sf_address_family_ipv4 = 1,
+    sf_address_family_ipv6 = 2,
+    sf_address_family_both = 3
+} SFAddressFamily;
 
 struct ibv_pd;
 struct sf_listener;
@@ -98,11 +109,12 @@ typedef struct sf_listener {
 } SFListener;
 
 struct sf_context;
+struct sf_address_family_handler;
 typedef struct sf_network_handler {
     bool enabled;
     bool explicit_post_recv;
     FCCommunicationType comm_type;
-    struct sf_context *ctx;
+    struct sf_address_family_handler *fh;
     struct ibv_pd *pd;
 
     SFListener inner;
@@ -140,19 +152,25 @@ typedef struct sf_nio_callbacks {
     sf_release_buffer_callback release_buffer;
 } SFNIOCallbacks;
 
+typedef struct sf_address_family_handler {
+    int af;   //AF_UNSPEC for disabled
+    SFNetworkHandler handlers[SF_NETWORK_HANDLER_COUNT];
+    char inner_bind_addr[IP_ADDRESS_SIZE];
+    char outer_bind_addr[IP_ADDRESS_SIZE];
+    struct sf_context *ctx;
+} SFAddressFamilyHandler;
+
 typedef struct sf_context {
     char name[64];
     struct nio_thread_data *thread_data;
     volatile int thread_count;
 
     //int rdma_port_offset;
-    SFNetworkHandler handlers[SF_NETWORK_HANDLER_COUNT];
+    SFAddressFamily address_family;
+    SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
 
     int accept_threads;
     int work_threads;
-
-    char inner_bind_addr[IP_ADDRESS_SIZE];
-    char outer_bind_addr[IP_ADDRESS_SIZE];
 
     int header_size;
     bool remove_from_ready_list;

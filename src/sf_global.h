@@ -90,12 +90,24 @@ extern SFContext                 g_sf_context;
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
 #define SF_G_UP_TIME             g_sf_global_vars.up_time
 
-#define SF_G_SOCK_HANDLER        (g_sf_context.handlers + \
+#define SF_G_SOCK_HANDLER        (g_sf_context.handlers  \
+        [SF_IPV4_ADDRESS_FAMILY_INDEX].handlers + \
         SF_SOCKET_NETWORK_HANDLER_INDEX)
 #define SF_G_OUTER_PORT          SF_G_SOCK_HANDLER->outer.port
 #define SF_G_INNER_PORT          SF_G_SOCK_HANDLER->inner.port
-#define SF_G_OUTER_BIND_ADDR     g_sf_context.outer_bind_addr
-#define SF_G_INNER_BIND_ADDR     g_sf_context.inner_bind_addr
+#define SF_G_OUTER_BIND_ADDR4     g_sf_context.handlers  \
+        [SF_IPV4_ADDRESS_FAMILY_INDEX].outer_bind_addr
+#define SF_G_INNER_BIND_ADDR4     g_sf_context.handlers  \
+        [SF_IPV4_ADDRESS_FAMILY_INDEX].inner_bind_addr
+#define SF_G_OUTER_BIND_ADDR6     g_sf_context.handlers  \
+        [SF_IPV6_ADDRESS_FAMILY_INDEX].outer_bind_addr
+#define SF_G_INNER_BIND_ADDR6     g_sf_context.handlers  \
+        [SF_IPV6_ADDRESS_FAMILY_INDEX].inner_bind_addr
+
+#define SF_G_IPV4_ENABLED     (g_sf_context.handlers  \
+        [SF_IPV4_ADDRESS_FAMILY_INDEX].af == AF_INET)
+#define SF_G_IPV6_ENABLED     (g_sf_context.handlers  \
+        [SF_IPV6_ADDRESS_FAMILY_INDEX].af == AF_INET6)
 
 #define SF_G_ACCEPT_THREADS      g_sf_context.accept_threads
 #define SF_G_WORK_THREADS        g_sf_context.work_threads
@@ -114,6 +126,11 @@ extern SFContext                 g_sf_context;
 #define SF_WORK_THREADS(sf_context)        sf_context.work_threads
 #define SF_ALIVE_THREAD_COUNT(sf_context)  sf_context.thread_count
 #define SF_THREAD_INDEX(sf_context, tdata) (int)(tdata - sf_context.thread_data)
+
+#define SF_IPV4_ENABLED(sf_context)   (sf_context.handlers  \
+        [SF_IPV4_ADDRESS_FAMILY_INDEX].af == AF_INET)
+#define SF_IPV6_ENABLED(sf_context)   (sf_context.handlers  \
+        [SF_IPV6_ADDRESS_FAMILY_INDEX].af == AF_INET6)
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
     do { \

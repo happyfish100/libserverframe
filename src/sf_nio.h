@@ -27,7 +27,7 @@
 #include "sf_types.h"
 #include "sf_global.h"
 
-#define SF_CTX  (task->handler->ctx)
+#define SF_CTX  (task->handler->fh->ctx)
 
 #ifdef __cplusplus
 extern "C" {

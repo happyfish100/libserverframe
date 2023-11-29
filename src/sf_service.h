@@ -156,7 +156,7 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
 {
     struct fast_task_info *task;
 
-    task = free_queue_pop(&handler->ctx->free_queue);
+    task = free_queue_pop(&handler->fh->ctx->free_queue);
     if (task == NULL) {
         logError("file: "__FILE__", line: %d, "
                 "malloc task buff failed, you should "
@@ -190,22 +190,23 @@ static inline void sf_release_task(struct fast_task_info *task)
     }
 }
 
-// 判断当前服务器是否存在IPv4地址
-bool checkHostHasIPv4Addr();
-
-// 判断当前服务器是否存在IPv6地址
-bool checkHostHasIPv6Addr();
-
 static inline SFNetworkHandler *sf_get_first_network_handler_ex(
         SFContext *sf_context)
 {
+    int i;
     SFNetworkHandler *handler;
     SFNetworkHandler *end;
 
-    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
-    for (handler=sf_context->handlers; handler<end; handler++) {
-        if (handler->enabled) {
-            return handler;
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        if (sf_context->handlers[i].af == AF_UNSPEC) {
+            continue;
+        }
+
+        end = sf_context->handlers[i].handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=sf_context->handlers[i].handlers; handler<end; handler++) {
+            if (handler->enabled) {
+                return handler;
+            }
         }
     }
 
@@ -218,10 +219,20 @@ static inline SFNetworkHandler *sf_get_first_network_handler_ex(
 static inline SFNetworkHandler *sf_get_rdma_network_handler(
         SFContext *sf_context)
 {
+    int i;
     SFNetworkHandler *handler;
 
-    handler = sf_context->handlers + SF_RDMACM_NETWORK_HANDLER_INDEX;
-    return (handler->enabled ? handler : NULL);
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        if (sf_context->handlers[i].af != AF_UNSPEC) {
+            handler = sf_context->handlers[i].handlers +
+                SF_RDMACM_NETWORK_HANDLER_INDEX;
+            if (handler->enabled) {
+                return handler;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 static inline SFNetworkHandler *sf_get_rdma_network_handler2(

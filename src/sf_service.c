@@ -115,6 +115,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     int result;
     int bytes;
     int extra_events;
+    int i;
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
     struct nio_thread_data *thread_data;
@@ -132,8 +133,10 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             send_done_callback, deal_func, task_cleanup_func,
             timeout_callback, release_buffer_callback);
     if (explicit_post_recv) {
-        sf_context->handlers[SF_RDMACM_NETWORK_HANDLER_INDEX].
-            explicit_post_recv = true;
+        for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+            sf_context->handlers[i].handlers[SF_RDMACM_NETWORK_HANDLER_INDEX].
+                explicit_post_recv = true;
+        }
     }
 
     if ((result=sf_init_free_queue(&sf_context->free_queue,
@@ -350,28 +353,8 @@ int sf_socket_create_server(SFListener *listener,
 {
     int result;
 
-    if (af == AF_UNSPEC) {
-        if (bind_addr == NULL || *bind_addr == '\0') {
-            // 如果当前服务不存在IPv4地址，但是存在IPv6地址，则自动绑定IPv6地址
-            if (!checkHostHasIPv4Addr() && checkHostHasIPv6Addr()) {
-                listener->sock = socketServerIPv6(bind_addr,
-                        listener->port, &result);
-            } else {
-                listener->sock = socketServer(bind_addr,
-                        listener->port, &result);
-            }
-        } else if (is_ipv6_addr(bind_addr)) {
-            listener->sock = socketServerIPv6(bind_addr,
-                    listener->port, &result);
-        } else {
-            listener->sock = socketServer(bind_addr,
-                    listener->port, &result);
-        }
-    } else {
-        listener->sock = socketServer2(af, bind_addr,
-                listener->port, &result);
-    }
-
+    listener->sock = socketServer2(af, bind_addr,
+            listener->port, &result);
     if (listener->sock < 0) {
         return result;
     }
@@ -386,80 +369,90 @@ int sf_socket_create_server(SFListener *listener,
 int sf_socket_server_ex(SFContext *sf_context)
 {
     int result;
-    int af = AF_UNSPEC;
+    int i;
     bool dual_ports;
     const char *bind_addr;
+    SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
     SFNetworkHandler *end;
 
-    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
-    for (handler=sf_context->handlers; handler<end; handler++) {
-        if (!handler->enabled) {
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        fh = sf_context->handlers + i;
+        if (fh->af == AF_UNSPEC) {
             continue;
         }
 
-        handler->inner.enabled = false;
-        handler->outer.enabled = false;
-        if (handler->outer.port == handler->inner.port) {
-            if (*sf_context->outer_bind_addr == '\0' ||
-                    *sf_context->inner_bind_addr == '\0') {
-                bind_addr = "";
-                if ((result=handler->create_server(&handler->
-                                outer, af, bind_addr)) != 0)
+        end = fh->handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=fh->handlers; handler<end; handler++) {
+            if (!handler->enabled) {
+                continue;
+            }
+
+            handler->inner.enabled = false;
+            handler->outer.enabled = false;
+            if (handler->outer.port == handler->inner.port) {
+                if (*fh->outer_bind_addr == '\0' ||
+                        *fh->inner_bind_addr == '\0')
                 {
-                    return result;
-                }
-                handler->outer.enabled = true;
-                dual_ports = false;
-            } else if (strcmp(sf_context->outer_bind_addr,
-                        sf_context->inner_bind_addr) == 0) {
-                bind_addr = sf_context->outer_bind_addr;
-                if (is_private_ip(bind_addr)) {
+                    bind_addr = "";
                     if ((result=handler->create_server(&handler->
-                                    inner, af, bind_addr)) != 0)
-                    {
-                        return result;
-                    }
-                    handler->inner.enabled = true;
-                } else {
-                    if ((result=handler->create_server(&handler->
-                                    outer, af, bind_addr)) != 0)
+                                    outer, fh->af, bind_addr)) != 0)
                     {
                         return result;
                     }
                     handler->outer.enabled = true;
+                    dual_ports = false;
+                } else if (strcmp(fh->outer_bind_addr,
+                            fh->inner_bind_addr) == 0)
+                {
+                    bind_addr = fh->outer_bind_addr;
+                    if (is_private_ip(bind_addr)) {
+                        if ((result=handler->create_server(&handler->
+                                        inner, fh->af, bind_addr)) != 0)
+                        {
+                            return result;
+                        }
+                        handler->inner.enabled = true;
+                    } else {
+                        if ((result=handler->create_server(&handler->
+                                        outer, fh->af, bind_addr)) != 0)
+                        {
+                            return result;
+                        }
+                        handler->outer.enabled = true;
+                    }
+                    dual_ports = false;
+                } else {
+                    dual_ports = true;
                 }
-                dual_ports = false;
             } else {
                 dual_ports = true;
             }
-        } else {
-            dual_ports = true;
-        }
 
-        if (dual_ports) {
-            if ((result=handler->create_server(&handler->outer, af,
-                            sf_context->outer_bind_addr)) != 0)
-            {
-                return result;
+            if (dual_ports) {
+                if ((result=handler->create_server(&handler->outer,
+                                fh->af, fh->outer_bind_addr)) != 0)
+                {
+                    return result;
+                }
+
+                if ((result=handler->create_server(&handler->inner,
+                                fh->af, fh->inner_bind_addr)) != 0)
+                {
+                    return result;
+                }
+                handler->inner.enabled = true;
+                handler->outer.enabled = true;
             }
 
-            if ((result=handler->create_server(&handler->inner, af,
-                            sf_context->inner_bind_addr)) != 0)
-            {
-                return result;
-            }
-            handler->inner.enabled = true;
-            handler->outer.enabled = true;
+            /*
+               logInfo("%p [%d] inner {port: %d, enabled: %d}, "
+               "outer {port: %d, enabled: %d}", sf_context,
+               (int)(handler-sf_context->handlers),
+               handler->inner.port, handler->inner.enabled,
+               handler->outer.port, handler->outer.enabled);
+             */
         }
-
-        /*
-        logInfo("%p [%d] inner {port: %d, enabled: %d}, "
-                "outer {port: %d, enabled: %d}", sf_context,
-                (int)(handler-sf_context->handlers),
-                handler->inner.port, handler->inner.enabled,
-                handler->outer.port, handler->outer.enabled);
-                */
     }
 
     return 0;
@@ -518,19 +511,27 @@ void sf_socket_close_connection(struct fast_task_info *task)
 
 void sf_socket_close_ex(SFContext *sf_context)
 {
+    int i;
     SFNetworkHandler *handler;
     SFNetworkHandler *end;
 
-    end = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
-    for (handler=sf_context->handlers; handler<end; handler++) {
-        if (!handler->enabled) {
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        if (sf_context->handlers[i].af == AF_UNSPEC) {
             continue;
         }
-        if (handler->outer.enabled) {
-            handler->close_server(&handler->outer);
-        }
-        if (handler->inner.enabled) {
-            handler->close_server(&handler->inner);
+
+        end = sf_context->handlers[i].handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=sf_context->handlers[i].handlers; handler<end; handler++) {
+            if (!handler->enabled) {
+                continue;
+            }
+
+            if (handler->outer.enabled) {
+                handler->close_server(&handler->outer);
+            }
+            if (handler->inner.enabled) {
+                handler->close_server(&handler->inner);
+            }
         }
     }
 }
@@ -544,10 +545,10 @@ static void accept_run(SFListener *listener)
             continue;
         }
 
-        task->thread_data = listener->handler->ctx->thread_data +
-            task->event.fd % listener->handler->ctx->work_threads;
-        if (listener->handler->ctx->callbacks.accept_done != NULL) {
-            if (listener->handler->ctx->callbacks.accept_done(task,
+        task->thread_data = listener->handler->fh->ctx->thread_data +
+            task->event.fd % listener->handler->fh->ctx->work_threads;
+        if (listener->handler->fh->ctx->callbacks.accept_done != NULL) {
+            if (listener->handler->fh->ctx->callbacks.accept_done(task,
                         listener->inaddr.sin_addr.s_addr,
                         listener->is_inner) != 0)
             {
@@ -571,7 +572,7 @@ static void *accept_thread_entrance(SFListener *listener)
         char thread_name[32];
         snprintf(thread_name, sizeof(thread_name), "%s-%s-listen",
                 listener->handler->comm_type == fc_comm_type_sock ?
-                "sock" : "rdma", listener->handler->ctx->name);
+                "sock" : "rdma", listener->handler->fh->ctx->name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif
@@ -618,25 +619,35 @@ int _accept_loop(SFListener *listener, const int accept_threads)
 
 int sf_accept_loop_ex(SFContext *sf_context, const bool blocked)
 {
+    int i;
     SFNetworkHandler *handler;
     SFNetworkHandler *hend;
-    SFListener *listeners[SF_NETWORK_HANDLER_COUNT * 2];
+    SFListener *listeners[SF_ADDRESS_FAMILY_COUNT *
+        SF_NETWORK_HANDLER_COUNT * 2];
     SFListener **listener;
     SFListener **last;
     SFListener **lend;
 
     listener = listeners;
-    hend = sf_context->handlers + SF_NETWORK_HANDLER_COUNT;
-    for (handler=sf_context->handlers; handler<hend; handler++) {
-        if (!handler->enabled) {
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        if (sf_context->handlers[i].af == AF_UNSPEC) {
             continue;
         }
 
-        if (handler->inner.enabled) {
-            *listener++ = &handler->inner;
-        }
-        if (handler->outer.enabled) {
-            *listener++ = &handler->outer;
+        hend = sf_context->handlers[i].handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=sf_context->handlers[i].handlers;
+                handler<hend; handler++)
+        {
+            if (!handler->enabled) {
+                continue;
+            }
+
+            if (handler->inner.enabled) {
+                *listener++ = &handler->inner;
+            }
+            if (handler->outer.enabled) {
+                *listener++ = &handler->outer;
+            }
         }
     }
 
@@ -861,60 +872,4 @@ void sf_notify_all_threads_ex(SFContext *sf_context)
 void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler)
 {
     sig_quit_handler = quit_handler;
-}
-
-// 判断当前服务器是否存在IPv4地址
-bool checkHostHasIPv4Addr()
-{
-    struct ifaddrs *ifaddr, *ifa;
-    bool hasIPv4;
-
-    if (getifaddrs(&ifaddr) == -1) {
-        return false;
-    }
-
-    hasIPv4 = false;
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) {
-            continue;
-        }
-        if (strcmp(ifa->ifa_name, "lo") == 0) { // 排除lo接口
-            continue;
-        }
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            hasIPv4 = true;
-            break;
-        }
-    }
-
-    freeifaddrs(ifaddr);
-    return hasIPv4;
-}
-
-// 判断当前服务器是否存在IPv6地址
-bool checkHostHasIPv6Addr()
-{
-    struct ifaddrs *ifaddr, *ifa;
-    bool hasIPv6;
-
-    if (getifaddrs(&ifaddr) == -1) {
-        return false;
-    }
-
-    hasIPv6 = false;
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) {
-            continue;
-        }
-        if (strcmp(ifa->ifa_name, "lo") == 0) { // 排除lo接口
-            continue;
-        }
-        if (ifa->ifa_addr->sa_family == AF_INET6) {
-            hasIPv6 = true;
-            break;
-        }
-    }
-
-    freeifaddrs(ifaddr);
-    return hasIPv6;
 }
