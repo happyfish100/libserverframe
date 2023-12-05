@@ -794,6 +794,41 @@ int sf_alloc_rdma_pd(SFContext *sf_context,
     return 0;
 }
 
+void sf_set_address_family_by_ip(SFContext *sf_context,
+        FCAddressPtrArray *address_array)
+{
+    SFAddressFamilyHandler *handler;
+    SFAddressFamilyHandler *hend;
+    FCAddressInfo **pp_addr;
+    FCAddressInfo **addr_end;
+
+    if (sf_context->address_family != sf_address_family_auto) {
+        return;
+    }
+
+    hend = sf_context->handlers + SF_ADDRESS_FAMILY_COUNT;
+    for (handler=sf_context->handlers; handler<hend; handler++) {
+        if (handler->af == AF_UNSPEC) {
+            continue;
+        }
+
+        if (*(handler->inner_bind_addr) == '\0' &&
+                *(handler->outer_bind_addr) == '\0')
+        {
+            handler->af = AF_UNSPEC;
+        }
+    }
+
+    addr_end = address_array->addrs + address_array->count;
+    for (pp_addr=address_array->addrs; pp_addr<addr_end; pp_addr++) {
+        if ((*pp_addr)->conn.af == AF_INET) {
+            sf_context->handlers[SF_IPV4_ADDRESS_FAMILY_INDEX].af = AF_INET;
+        } else {
+            sf_context->handlers[SF_IPV6_ADDRESS_FAMILY_INDEX].af = AF_INET6;
+        }
+    }
+}
+
 static void combine_bind_addr(char *bind_addr, const char *ip_addr)
 {
     char *p;

@@ -123,13 +123,13 @@ extern SFContext                 g_sf_context;
 
 #define SF_G_EPOLL_EDGE_TRIGGER  g_sf_global_vars.epoll_edge_trigger
 
-#define SF_WORK_THREADS(sf_context)        sf_context.work_threads
-#define SF_ALIVE_THREAD_COUNT(sf_context)  sf_context.thread_count
-#define SF_THREAD_INDEX(sf_context, tdata) (int)(tdata - sf_context.thread_data)
+#define SF_WORK_THREADS(sf_context)        (sf_context).work_threads
+#define SF_ALIVE_THREAD_COUNT(sf_context)  (sf_context).thread_count
+#define SF_THREAD_INDEX(sf_context, tdata) (int)(tdata - (sf_context).thread_data)
 
-#define SF_IPV4_ENABLED(sf_context)   (sf_context.handlers  \
+#define SF_IPV4_ENABLED(sf_context)   ((sf_context).handlers  \
         [SF_IPV4_ADDRESS_FAMILY_INDEX].af == AF_INET)
-#define SF_IPV6_ENABLED(sf_context)   (sf_context.handlers  \
+#define SF_IPV6_ENABLED(sf_context)   ((sf_context).handlers  \
         [SF_IPV6_ADDRESS_FAMILY_INDEX].af == AF_INET6)
 
 #define SF_CHOWN_RETURN_ON_ERROR(path, current_uid, current_gid) \
@@ -253,6 +253,9 @@ static inline int sf_load_context_from_config(SFContext *sf_context,
 }
 
 int sf_alloc_rdma_pd(SFContext *sf_context,
+        FCAddressPtrArray *address_array);
+
+void sf_set_address_family_by_ip(SFContext *sf_context,
         FCAddressPtrArray *address_array);
 
 int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
