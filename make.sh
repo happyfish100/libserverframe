@@ -8,9 +8,9 @@ LIB_VERSION=lib64
 DEBUG_FLAG=0
 
 if [ -f /usr/include/fastcommon/_os_define.h ]; then
-  OS_BITS=$(fgrep OS_BITS /usr/include/fastcommon/_os_define.h | awk '{print $NF;}')
+  OS_BITS=$(grep -F OS_BITS /usr/include/fastcommon/_os_define.h | awk '{print $NF;}')
 elif [ -f /usr/local/include/fastcommon/_os_define.h ]; then
-  OS_BITS=$(fgrep OS_BITS /usr/local/include/fastcommon/_os_define.h | awk '{print $NF;}')
+  OS_BITS=$(grep -F OS_BITS /usr/local/include/fastcommon/_os_define.h | awk '{print $NF;}')
 else
   OS_BITS=64
 fi
@@ -77,19 +77,19 @@ elif [ "$uname" = "HP-UX" ]; then
   fi
 elif [ "$uname" = "FreeBSD" ]; then
   if [ -f /usr/lib/libc_r.so ]; then
-    line=$(nm -D /usr/lib/libc_r.so | grep pthread_create | grep -w T)
+    line=$(nm -D /usr/lib/libc_r.so | grep -F pthread_create | grep -w T)
     if [ $? -eq 0 ]; then
       LIBS="$LIBS -lc_r"
       have_pthread=1
     fi
   elif [ -f /lib64/libc_r.so ]; then
-    line=$(nm -D /lib64/libc_r.so | grep pthread_create | grep -w T)
+    line=$(nm -D /lib64/libc_r.so | grep -F pthread_create | grep -w T)
     if [ $? -eq 0 ]; then
       LIBS="$LIBS -lc_r"
       have_pthread=1
     fi
   elif [ -f /usr/lib64/libc_r.so ]; then
-    line=$(nm -D /usr/lib64/libc_r.so | grep pthread_create | grep -w T)
+    line=$(nm -D /usr/lib64/libc_r.so | grep -F pthread_create | grep -w T)
     if [ $? -eq 0 ]; then
       LIBS="$LIBS -lc_r"
       have_pthread=1
@@ -98,7 +98,7 @@ elif [ "$uname" = "FreeBSD" ]; then
 fi
 
 if [ $have_pthread -eq 0 ] && [ "$uname" = "Linux" ]; then
-   /sbin/ldconfig -p | fgrep libpthread.so > /dev/null
+   /sbin/ldconfig -p | grep -w libpthread.so > /dev/null
    if [ $? -eq 0 ]; then
       LIBS="$LIBS -lpthread"
    else

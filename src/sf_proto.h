@@ -68,19 +68,17 @@
 #define SF_PROTO_MAGIC_PARAMS(m) \
     m[0], m[1], m[2], m[3]
 
-#define SF_PROTO_SET_HEADER(header, _cmd, _body_len) \
+#define SF_PROTO_SET_HEADER_EX(header, _cmd, _flags, _body_len) \
     do {  \
         SF_PROTO_SET_MAGIC((header)->magic);   \
         (header)->cmd = _cmd;      \
         (header)->status[0] = (header)->status[1] = 0; \
+        short2buff(_flags, (header)->flags); \
         int2buff(_body_len, (header)->body_len); \
     } while (0)
 
-#define SF_PROTO_SET_HEADER_EX(header, _cmd, _flags, _body_len) \
-    do {  \
-        SF_PROTO_SET_HEADER(header, _cmd, _body_len); \
-        short2buff(_flags, (header)->flags); \
-    } while (0)
+#define SF_PROTO_SET_HEADER(header, _cmd, _body_len) \
+        SF_PROTO_SET_HEADER_EX(header, _cmd, 0, _body_len)
 
 #define SF_PROTO_SET_RESPONSE_HEADER(proto_header, resp_header) \
     do {  \
@@ -320,6 +318,8 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     ctx->request.header.body_len = SF_RECV_BODY_LENGTH(task);
     ctx->request.header.status = buff2short(((SFCommonProtoHeader *)
                 task->recv.ptr->data)->status);
+    ctx->request.header.flags = buff2short(((SFCommonProtoHeader *)
+                task->recv.ptr->data)->flags);
     if (task->recv_body != NULL) {
         ctx->request.body = task->recv_body;
     } else {
