@@ -30,8 +30,8 @@ typedef struct {
 #define sf_buffered_writer_init(writer, filename) \
     sf_buffered_writer_init_ex(writer, filename, 1024 * 1024)
 
-#define SF_BUFFERED_WRITER_LENGTH(bw) ((bw).buffer.current - (bw).buffer.buff)
-#define SF_BUFFERED_WRITER_REMAIN(bw) ((bw).buffer.end - (bw).buffer.current)
+#define SF_BUFFERED_WRITER_LENGTH(bw)  SF_BINLOG_BUFFER_LENGTH((bw).buffer)
+#define SF_BUFFERED_WRITER_REMAIN(bw)  SF_BINLOG_BUFFER_REMAIN((bw).buffer)
 
 #ifdef __cplusplus
 extern "C" {

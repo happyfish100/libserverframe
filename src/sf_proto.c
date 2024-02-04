@@ -674,6 +674,7 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
 
     status = sf_unify_errno(FC_ABS(ctx->response.header.status));
     short2buff(status, proto_header->status);
+    short2buff(ctx->response.header.flags, proto_header->flags);
     proto_header->cmd = ctx->response.header.cmd;
     int2buff(ctx->response.header.body_len, proto_header->body_len);
     task->send.ptr->length = sizeof(SFCommonProtoHeader) +

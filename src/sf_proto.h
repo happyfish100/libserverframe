@@ -307,6 +307,7 @@ static inline void sf_proto_init_task_context(struct fast_task_info *task,
     ctx->response.header.cmd = SF_PROTO_ACK;
     ctx->response.header.body_len = 0;
     ctx->response.header.status = 0;
+    ctx->response.header.flags = 0;
     ctx->response.error.length = 0;
     ctx->response.error.message[0] = '\0';
     ctx->log_level = LOG_ERR;

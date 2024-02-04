@@ -30,9 +30,6 @@
 #define SF_BINLOG_FILE_PREFIX          "binlog"
 #define SF_BINLOG_FILE_EXT_FMT         ".%06d"
 
-#define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).end - (buffer).buff)
-#define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
-
 typedef struct sf_file_writer_info {
     struct {
         const char *data_path;
