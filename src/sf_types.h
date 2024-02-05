@@ -42,7 +42,7 @@
 #define SF_SOCKET_NETWORK_HANDLER_INDEX   0
 #define SF_RDMACM_NETWORK_HANDLER_INDEX   1
 
-#define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).end - (buffer).buff)
+#define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).current - (buffer).buff)
 #define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
 
 typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
