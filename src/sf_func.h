@@ -56,7 +56,8 @@ static inline int sf_binlog_buffer_init(SFBinlogBuffer *buffer, const int size)
         return ENOMEM;
     }
 
-    buffer->current = buffer->end = buffer->buff;
+    buffer->current = buffer->data_end = buffer->buff;
+    buffer->buff_end = buffer->buff + size;
     buffer->size = size;
     return 0;
 }
@@ -65,7 +66,8 @@ static inline void sf_binlog_buffer_destroy(SFBinlogBuffer *buffer)
 {
     if (buffer->buff != NULL) {
         free(buffer->buff);
-        buffer->current = buffer->end = buffer->buff = NULL;
+        buffer->current = buffer->buff = NULL;
+        buffer->data_end = buffer->buff_end = NULL;
         buffer->size = 0;
     }
 }

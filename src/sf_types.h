@@ -42,8 +42,9 @@
 #define SF_SOCKET_NETWORK_HANDLER_INDEX   0
 #define SF_RDMACM_NETWORK_HANDLER_INDEX   1
 
-#define SF_BINLOG_BUFFER_LENGTH(buffer) ((buffer).current - (buffer).buff)
-#define SF_BINLOG_BUFFER_REMAIN(buffer) ((buffer).end - (buffer).current)
+#define SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(bf) ((bf).data_end - (bf).buff)
+#define SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(bf) ((bf).buff_end - (bf).data_end)
+#define SF_BINLOG_BUFFER_CONSUMER_DATA_REMAIN(bf) ((bf).data_end - (bf).current)
 
 typedef int (*sf_accept_done_callback)(struct fast_task_info *task,
         const in_addr_64_t client_addr, const bool bInnerPort);
@@ -222,10 +223,11 @@ typedef struct sf_binlog_file_position {
 } SFBinlogFilePosition;
 
 typedef struct server_binlog_buffer {
-    char *buff;    //the buffer pointer
-    char *current; //for the consumer
-    char *end;     //data end ptr
-    int size;      //the buffer size (capacity)
+    char *buff;       //the buffer pointer
+    char *current;    //for the consumer
+    char *data_end;   //data end ptr
+    char *buff_end;   //buffer end ptr
+    int size;         //the buffer size (capacity)
 } SFBinlogBuffer;
 
 typedef struct sf_space_stat {

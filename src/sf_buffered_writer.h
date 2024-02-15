@@ -30,8 +30,11 @@ typedef struct {
 #define sf_buffered_writer_init(writer, filename) \
     sf_buffered_writer_init_ex(writer, filename, 1024 * 1024)
 
-#define SF_BUFFERED_WRITER_LENGTH(bw)  SF_BINLOG_BUFFER_LENGTH((bw).buffer)
-#define SF_BUFFERED_WRITER_REMAIN(bw)  SF_BINLOG_BUFFER_REMAIN((bw).buffer)
+#define SF_BUFFERED_WRITER_LENGTH(bw)  \
+    SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH((bw).buffer)
+
+#define SF_BUFFERED_WRITER_REMAIN(bw)  \
+    SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN((bw).buffer)
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +59,6 @@ extern "C" {
         if ((result=sf_binlog_buffer_init(&writer->buffer, buffer_size)) != 0) {
             return result;
         }
-        writer->buffer.end = writer->buffer.buff + writer->buffer.size;
         return 0;
     }
 
@@ -65,7 +67,7 @@ extern "C" {
         int result;
         int length;
 
-        length = writer->buffer.current - writer->buffer.buff;
+        length = writer->buffer.data_end - writer->buffer.buff;
         if (fc_safe_write(writer->fd, writer->buffer.buff, length) != length) {
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
@@ -74,7 +76,7 @@ extern "C" {
             return result;
         }
 
-        writer->buffer.current = writer->buffer.buff;
+        writer->buffer.data_end = writer->buffer.buff;
         return 0;
     }
 

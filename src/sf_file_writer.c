@@ -279,7 +279,7 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
     int result;
     int len;
 
-    len = SF_BINLOG_BUFFER_LENGTH(writer->binlog_buffer);
+    len = SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(writer->binlog_buffer);
     if (len == 0) {
         return 0;
     }
@@ -292,7 +292,7 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
         }
     }
 
-    writer->binlog_buffer.end = writer->binlog_buffer.buff;
+    writer->binlog_buffer.data_end = writer->binlog_buffer.buff;
     return result;
 }
 
@@ -324,7 +324,7 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     int result;
 
     if (buffer->length >= writer->binlog_buffer.size / 4) {
-        if (SF_BINLOG_BUFFER_LENGTH(writer->binlog_buffer) > 0) {
+        if (SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(writer->binlog_buffer) > 0) {
             if ((result=sf_file_writer_flush(writer)) != 0) {
                 return result;
             }
@@ -342,13 +342,13 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     }
 
     if (writer->cfg.file_rotate_size > 0 && writer->file.size +
-            SF_BINLOG_BUFFER_LENGTH(writer->binlog_buffer) +
+            SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(writer->binlog_buffer) +
             buffer->length > writer->cfg.file_rotate_size)
     {
         if ((result=sf_file_writer_flush(writer)) != 0) {
             return result;
         }
-    } else if (writer->binlog_buffer.size - SF_BINLOG_BUFFER_LENGTH(
+    } else if (SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(
                 writer->binlog_buffer) < buffer->length)
     {
         if ((result=sf_file_writer_flush(writer)) != 0) {
@@ -359,8 +359,8 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
         writer->last_versions.pending = version;
     }
-    memcpy(writer->binlog_buffer.end, buffer->buff, buffer->length);
-    writer->binlog_buffer.end += buffer->length;
+    memcpy(writer->binlog_buffer.data_end, buffer->buff, buffer->length);
+    writer->binlog_buffer.data_end += buffer->length;
 
     return 0;
 }
