@@ -50,8 +50,6 @@ static IdempotencyReceiptGlobalVars receipt_global_vars;
 
 static int receipt_init_task(struct fast_task_info *task)
 {
-    task->connect_timeout = SF_G_CONNECT_TIMEOUT; //for client side
-    task->network_timeout = SF_G_NETWORK_TIMEOUT;
     if (RDMA_INIT_CONNECTION != NULL) {
         return RDMA_INIT_CONNECTION(task, RDMA_PD);
     } else {

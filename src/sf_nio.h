@@ -27,7 +27,8 @@
 #include "sf_types.h"
 #include "sf_global.h"
 
-#define SF_CTX  (task->handler->fh->ctx)
+#define SF_CTX              (task->handler->fh->ctx)
+#define SF_NET_BUFFER_CFG   SF_CTX->net_buffer_cfg
 
 #ifdef __cplusplus
 extern "C" {
@@ -128,12 +129,12 @@ static inline int sf_set_body_length(struct fast_task_info *task)
     }
 
     task->recv.ptr->length += SF_CTX->header_size;
-    if (task->recv.ptr->length > g_sf_global_vars.max_pkg_size) {
+    if (task->recv.ptr->length > SF_NET_BUFFER_CFG.max_pkg_size) {
         logError("file: "__FILE__", line: %d, "
                 "client ip: %s, pkg length: %d > "
                 "max pkg size: %d", __LINE__,
                 task->client_ip, task->recv.ptr->length,
-                g_sf_global_vars.max_pkg_size);
+                SF_NET_BUFFER_CFG.max_pkg_size);
         return -1;
     }
 

@@ -37,11 +37,11 @@
 #include "sf_global.h"
 
 SFGlobalVariables g_sf_global_vars = {
-    SF_DEFAULT_CONNECT_TIMEOUT, SF_DEFAULT_NETWORK_TIMEOUT,
     {{'/', 't', 'm', 'p', '\0'}, false},
-    true, true, false, DEFAULT_MAX_CONNECTONS,
+    true, true, false, { SF_DEFAULT_CONNECT_TIMEOUT,
+        SF_DEFAULT_NETWORK_TIMEOUT, DEFAULT_MAX_CONNECTONS,
     SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
-    SF_DEF_MAX_BUFF_SIZE, 0, SF_DEF_THREAD_STACK_SIZE, 0,
+    SF_DEF_MAX_BUFF_SIZE}, 0, SF_DEF_THREAD_STACK_SIZE, 0,
     {false, 0, 0, {'\0'}, {'\0'}},
     {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
     {0, 0}, NULL, {NULL, 0}
@@ -50,54 +50,48 @@ SFGlobalVariables g_sf_global_vars = {
 SFContext g_sf_context = {{'\0'}, NULL, 0, sf_address_family_auto,
     {{AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}},
         {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},
-    1, DEFAULT_WORK_THREADS, 0, true, true, true, {false, 0, 0},
-    {sf_task_finish_clean_up}
+    {DEFAULT_MAX_CONNECTONS, SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
+    SF_DEF_MAX_BUFF_SIZE}, 1, DEFAULT_WORK_THREADS, 0, true, true, true,
+    {false, 0, 0}, {sf_task_finish_clean_up}
 };
 
 static int load_network_parameters(IniFullContext *ini_ctx,
         const char *max_pkg_size_item_nm, const int fixed_buff_size,
-        const int task_buffer_extra_size)
+        const int task_buffer_extra_size, SFNetBufferConfig *net_buffer_cfg)
 {
-    int result;
     int padding_buff_size;
     char *pMinBuffSize;
     char *pMaxBuffSize;
 
-    g_sf_global_vars.connect_timeout = iniGetIntValueEx(ini_ctx->
+    net_buffer_cfg->connect_timeout = iniGetIntValueEx(ini_ctx->
             section_name, "connect_timeout", ini_ctx->context,
             SF_DEFAULT_CONNECT_TIMEOUT, true);
-    if (g_sf_global_vars.connect_timeout <= 0) {
-        g_sf_global_vars.connect_timeout = SF_DEFAULT_CONNECT_TIMEOUT;
+    if (net_buffer_cfg->connect_timeout <= 0) {
+        net_buffer_cfg->connect_timeout = SF_DEFAULT_CONNECT_TIMEOUT;
     }
 
-    g_sf_global_vars.network_timeout = iniGetIntValueEx(ini_ctx->
+    net_buffer_cfg->network_timeout = iniGetIntValueEx(ini_ctx->
             section_name, "network_timeout", ini_ctx->context,
             SF_DEFAULT_NETWORK_TIMEOUT, true);
-    if (g_sf_global_vars.network_timeout <= 0) {
-        g_sf_global_vars.network_timeout = SF_DEFAULT_NETWORK_TIMEOUT;
+    if (net_buffer_cfg->network_timeout <= 0) {
+        net_buffer_cfg->network_timeout = SF_DEFAULT_NETWORK_TIMEOUT;
     }
 
-    g_sf_global_vars.max_connections = iniGetIntValueEx(ini_ctx->section_name,
+    net_buffer_cfg->max_connections = iniGetIntValueEx(ini_ctx->section_name,
             "max_connections", ini_ctx->context, DEFAULT_MAX_CONNECTONS, true);
-    if (g_sf_global_vars.max_connections <= 0) {
-        g_sf_global_vars.max_connections = DEFAULT_MAX_CONNECTONS;
-    }
-
-    if ((result=set_rlimit(RLIMIT_NOFILE, g_sf_global_vars.
-                    max_connections)) != 0)
-    {
-        return result;
+    if (net_buffer_cfg->max_connections <= 0) {
+        net_buffer_cfg->max_connections = DEFAULT_MAX_CONNECTONS;
     }
 
     if (fixed_buff_size > 0) {
         padding_buff_size = fixed_buff_size + task_buffer_extra_size;
-        g_sf_global_vars.min_buff_size = padding_buff_size;
-        g_sf_global_vars.max_buff_size = padding_buff_size;
-        g_sf_global_vars.max_pkg_size = padding_buff_size;
+        net_buffer_cfg->min_buff_size = padding_buff_size;
+        net_buffer_cfg->max_buff_size = padding_buff_size;
+        net_buffer_cfg->max_pkg_size = padding_buff_size;
         return 0;
     }
 
-    g_sf_global_vars.max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
+    net_buffer_cfg->max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
             max_pkg_size_item_nm, SF_DEF_MAX_PACKAGE_SIZE, 1, 8192,
             SF_MAX_NETWORK_BUFF_SIZE, true);
     pMinBuffSize = iniGetStrValueEx(ini_ctx->section_name,
@@ -105,34 +99,34 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     pMaxBuffSize = iniGetStrValueEx(ini_ctx->section_name,
             "max_buff_size", ini_ctx->context, true);
     if (pMinBuffSize == NULL || pMaxBuffSize == NULL) {
-        g_sf_global_vars.min_buff_size = g_sf_global_vars.max_pkg_size;
-        g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
+        net_buffer_cfg->min_buff_size = net_buffer_cfg->max_pkg_size;
+        net_buffer_cfg->max_buff_size = net_buffer_cfg->max_pkg_size;
     } else {
-        g_sf_global_vars.min_buff_size = iniGetByteCorrectValueEx(ini_ctx,
+        net_buffer_cfg->min_buff_size = iniGetByteCorrectValueEx(ini_ctx,
             "min_buff_size", SF_DEF_MIN_BUFF_SIZE, 1, 4096,
             SF_MAX_NETWORK_BUFF_SIZE, true);
-        g_sf_global_vars.max_buff_size = iniGetByteCorrectValueEx(ini_ctx,
+        net_buffer_cfg->max_buff_size = iniGetByteCorrectValueEx(ini_ctx,
             "max_buff_size", SF_DEF_MAX_BUFF_SIZE, 1, 8192,
             SF_MAX_NETWORK_BUFF_SIZE, true);
 
-        if (g_sf_global_vars.max_buff_size < g_sf_global_vars.max_pkg_size) {
-            g_sf_global_vars.max_buff_size = g_sf_global_vars.max_pkg_size;
+        if (net_buffer_cfg->max_buff_size < net_buffer_cfg->max_pkg_size) {
+            net_buffer_cfg->max_buff_size = net_buffer_cfg->max_pkg_size;
         }
-        if (g_sf_global_vars.max_buff_size < g_sf_global_vars.min_buff_size) {
+        if (net_buffer_cfg->max_buff_size < net_buffer_cfg->min_buff_size) {
             logWarning("file: "__FILE__", line: %d, "
                     "max_buff_size: %d < min_buff_size: %d, "
                     "set max_buff_size to min_buff_size", __LINE__,
-                    g_sf_global_vars.max_buff_size,
-                    g_sf_global_vars.min_buff_size);
-            g_sf_global_vars.max_buff_size = g_sf_global_vars.min_buff_size;
+                    net_buffer_cfg->max_buff_size,
+                    net_buffer_cfg->min_buff_size);
+            net_buffer_cfg->max_buff_size = net_buffer_cfg->min_buff_size;
         }
     }
 
     if (task_buffer_extra_size > 0) {
-        g_sf_global_vars.min_buff_size += task_buffer_extra_size;
-        g_sf_global_vars.max_buff_size += task_buffer_extra_size;
-        if (g_sf_global_vars.max_pkg_size < g_sf_global_vars.max_buff_size) {
-            g_sf_global_vars.max_pkg_size = g_sf_global_vars.max_buff_size;
+        net_buffer_cfg->min_buff_size += task_buffer_extra_size;
+        net_buffer_cfg->max_buff_size += task_buffer_extra_size;
+        if (net_buffer_cfg->max_pkg_size < net_buffer_cfg->max_buff_size) {
+            net_buffer_cfg->max_pkg_size = net_buffer_cfg->max_buff_size;
         }
     }
 
@@ -305,7 +299,14 @@ int sf_load_global_config_ex(const char *log_filename_prefix,
     tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
     if (load_network_params) {
         if ((result=load_network_parameters(ini_ctx, max_pkg_size_item_nm,
-                        fixed_buff_size, task_buffer_extra_size)) != 0)
+                        fixed_buff_size, task_buffer_extra_size,
+                        &g_sf_global_vars.net_buffer_cfg)) != 0)
+        {
+            return result;
+        }
+
+        if ((result=set_rlimit(RLIMIT_NOFILE, g_sf_global_vars.
+                        net_buffer_cfg.max_connections)) != 0)
         {
             return result;
         }
@@ -416,7 +417,8 @@ int sf_load_config_ex(const char *log_filename_prefix,
     {
         return result;
     }
-    return sf_load_context_from_config_ex(&g_sf_context, config);
+    return sf_load_context_from_config_ex(&g_sf_context, config,
+            fixed_buff_size, task_buffer_extra_size);
 }
 
 #define API_PREFIX_NAME  "fast_rdma_"
@@ -639,7 +641,8 @@ static int load_address_family(SFContext *sf_context,
 }
 
 int sf_load_context_from_config_ex(SFContext *sf_context,
-        SFContextIniConfig *config)
+        SFContextIniConfig *config, const int fixed_buff_size,
+        const int task_buffer_extra_size)
 {
     SFAddressFamilyHandler *fh;
     SFNetworkHandler *sock_handler;
@@ -761,6 +764,14 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
     if ((result=load_address_family(sf_context, config)) != 0) {
+        return result;
+    }
+
+    if ((result=load_network_parameters(&config->ini_ctx, config->
+                    max_pkg_size_item_name, fixed_buff_size,
+                    task_buffer_extra_size, &sf_context->
+                    net_buffer_cfg)) != 0)
+    {
         return result;
     }
 
@@ -960,11 +971,11 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
     int max_buff_size;
     char pkg_buff[256];
 
-    max_pkg_size = g_sf_global_vars.max_pkg_size -
+    max_pkg_size = g_sf_global_vars.net_buffer_cfg.max_pkg_size -
         g_sf_global_vars.task_buffer_extra_size;
-    min_buff_size = g_sf_global_vars.min_buff_size -
+    min_buff_size = g_sf_global_vars.net_buffer_cfg.min_buff_size -
         g_sf_global_vars.task_buffer_extra_size;
-    max_buff_size = g_sf_global_vars.max_buff_size -
+    max_buff_size = g_sf_global_vars.net_buffer_cfg.max_buff_size -
         g_sf_global_vars.task_buffer_extra_size;
 
     if (min_buff_size == max_buff_size && max_pkg_size == max_buff_size) {
@@ -982,9 +993,9 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             "network_timeout=%d, thread_stack_size=%d KB, "
             "%s, tcp_quick_ack=%d, log_level=%s, "
             "run_by_group=%s, run_by_user=%s, ", SF_G_BASE_PATH_STR,
-            g_sf_global_vars.max_connections,
-            g_sf_global_vars.connect_timeout,
-            g_sf_global_vars.network_timeout,
+            g_sf_global_vars.net_buffer_cfg.max_connections,
+            g_sf_global_vars.net_buffer_cfg.connect_timeout,
+            g_sf_global_vars.net_buffer_cfg.network_timeout,
             g_sf_global_vars.thread_stack_size / 1024,
             pkg_buff, g_sf_global_vars.tcp_quick_ack,
             log_get_level_caption(),

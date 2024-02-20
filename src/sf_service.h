@@ -148,8 +148,6 @@ void sf_notify_all_threads_ex(SFContext *sf_context);
 
 void sf_set_sig_quit_handler(sf_sig_quit_handler quit_handler);
 
-int sf_init_task(struct fast_task_info *task);
-
 static inline struct fast_task_info *sf_alloc_init_task_ex(
         SFNetworkHandler *handler, const int fd,
         const int reffer_count)

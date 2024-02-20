@@ -164,6 +164,15 @@ typedef struct sf_address_family_handler {
     struct sf_context *ctx;
 } SFAddressFamilyHandler;
 
+typedef struct sf_net_buffer_config {
+    int connect_timeout;
+    int network_timeout;
+    int max_connections;
+    int max_pkg_size;
+    int min_buff_size;
+    int max_buff_size;
+} SFNetBufferConfig;
+
 typedef struct sf_context {
     char name[64];
     struct nio_thread_data *thread_data;
@@ -172,6 +181,8 @@ typedef struct sf_context {
     //int rdma_port_offset;
     SFAddressFamily address_family;
     SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
+
+    SFNetBufferConfig net_buffer_cfg;
 
     int accept_threads;
     int work_threads;

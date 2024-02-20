@@ -30,8 +30,6 @@ typedef struct sf_connection_stat {
 } SFConnectionStat;
 
 typedef struct sf_global_variables {
-    int connect_timeout;
-    int network_timeout;
     struct {
         char str[MAX_PATH_SIZE];
         bool inited;
@@ -41,10 +39,9 @@ typedef struct sf_global_variables {
     volatile bool continue_flag;
     bool tcp_quick_ack;
     bool epoll_edge_trigger;
-    int max_connections;
-    int max_pkg_size;
-    int min_buff_size;
-    int max_buff_size;
+
+    SFNetBufferConfig net_buffer_cfg;
+
     int task_buffer_extra_size;
     int thread_stack_size;
 
@@ -84,8 +81,8 @@ extern SFContext                 g_sf_context;
 #define SF_G_BASE_PATH_INITED    g_sf_global_vars.base_path.inited
 #define SF_G_BASE_PATH_CREATED   g_sf_global_vars.base_path.created
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
-#define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.connect_timeout
-#define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.network_timeout
+#define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.net_buffer_cfg.connect_timeout
+#define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.net_buffer_cfg.network_timeout
 #define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
 #define SF_G_UP_TIME             g_sf_global_vars.up_time
@@ -236,20 +233,23 @@ static inline int sf_load_config(const char *log_filename_prefix,
 }
 
 int sf_load_context_from_config_ex(SFContext *sf_context,
-        SFContextIniConfig *config);
+        SFContextIniConfig *config, const int fixed_buff_size,
+        const int task_buffer_extra_size);
 
 static inline int sf_load_context_from_config(SFContext *sf_context,
         const FCCommunicationType comm_type,
         const char *filename, IniContext *pIniContext,
         const char *section_name, const int default_inner_port,
-        const int default_outer_port)
+        const int default_outer_port, const int fixed_buff_size,
+        const int task_buffer_extra_size)
 {
     SFContextIniConfig config;
 
     SF_SET_CONTEXT_INI_CONFIG(config, comm_type, filename, pIniContext,
             section_name, default_inner_port, default_outer_port,
             DEFAULT_WORK_THREADS);
-    return sf_load_context_from_config_ex(sf_context, &config);
+    return sf_load_context_from_config_ex(sf_context, &config,
+            fixed_buff_size, task_buffer_extra_size);
 }
 
 int sf_alloc_rdma_pd(SFContext *sf_context,

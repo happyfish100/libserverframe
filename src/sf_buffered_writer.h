@@ -80,13 +80,23 @@ extern "C" {
         return 0;
     }
 
-    static inline void sf_buffered_writer_destroy(SFBufferedWriter *writer)
+    static inline int sf_buffered_writer_destroy(SFBufferedWriter *writer)
     {
+        int result;
+
         if (writer->fd >= 0) {
+            if (fsync(writer->fd) != 0) {
+                result = errno != 0 ? errno : EIO;
+                logError("file: "__FILE__", line: %d, "
+                        "fsync to file %s fail, errno: %d, error info: %s",
+                        __LINE__, writer->filename, result, STRERROR(result));
+                return result;
+            }
             close(writer->fd);
             writer->fd = -1;
         }
         sf_binlog_buffer_destroy(&writer->buffer);
+        return 0;
     }
 
 #ifdef __cplusplus

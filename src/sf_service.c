@@ -58,19 +58,11 @@ struct worker_thread_context {
     struct nio_thread_data *thread_data;
 };
 
-int sf_init_task(struct fast_task_info *task)
-{
-    task->connect_timeout = SF_G_CONNECT_TIMEOUT; //for client side
-    task->network_timeout = SF_G_NETWORK_TIMEOUT;
-    return 0;
-}
-
 static void *worker_thread_entrance(void *arg);
 
-static int sf_init_free_queue(struct fast_task_queue *free_queue,
-        const char *name, const bool double_buffers,
-        const int task_padding_size, const int task_arg_size,
-        TaskInitCallback init_callback)
+static int sf_init_free_queue(SFContext *sf_context, const char *name,
+        const bool double_buffers, const int task_padding_size,
+        const int task_arg_size, TaskInitCallback init_callback)
 {
     int result;
     int m;
@@ -82,19 +74,18 @@ static int sf_init_free_queue(struct fast_task_queue *free_queue,
         return result;
     }
 
-    m = g_sf_global_vars.min_buff_size / (64 * 1024);
+    m = sf_context->net_buffer_cfg.min_buff_size / (64 * 1024);
     if (m == 0) {
         m = 1;
     } else if (m > 16) {
         m = 16;
     }
     alloc_conn_once = 256 / m;
-    return free_queue_init_ex2(free_queue, name, double_buffers,
-            g_sf_global_vars.max_connections, alloc_conn_once,
-            g_sf_global_vars.min_buff_size, g_sf_global_vars.
-            max_buff_size, task_padding_size, task_arg_size,
-            (init_callback != NULL ? init_callback :
-             sf_init_task));
+    return free_queue_init_ex2(&sf_context->free_queue, name, double_buffers,
+            sf_context->net_buffer_cfg.max_connections, alloc_conn_once,
+            sf_context->net_buffer_cfg.min_buff_size, sf_context->
+            net_buffer_cfg.max_buff_size, task_padding_size,
+            task_arg_size, init_callback);
 }
 
 int sf_service_init_ex2(SFContext *sf_context, const char *name,
@@ -125,8 +116,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 
     snprintf(sf_context->name, sizeof(sf_context->name), "%s", name);
     sf_context->connect_need_log = true;
-    sf_context->realloc_task_buffer = g_sf_global_vars.
-                    min_buff_size < g_sf_global_vars.max_buff_size;
+    sf_context->realloc_task_buffer = sf_context->net_buffer_cfg.
+        min_buff_size < sf_context->net_buffer_cfg.max_buff_size;
     sf_context->callbacks.accept_done = accept_done_callback;
     sf_set_parameters_ex(sf_context, proto_header_size,
             set_body_length_func, alloc_recv_buffer_func,
@@ -139,9 +130,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         }
     }
 
-    if ((result=sf_init_free_queue(&sf_context->free_queue,
-                    name, double_buffers, task_padding_size,
-                    task_arg_size, init_callback)) != 0)
+    if ((result=sf_init_free_queue(sf_context, name, double_buffers,
+                    task_padding_size, task_arg_size, init_callback)) != 0)
     {
         return result;
     }
@@ -203,8 +193,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&thread_data->ev_puller, 2 + g_sf_global_vars.
-                    max_connections, net_timeout_ms, extra_events) != 0)
+        if (ioevent_init(&thread_data->ev_puller, 2 + sf_context->
+                    net_buffer_cfg.max_connections, net_timeout_ms,
+                    extra_events) != 0)
         {
             result  = errno != 0 ? errno : ENOMEM;
             logError("file: "__FILE__", line: %d, "
@@ -214,8 +205,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             return result;
         }
 
-        result = fast_timer_init(&thread_data->timer,
-                2 * g_sf_global_vars.network_timeout, g_current_time);
+        result = fast_timer_init(&thread_data->timer, 2 * sf_context->
+                net_buffer_cfg.network_timeout, g_current_time);
         if (result != 0) {
             logError("file: "__FILE__", line: %d, "
                     "fast_timer_init fail, errno: %d, error info: %s",
@@ -359,7 +350,9 @@ int sf_socket_create_server(SFListener *listener,
         return result;
     }
 
-    if ((result=tcpsetserveropt(listener->sock, SF_G_NETWORK_TIMEOUT)) != 0) {
+    if ((result=tcpsetserveropt(listener->sock, listener->handler->
+                    fh->ctx->net_buffer_cfg.network_timeout)) != 0)
+    {
         return result;
     }
 

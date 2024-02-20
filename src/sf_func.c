@@ -38,7 +38,7 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
     if(*sock < 0) {
         return errno != 0 ? errno : ENOMEM;
     }
-    tcpsetserveropt(*sock, g_sf_global_vars.network_timeout);
+    tcpsetserveropt(*sock, g_sf_global_vars.net_buffer_cfg.network_timeout);
 
     if ((result=tcpsetnonblockopt(*sock)) != 0) {
         close(*sock);
@@ -47,8 +47,8 @@ int sf_connect_to_server(const char *ip_addr, const int port, int *sock)
     }
     FC_SET_CLOEXEC(*sock);
 
-    if ((result=connectserverbyip_nb(*sock, ip_addr, port,
-                    g_sf_global_vars.connect_timeout)) != 0)
+    if ((result=connectserverbyip_nb(*sock, ip_addr, port, g_sf_global_vars.
+                    net_buffer_cfg.connect_timeout)) != 0)
     {
         close(*sock);
         *sock = -1;

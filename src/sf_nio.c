@@ -197,7 +197,7 @@ static inline int sf_nio_init(struct fast_task_info *task)
 {
     inc_connection_current_count();
     return sf_ioevent_add(task, (IOEventCallback)sf_client_sock_read,
-            task->network_timeout);
+            SF_CTX->net_buffer_cfg.network_timeout);
 }
 
 int sf_socket_async_connect_check(struct fast_task_info *task)
@@ -274,7 +274,8 @@ static int sf_async_connect_server(struct fast_task_info *task)
     if ((result=task->handler->async_connect_server(task)) == EINPROGRESS) {
         result = ioevent_set(task, task->thread_data, task->event.fd,
                 IOEVENT_READ | IOEVENT_WRITE, (IOEventCallback)
-                sf_client_connect_done, task->connect_timeout);
+                sf_client_connect_done, SF_CTX->net_buffer_cfg.
+                connect_timeout);
         return result > 0 ? -1 * result : result;
     } else {
         if (SF_CTX->callbacks.connect_done != NULL) {
@@ -283,7 +284,8 @@ static int sf_async_connect_server(struct fast_task_info *task)
 
         if (result == 0) {
             if ((result=sf_ioevent_add(task, (IOEventCallback)
-                            sf_client_sock_read, task->network_timeout)) != 0)
+                            sf_client_sock_read, SF_CTX->
+                            net_buffer_cfg.network_timeout)) != 0)
             {
                 return result;
             }
@@ -339,7 +341,7 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
         case SF_NIO_STAGE_FORWARDED:  //forward by other thread
             if ((result=sf_ioevent_add(task, (IOEventCallback)
                             sf_client_sock_read,
-                            task->network_timeout)) == 0)
+                            SF_CTX->net_buffer_cfg.network_timeout)) == 0)
             {
                 result = SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_SEND);
             }
@@ -831,7 +833,7 @@ static int calc_iops_and_remove_polling(struct fast_task_info *task)
                             task->thread_data->timeout_ms);
                 }
                 result = sf_ioevent_add(task, (IOEventCallback)
-                        sf_client_sock_read, task->network_timeout);
+                        sf_client_sock_read, SF_CTX->net_buffer_cfg.network_timeout);
 
                 logInfo("file: "__FILE__", line: %d, client: %s:%u, "
                         "remove polling iops: %"PRId64, __LINE__,
@@ -915,7 +917,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
             }
 
             task->event.timer.expires = g_current_time +
-                task->network_timeout;
+                SF_CTX->net_buffer_cfg.network_timeout;
             fast_timer_add(&task->thread_data->timer,
                 &task->event.timer);
         } else {
@@ -943,7 +945,7 @@ int sf_client_sock_read(int sock, short event, void *arg)
     while (1) {
         fast_timer_modify(&task->thread_data->timer,
             &task->event.timer, g_current_time +
-            task->network_timeout);
+            SF_CTX->net_buffer_cfg.network_timeout);
 
         if ((bytes=task->handler->recv_data(task, !task->handler->
                         explicit_post_recv, &action)) < 0)
@@ -1017,7 +1019,7 @@ int sf_client_sock_write(int sock, short event, void *arg)
     while (1) {
         fast_timer_modify(&task->thread_data->timer,
                 &task->event.timer, g_current_time +
-                task->network_timeout);
+                SF_CTX->net_buffer_cfg.network_timeout);
 
         if ((bytes=task->handler->send_data(task, &action, &send_done)) < 0) {
             ioevent_add_to_deleted_list(task);
