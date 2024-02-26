@@ -56,8 +56,9 @@ SFContext g_sf_context = {{'\0'}, NULL, 0, sf_address_family_auto,
 };
 
 static int load_network_parameters(IniFullContext *ini_ctx,
-        const char *max_pkg_size_item_nm, const int fixed_buff_size,
-        const int task_buffer_extra_size, SFNetBufferConfig *net_buffer_cfg)
+        const char *max_pkg_size_item_nm, const int max_pkg_size_min_value,
+        const int fixed_buff_size, const int task_buffer_extra_size,
+        SFNetBufferConfig *net_buffer_cfg)
 {
     int padding_buff_size;
     char *pMinBuffSize;
@@ -84,7 +85,8 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     }
 
     if (fixed_buff_size > 0) {
-        padding_buff_size = fixed_buff_size + task_buffer_extra_size;
+        padding_buff_size = FC_MAX(fixed_buff_size, max_pkg_size_min_value) +
+            task_buffer_extra_size;
         net_buffer_cfg->min_buff_size = padding_buff_size;
         net_buffer_cfg->max_buff_size = padding_buff_size;
         net_buffer_cfg->max_pkg_size = padding_buff_size;
@@ -94,6 +96,13 @@ static int load_network_parameters(IniFullContext *ini_ctx,
     net_buffer_cfg->max_pkg_size = iniGetByteCorrectValueEx(ini_ctx,
             max_pkg_size_item_nm, SF_DEF_MAX_PACKAGE_SIZE, 1, 8192,
             SF_MAX_NETWORK_BUFF_SIZE, true);
+    if (net_buffer_cfg->max_pkg_size < max_pkg_size_min_value) {
+        net_buffer_cfg->max_pkg_size = max_pkg_size_min_value;
+    }
+    if (task_buffer_extra_size > 0) {
+        net_buffer_cfg->max_pkg_size += task_buffer_extra_size;
+    }
+
     pMinBuffSize = iniGetStrValueEx(ini_ctx->section_name,
             "min_buff_size", ini_ctx->context, true);
     pMaxBuffSize = iniGetStrValueEx(ini_ctx->section_name,
@@ -109,8 +118,16 @@ static int load_network_parameters(IniFullContext *ini_ctx,
             "max_buff_size", SF_DEF_MAX_BUFF_SIZE, 1, 8192,
             SF_MAX_NETWORK_BUFF_SIZE, true);
 
+        if (task_buffer_extra_size > 0) {
+            net_buffer_cfg->min_buff_size += task_buffer_extra_size;
+            net_buffer_cfg->max_buff_size += task_buffer_extra_size;
+        }
         if (net_buffer_cfg->max_buff_size < net_buffer_cfg->max_pkg_size) {
             net_buffer_cfg->max_buff_size = net_buffer_cfg->max_pkg_size;
+        } else if (net_buffer_cfg->max_pkg_size <
+                net_buffer_cfg->max_buff_size)
+        {
+            net_buffer_cfg->max_pkg_size = net_buffer_cfg->max_buff_size;
         }
         if (net_buffer_cfg->max_buff_size < net_buffer_cfg->min_buff_size) {
             logWarning("file: "__FILE__", line: %d, "
@@ -119,14 +136,6 @@ static int load_network_parameters(IniFullContext *ini_ctx,
                     net_buffer_cfg->max_buff_size,
                     net_buffer_cfg->min_buff_size);
             net_buffer_cfg->max_buff_size = net_buffer_cfg->min_buff_size;
-        }
-    }
-
-    if (task_buffer_extra_size > 0) {
-        net_buffer_cfg->min_buff_size += task_buffer_extra_size;
-        net_buffer_cfg->max_buff_size += task_buffer_extra_size;
-        if (net_buffer_cfg->max_pkg_size < net_buffer_cfg->max_buff_size) {
-            net_buffer_cfg->max_pkg_size = net_buffer_cfg->max_buff_size;
         }
     }
 
@@ -284,6 +293,7 @@ int sf_load_global_config_ex(const char *log_filename_prefix,
         const char *max_pkg_size_item_nm, const int fixed_buff_size,
         const int task_buffer_extra_size, const bool need_set_run_by)
 {
+    const int max_pkg_size_min_value = 0;
     int result;
     const char *old_section_name;
     char *pRunByGroup;
@@ -299,8 +309,9 @@ int sf_load_global_config_ex(const char *log_filename_prefix,
     tcp_set_quick_ack(g_sf_global_vars.tcp_quick_ack);
     if (load_network_params) {
         if ((result=load_network_parameters(ini_ctx, max_pkg_size_item_nm,
-                        fixed_buff_size, task_buffer_extra_size,
-                        &g_sf_global_vars.net_buffer_cfg)) != 0)
+                        max_pkg_size_min_value, fixed_buff_size,
+                        task_buffer_extra_size, &g_sf_global_vars.
+                        net_buffer_cfg)) != 0)
         {
             return result;
         }
@@ -768,9 +779,9 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
     if ((result=load_network_parameters(&config->ini_ctx, config->
-                    max_pkg_size_item_name, fixed_buff_size,
-                    task_buffer_extra_size, &sf_context->
-                    net_buffer_cfg)) != 0)
+                    max_pkg_size_item_name, config->max_pkg_size_min_value,
+                    fixed_buff_size, task_buffer_extra_size,
+                    &sf_context->net_buffer_cfg)) != 0)
     {
         return result;
     }

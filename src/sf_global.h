@@ -66,6 +66,7 @@ typedef struct sf_context_ini_config {
     int default_inner_port;
     int default_outer_port;
     int default_work_threads;
+    int max_pkg_size_min_value;
     FCCommunicationType comm_type;
     const char *max_pkg_size_item_name;
 } SFContextIniConfig;
@@ -172,9 +173,9 @@ extern SFContext                 g_sf_context;
 #define SF_FCHOWN_TO_RUNBY_RETURN_ON_ERROR(fd, path) \
     SF_FCHOWN_RETURN_ON_ERROR(fd, path, geteuid(), getegid())
 
-#define SF_SET_CONTEXT_INI_CONFIG_EX(config, the_comm_type, filename,   \
-        pIniContext, section_name, def_inner_port, def_outer_port, \
-        def_work_threads, max_pkg_size_item_nm) \
+#define SF_SET_CONTEXT_INI_CONFIG_EX(config, the_comm_type, filename, \
+        pIniContext, section_name, def_inner_port, def_outer_port,    \
+        def_work_threads, max_pkg_size_item_nm, max_pkg_size_min_val) \
     do { \
         FAST_INI_SET_FULL_CTX_EX(config.ini_ctx, filename, \
                 section_name, pIniContext);   \
@@ -183,6 +184,7 @@ extern SFContext                 g_sf_context;
         config.default_outer_port = def_outer_port; \
         config.default_work_threads = def_work_threads; \
         config.max_pkg_size_item_name = max_pkg_size_item_nm; \
+        config.max_pkg_size_min_value = max_pkg_size_min_val; \
     } while (0)
 
 #define SF_SET_CONTEXT_INI_CONFIG(config, the_comm_type,     \
@@ -190,7 +192,7 @@ extern SFContext                 g_sf_context;
         def_outer_port, def_work_threads) \
      SF_SET_CONTEXT_INI_CONFIG_EX(config, the_comm_type, filename, \
              pIniContext, section_name, def_inner_port, def_outer_port, \
-             def_work_threads, "max_pkg_size")
+             def_work_threads, "max_pkg_size", 0)
 
 int sf_load_global_config_ex(const char *log_filename_prefix,
         IniFullContext *ini_ctx, const bool load_network_params,

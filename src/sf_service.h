@@ -170,7 +170,10 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
     return task;
 }
 
-#define sf_hold_task(task) __sync_add_and_fetch(&task->reffer_count, 1)
+#define sf_hold_task_ex(task, inc_count) __sync_add_and_fetch( \
+        &task->reffer_count, inc_count)
+#define sf_hold_task(task)  sf_hold_task_ex(task, 1)
+
 #define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
 
 static inline void sf_release_task(struct fast_task_info *task)
