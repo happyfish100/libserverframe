@@ -430,20 +430,23 @@ static void binlog_wbuffer_destroy_func(void *element, void *args)
 
 int sf_binlog_writer_init_normal_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const char *file_prefix, const int buffer_size,
-        const int64_t file_rotate_size, const bool call_fsync)
+        const char *file_prefix, const int max_record_size,
+        const int buffer_size, const int64_t file_rotate_size,
+        const bool call_fsync)
 {
     memset(writer, 0, sizeof(*writer));
     writer->order_by = SF_BINLOG_WRITER_TYPE_ORDER_BY_NONE;
     return sf_file_writer_init(&writer->fw, data_path, subdir_name,
-            file_prefix, buffer_size, file_rotate_size, call_fsync);
+            file_prefix, max_record_size, buffer_size,
+            file_rotate_size, call_fsync);
 }
 
 int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
         const char *data_path, const char *subdir_name,
-        const char *file_prefix, const uint64_t next_version,
-        const int buffer_size, const int ring_size,
-        const int64_t file_rotate_size, const bool call_fsync)
+        const char *file_prefix, const int max_record_size,
+        const uint64_t next_version, const int buffer_size,
+        const int ring_size, const int64_t file_rotate_size,
+        const bool call_fsync)
 {
     int bytes;
 
@@ -462,7 +465,8 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
     binlog_writer_set_next_version(writer, next_version);
     writer->flush.in_queue = false;
     return sf_file_writer_init(&writer->fw, data_path, subdir_name,
-            file_prefix, buffer_size, file_rotate_size, call_fsync);
+            file_prefix, max_record_size, buffer_size,
+            file_rotate_size, call_fsync);
 }
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,

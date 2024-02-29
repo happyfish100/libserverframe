@@ -236,9 +236,8 @@ static int do_write_to_file(SFFileWriterInfo *writer,
         if (fsync(writer->file.fd) != 0) {
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
-                    "fsync to binlog file \"%s\" fail, "
-                    "errno: %d, error info: %s",
-                    __LINE__, writer->file.name,
+                    "fsync to binlog file \"%s\" fail, errno: %d, "
+                    "error info: %s", __LINE__, writer->file.name,
                     result, STRERROR(result));
             return result;
         }
@@ -294,6 +293,26 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
 
     writer->binlog_buffer.data_end = writer->binlog_buffer.buff;
     return result;
+}
+
+int sf_file_writer_fsync(SFFileWriterInfo *writer)
+{
+    int result;
+
+    if ((result=sf_file_writer_flush(writer)) != 0) {
+        return result;
+    }
+
+    if (fsync(writer->file.fd) == 0) {
+        return 0;
+    } else {
+        result = errno != 0 ? errno : EIO;
+        logError("file: "__FILE__", line: %d, "
+                "fsync to binlog file \"%s\" fail, errno: %d, "
+                "error info: %s", __LINE__, writer->file.name,
+                result, STRERROR(result));
+        return result;
+    }
 }
 
 int sf_file_writer_get_indexes(SFFileWriterInfo *writer,
@@ -365,10 +384,34 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     return 0;
 }
 
+int sf_file_writer_save_buffer(SFFileWriterInfo *writer, const int length)
+{
+    int result;
+
+    if (writer->cfg.file_rotate_size > 0 && writer->file.size +
+            SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(writer->binlog_buffer) +
+            length > writer->cfg.file_rotate_size)
+    {
+        if ((result=sf_file_writer_flush(writer)) != 0) {
+            return result;
+        }
+    }
+
+    writer->binlog_buffer.data_end += length;
+
+    if (SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(writer->binlog_buffer) <
+            writer->cfg.max_record_size)
+    {
+        return sf_file_writer_flush(writer);
+    } else {
+        return 0;
+    }
+}
+
 int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         const char *subdir_name, const char *file_prefix,
-        const int buffer_size, const int64_t file_rotate_size,
-        const bool call_fsync)
+        const int max_record_size, const int buffer_size,
+        const int64_t file_rotate_size, const bool call_fsync)
 {
     int result;
     int path_len;
@@ -385,6 +428,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         return result;
     }
 
+    writer->cfg.max_record_size = max_record_size;
     writer->cfg.call_fsync = call_fsync;
     writer->cfg.file_rotate_size = file_rotate_size;
     writer->cfg.data_path = data_path;

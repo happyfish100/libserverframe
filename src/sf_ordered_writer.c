@@ -250,8 +250,8 @@ int sf_ordered_writer_init_ex(SFOrderedWriterContext *context,
 {
     int result;
     if ((result=sf_file_writer_init(&context->writer.fw, data_path,
-                    subdir_name, file_prefix, buffer_size,
-                    file_rotate_size, call_fsync)) != 0)
+                    subdir_name, file_prefix, max_record_size,
+                    buffer_size, file_rotate_size, call_fsync)) != 0)
     {
         return result;
     }

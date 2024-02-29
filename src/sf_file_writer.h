@@ -68,8 +68,8 @@ extern "C" {
 
 int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
         const char *subdir_name, const char *file_prefix,
-        const int buffer_size, const int64_t file_rotate_size,
-        const bool call_fsync);
+        const int max_record_size, const int buffer_size,
+        const int64_t file_rotate_size, const bool call_fsync);
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
 
@@ -81,10 +81,26 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
 
 int sf_file_writer_flush(SFFileWriterInfo *writer);
 
+int sf_file_writer_fsync(SFFileWriterInfo *writer);
+
+#define SF_FILE_WRITER_DATA_END_BUFF(writer) (writer)->binlog_buffer.data_end
+#define SF_FILE_WRITER_CURRENT_DATA_VERSION(writer) \
+    (writer)->last_versions.pending
+#define SF_FILE_WRITER_NEXT_DATA_VERSION(writer) \
+    ++((writer)->last_versions.pending)
+
+int sf_file_writer_save_buffer(SFFileWriterInfo *writer, const int length);
+
 static inline void sf_file_writer_set_flags(
         SFFileWriterInfo *writer, const short flags)
 {
     writer->flags = flags;
+}
+
+static inline void sf_file_writer_set_call_fsync(
+        SFFileWriterInfo *writer, const bool call_fsync)
+{
+    writer->cfg.call_fsync = call_fsync;
 }
 
 static inline int64_t sf_file_writer_get_last_version_ex(
