@@ -84,7 +84,7 @@ extern SFContext                 g_sf_context;
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.net_buffer_cfg.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.net_buffer_cfg.network_timeout
-#define SF_G_MAX_CONNECTIONS     g_sf_global_vars.max_connections
+#define SF_G_MAX_CONNECTIONS     g_sf_global_vars.net_buffer_cfg.max_connections
 #define SF_G_THREAD_STACK_SIZE   g_sf_global_vars.thread_stack_size
 #define SF_G_UP_TIME             g_sf_global_vars.up_time
 

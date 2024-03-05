@@ -213,6 +213,7 @@ int idempotency_client_channel_check_reconnect(
         IdempotencyClientChannel *channel)
 {
     int result;
+    char formatted_ip[FORMATTED_IP_SIZE];
 
     if (!__sync_bool_compare_and_swap(&channel->in_ioevent, 0, 1)) {
         return 0;
@@ -223,10 +224,12 @@ int idempotency_client_channel_check_reconnect(
         channel->last_connect_time = g_current_time;
     }
 
-    logDebug("file: "__FILE__", line: %d, "
-            "trigger connect to server %s:%u",
-            __LINE__, channel->task->server_ip,
-            channel->task->port);
+    if (FC_LOG_BY_LEVEL(LOG_DEBUG)) {
+        format_ip_address(channel->task->server_ip, formatted_ip);
+        logDebug("file: "__FILE__", line: %d, "
+                "trigger connect to server %s:%u", __LINE__,
+                formatted_ip, channel->task->port);
+    }
 
     __sync_bool_compare_and_swap(&channel->task->canceled, 1, 0);
     if ((result=sf_nio_notify(channel->task, SF_NIO_STAGE_CONNECT)) == 0) {

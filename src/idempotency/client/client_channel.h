@@ -86,10 +86,12 @@ static inline int idempotency_client_channel_check_wait_ex(
         return 0;
     } else {
         /*
+        char formatted_ip[FORMATTED_IP_SIZE];
+        format_ip_address(channel->task->server_ip, formatted_ip);
         logInfo("file: "__FILE__", line: %d, "
                 "channel_check fail, server %s:%u, in_ioevent: %d, "
                 "canceled: %d, req count: %"PRId64, __LINE__,
-                channel->task->server_ip, channel->task->port,
+                formatted_ip, channel->task->port,
                 __sync_add_and_fetch(&channel->in_ioevent, 0),
                 __sync_add_and_fetch(&channel->task->canceled, 0),
                 channel->task->req_count);

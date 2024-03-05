@@ -405,6 +405,7 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
     ConnectionInfo *conn;
     SFClientServerEntry leader;
     SFNetRetryIntervalContext net_retry_ctx;
+    char formatted_ip[FORMATTED_IP_SIZE];
     int i;
     int connect_fails;
 
@@ -467,10 +468,11 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                 connect.times, ++i, *err_no);
     }
 
+    format_ip_address(server->group_addrs[cm->server_group_index].
+            address_array.addrs[0]->conn.ip_addr, formatted_ip);
     logWarning("file: "__FILE__", line: %d, "
             "%s get_leader_connection fail, server id: %d, %s:%u, errno: %d",
-            __LINE__, cm->module_name, server->id, server->group_addrs
-            [cm->server_group_index].  address_array.addrs[0]->conn.ip_addr,
+            __LINE__, cm->module_name, server->id, formatted_ip,
             server->group_addrs[cm->server_group_index].address_array.
             addrs[0]->conn.port, *err_no);
     return NULL;

@@ -14,8 +14,6 @@
  */
 
 
-#include <errno.h>
-#include "fastcommon/shared_func.h"
 #include "sf_util.h"
 #include "sf_nio.h"
 #include "sf_proto.h"
@@ -29,14 +27,16 @@ static int64_t log_slower_than_us = 0;
 int sf_proto_set_body_length(struct fast_task_info *task)
 {
     SFCommonProtoHeader *header;
+    char formatted_ip[FORMATTED_IP_SIZE];
 
     header = (SFCommonProtoHeader *)task->recv.ptr->data;
     if (!SF_PROTO_CHECK_MAGIC(header->magic)) {
+        format_ip_address(task->client_ip, formatted_ip);
         logError("file: "__FILE__", line: %d, "
                 "%s peer %s:%u, magic "SF_PROTO_MAGIC_FORMAT" is invalid, "
                 "expect: "SF_PROTO_MAGIC_FORMAT", cmd: %d, body length: %d",
                 __LINE__, (task->handler != NULL ? task->handler->fh->ctx->
-                    name : ""), task->client_ip, task->port,
+                    name : ""), formatted_ip, task->port,
                 SF_PROTO_MAGIC_PARAMS(header->magic),
                 SF_PROTO_MAGIC_EXPECT_PARAMS, header->cmd,
                 buff2int(header->body_len));
@@ -456,14 +456,17 @@ const char *sf_get_cmd_caption(const int cmd)
 int sf_proto_deal_ack(struct fast_task_info *task,
         SFRequestInfo *request, SFResponseInfo *response)
 {
+    char formatted_ip[FORMATTED_IP_SIZE];
+
     if (request->header.status != 0) {
         if (request->header.body_len > 0) {
             int remain_size;
             int len;
 
+            format_ip_address(task->client_ip, formatted_ip);
             response->error.length = sprintf(response->error.message,
                     "message from peer %s:%u => ",
-                    task->client_ip, task->port);
+                    formatted_ip, task->port);
             remain_size = sizeof(response->error.message) -
                 response->error.length;
             if (request->header.body_len >= remain_size) {
@@ -525,6 +528,7 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     char out_buff[sizeof(SFCommonProtoHeader) +
         sizeof(SFProtoGetGroupServersReq)];
     char in_buff[1024];
+    char formatted_ip[FORMATTED_IP_SIZE];
     SFCommonProtoHeader *header;
     SFProtoGetGroupServersReq *req;
     SFProtoGetGroupServersRespBodyHeader *body_header;
@@ -552,9 +556,10 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     }
 
     if (body_len < sizeof(SFProtoGetGroupServersRespBodyHeader)) {
+        format_ip_address(conn->ip_addr, formatted_ip);
         logError("file: "__FILE__", line: %d, "
-                "server %s:%d response body length: %d < %d",
-                __LINE__, conn->ip_addr, conn->port, body_len,
+                "server %s:%u response body length: %d < %d",
+                __LINE__, formatted_ip, conn->port, body_len,
                 (int)sizeof(SFProtoGetGroupServersRespBodyHeader));
         return EINVAL;
     }
@@ -562,15 +567,17 @@ int sf_proto_get_group_servers(ConnectionInfo *conn,
     body_header = (SFProtoGetGroupServersRespBodyHeader *)in_buff;
     count = buff2int(body_header->count);
     if (count <= 0) {
+        format_ip_address(conn->ip_addr, formatted_ip);
         logError("file: "__FILE__", line: %d, "
-                "server %s:%d response server count: %d <= 0",
-                __LINE__, conn->ip_addr, conn->port, count);
+                "server %s:%u response server count: %d <= 0",
+                __LINE__, formatted_ip, conn->port, count);
         return EINVAL;
     }
     if (count > sarray->alloc) {
+        format_ip_address(conn->ip_addr, formatted_ip);
         logError("file: "__FILE__", line: %d, "
-                "server %s:%d response server count: %d is too large, "
-                "exceeds %d", __LINE__, conn->ip_addr, conn->port,
+                "server %s:%u response server count: %d is too large, "
+                "exceeds %d", __LINE__, formatted_ip, conn->port,
                 count, sarray->alloc);
         return EOVERFLOW;
     }
@@ -630,6 +637,7 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
     int r;
     int64_t time_used;
     int log_level;
+    char formatted_ip[FORMATTED_IP_SIZE];
     char time_buff[32];
 
     if (ctx->log_level != LOG_NOTHING && ctx->response.error.length > 0) {
@@ -637,7 +645,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
                 "file: "__FILE__", line: %d, %s "
                 "peer %s:%u, cmd: %d (%s), req body length: %d, "
                 "resp status: %d, %s", __LINE__, service_name,
-                task->client_ip, task->port, ctx->request.header.cmd,
+                format_ip_address(task->client_ip, formatted_ip),
+                task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.status,
                 ctx->response.error.message);
@@ -650,7 +659,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
             log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
                     "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
                     "resp status: %d, time used: %s us", __LINE__, service_name,
-                    task->client_ip, task->port, ctx->request.header.cmd,
+                    format_ip_address(task->client_ip, formatted_ip),
+                    task->port, ctx->request.header.cmd,
                     GET_CMD_CAPTION(ctx->request.header.cmd),
                     ctx->request.header.body_len, ctx->response.header.status,
                     long_to_comma_str(time_used, time_buff));
@@ -691,8 +701,9 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         blen = sprintf(buff, "timed used: %s us, %s client %s:%u, "
                 "req cmd: %d (%s), req body len: %d, resp cmd: %d (%s), "
                 "status: %d, resp body len: %d", long_to_comma_str(time_used,
-                    time_buff), service_name, task->client_ip, task->port, ctx->
-                request.header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
+                    time_buff), service_name, format_ip_address(task->
+                        client_ip, formatted_ip), task->port, ctx->request.
+                header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
                 GET_CMD_CAPTION(ctx->response.header.cmd),
                 ctx->response.header.status, ctx->response.header.body_len);
@@ -705,7 +716,8 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
                 "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
                 "resp cmd: %d (%s), status: %d, resp body_len: %d, "
                 "time used: %s us", __LINE__, service_name,
-                task->client_ip, task->port, ctx->request.header.cmd,
+                format_ip_address(task->client_ip, formatted_ip),
+                task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
                 GET_CMD_CAPTION(ctx->response.header.cmd),

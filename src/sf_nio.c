@@ -216,6 +216,7 @@ static int sf_client_connect_done(int sock, short event, void *arg)
 {
     int result;
     struct fast_task_info *task;
+    char formatted_ip[FORMATTED_IP_SIZE];
 
     task = (struct fast_task_info *)arg;
     if (task->canceled) {
@@ -237,9 +238,10 @@ static int sf_client_connect_done(int sock, short event, void *arg)
 
     if (result != 0) {
         if (SF_CTX->connect_need_log) {
+            format_ip_address(task->server_ip, formatted_ip);
             logError("file: "__FILE__", line: %d, "
                     "connect to server %s:%u fail, errno: %d, "
-                    "error info: %s", __LINE__, task->server_ip,
+                    "error info: %s", __LINE__, formatted_ip,
                     task->port, result, STRERROR(result));
         }
         ioevent_add_to_deleted_list(task);
@@ -247,9 +249,10 @@ static int sf_client_connect_done(int sock, short event, void *arg)
     }
 
     if (SF_CTX->connect_need_log) {
+        format_ip_address(task->server_ip, formatted_ip);
         logInfo("file: "__FILE__", line: %d, "
                 "connect to server %s:%u successfully",
-                __LINE__, task->server_ip, task->port);
+                __LINE__, formatted_ip, task->port);
     }
     return SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_HANDSHAKE);
 }
@@ -270,6 +273,7 @@ int sf_socket_async_connect_server(struct fast_task_info *task)
 static int sf_async_connect_server(struct fast_task_info *task)
 {
     int result;
+    char formatted_ip[FORMATTED_IP_SIZE];
 
     if ((result=task->handler->async_connect_server(task)) == EINPROGRESS) {
         result = ioevent_set(task, task->thread_data, task->event.fd,
@@ -291,17 +295,19 @@ static int sf_async_connect_server(struct fast_task_info *task)
             }
 
             if (SF_CTX->connect_need_log) {
+                format_ip_address(task->server_ip, formatted_ip);
                 logInfo("file: "__FILE__", line: %d, "
                         "connect to server %s:%u successfully",
-                        __LINE__, task->server_ip, task->port);
+                        __LINE__, formatted_ip, task->port);
             }
             return SF_CTX->callbacks.deal_task(task, SF_NIO_STAGE_HANDSHAKE);
         } else {
             task->handler->close_connection(task);
             if (SF_CTX->connect_need_log) {
+                format_ip_address(task->server_ip, formatted_ip);
                 logError("file: "__FILE__", line: %d, "
                         "connect to server %s:%u fail, errno: %d, "
-                        "error info: %s", __LINE__, task->server_ip,
+                        "error info: %s", __LINE__, formatted_ip,
                         task->port, result, STRERROR(result));
             }
             return result > 0 ? -1 * result : result;
@@ -767,6 +773,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
 
 static int calc_iops_and_trigger_polling(struct fast_task_info *task)
 {
+    char formatted_ip[FORMATTED_IP_SIZE];
     int time_distance;
     int result = 0;
 
@@ -793,9 +800,10 @@ static int calc_iops_and_trigger_polling(struct fast_task_info *task)
                 fc_list_add_tail(&task->polling.dlink,
                         &task->thread_data->polling_queue);
 
+                format_ip_address(task->client_ip, formatted_ip);
                 logInfo("file: "__FILE__", line: %d, client: %s:%u, "
                         "trigger polling iops: %"PRId64, __LINE__,
-                        task->client_ip, task->port, (task->req_count -
+                        formatted_ip, task->port, (task->req_count -
                             task->polling.last_req_count) / time_distance);
             }
         } else {
@@ -813,6 +821,7 @@ static int calc_iops_and_trigger_polling(struct fast_task_info *task)
 
 static int calc_iops_and_remove_polling(struct fast_task_info *task)
 {
+    char formatted_ip[FORMATTED_IP_SIZE];
     int time_distance;
     int result = 0;
 
@@ -835,9 +844,10 @@ static int calc_iops_and_remove_polling(struct fast_task_info *task)
                 result = sf_ioevent_add(task, (IOEventCallback)
                         sf_client_sock_read, SF_CTX->net_buffer_cfg.network_timeout);
 
+                format_ip_address(task->client_ip, formatted_ip);
                 logInfo("file: "__FILE__", line: %d, client: %s:%u, "
                         "remove polling iops: %"PRId64, __LINE__,
-                        task->client_ip, task->port, (task->req_count -
+                        formatted_ip, task->port, (task->req_count -
                             task->polling.last_req_count) / time_distance);
             }
         } else {
