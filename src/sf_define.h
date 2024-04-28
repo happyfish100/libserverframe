@@ -20,8 +20,8 @@
 
 #include "fastcommon/sockopt.h"
 
-#define SF_DEFAULT_CONNECT_TIMEOUT    2
-#define SF_DEFAULT_NETWORK_TIMEOUT   10
+#define SF_DEFAULT_CONNECT_TIMEOUT   10
+#define SF_DEFAULT_NETWORK_TIMEOUT   60
 
 #define SF_DEF_THREAD_STACK_SIZE  (256 * 1024)
 #define SF_MIN_THREAD_STACK_SIZE  (64 * 1024)
