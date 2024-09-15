@@ -46,12 +46,11 @@ static IdempotencyReceiptGlobalVars receipt_global_vars;
 #define RECEIPT_THREAD_CONTEXTS  receipt_global_vars.thread_contexts
 #define TASK_PADDING_SIZE        receipt_global_vars.rdma.task_padding_size
 #define RDMA_INIT_CONNECTION     receipt_global_vars.rdma.init_connection
-#define RDMA_PD                  receipt_global_vars.rdma.pd
 
-static int receipt_init_task(struct fast_task_info *task)
+static int receipt_init_task(struct fast_task_info *task, void *arg)
 {
     if (RDMA_INIT_CONNECTION != NULL) {
-        return RDMA_INIT_CONNECTION(task, RDMA_PD);
+        return RDMA_INIT_CONNECTION(task, arg);
     } else {
         return 0;
     }
@@ -525,6 +524,7 @@ static int do_init(FCAddressPtrArray *address_array)
     int result;
     int bytes;
     SFNetworkHandler *rdma_handler;
+    struct ibv_pd *pd;
 
     bytes = sizeof(IdempotencyReceiptThreadContext) * SF_G_WORK_THREADS;
     RECEIPT_THREAD_CONTEXTS = (IdempotencyReceiptThreadContext *)
@@ -541,11 +541,11 @@ static int do_init(FCAddressPtrArray *address_array)
 
         TASK_PADDING_SIZE = rdma_handler->get_connection_size();
         RDMA_INIT_CONNECTION = rdma_handler->init_connection;
-        RDMA_PD = rdma_handler->pd;
+        pd = rdma_handler->pd;
     } else {
         TASK_PADDING_SIZE = 0;
         RDMA_INIT_CONNECTION = NULL;
-        RDMA_PD = NULL;
+        pd = NULL;
     }
     return sf_service_init_ex2(&g_sf_context, "idemp-receipt",
             receipt_alloc_thread_extra_data, receipt_thread_loop_callback,
@@ -553,7 +553,7 @@ static int do_init(FCAddressPtrArray *address_array)
             receipt_task_finish_cleanup, receipt_recv_timeout_callback,
             1000, sizeof(SFCommonProtoHeader), TASK_PADDING_SIZE,
             task_arg_size, double_buffers, explicit_post_recv,
-            receipt_init_task, NULL);
+            receipt_init_task, pd, NULL);
 }
 
 int receipt_handler_init(FCAddressPtrArray *address_array)

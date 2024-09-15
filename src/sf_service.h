@@ -46,7 +46,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
         const bool explicit_post_recv, TaskInitCallback init_callback,
-        sf_release_buffer_callback release_buffer_callback);
+        void *init_arg, sf_release_buffer_callback release_buffer_callback);
 
 #define sf_service_init_ex(sf_context, name, alloc_thread_extra_data_callback,\
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -56,7 +56,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         thread_loop_callback, accept_done_callback, set_body_length_func,     \
         NULL, send_done_callback, deal_func, task_cleanup_func, \
         timeout_callback, net_timeout_ms, proto_header_size, \
-        0, task_arg_size, false, false, NULL, NULL)
+        0, task_arg_size, false, false, NULL, NULL, NULL)
 
 #define sf_service_init(name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -66,7 +66,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         thread_loop_callback, accept_done_callback, set_body_length_func, NULL,\
         send_done_callback, deal_func, task_cleanup_func, timeout_callback, \
         net_timeout_ms, proto_header_size, 0, task_arg_size, false, false,  \
-        NULL, NULL)
+        NULL, NULL, NULL)
 
 int sf_service_destroy_ex(SFContext *sf_context);
 

@@ -67,7 +67,6 @@ typedef struct idempotency_receipt_global_vars {
     struct {
         int task_padding_size;
         sf_init_connection_callback init_connection;
-        struct ibv_pd *pd;
     } rdma;
     IdempotencyReceiptThreadContext *thread_contexts;
 } IdempotencyReceiptGlobalVars;
