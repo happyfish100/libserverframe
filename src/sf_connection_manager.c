@@ -176,7 +176,7 @@ static inline bool alive_array_cas(SFConnectionManager *cm,
         push_to_detect_queue(cm, group, new_alives);
         fast_mblock_delay_free_object(&cm->sptr_array_allocator, old_alives,
                 (cm->common_cfg->connect_timeout + cm->common_cfg->
-                 network_timeout) * group->all.count);
+                 network_timeout) * group->all.count * 4);
         return true;
     } else {
         fast_mblock_free_object(&cm->sptr_array_allocator, new_alives);
