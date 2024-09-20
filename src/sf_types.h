@@ -179,6 +179,7 @@ typedef struct sf_context {
     volatile int thread_count;
 
     //int rdma_port_offset;
+    bool is_client;   //since v1.2.5
     SFAddressFamily address_family;
     SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
 

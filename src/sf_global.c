@@ -47,7 +47,7 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {{'\0'}, NULL, 0, sf_address_family_auto,
+SFContext g_sf_context = {{'\0'}, NULL, 0, false, sf_address_family_auto,
     {{AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}},
         {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},
     {DEFAULT_MAX_CONNECTONS, SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
@@ -447,7 +447,7 @@ int sf_load_config_ex(const char *log_filename_prefix,
 
 #define LOAD_API(handler, fname)  LOAD_API_EX(handler, server_, fname)
 
-static int load_rdma_apis(SFNetworkHandler *handler)
+static int load_rdma_apis(SFContext *sf_context, SFNetworkHandler *handler)
 {
     const char *library = "libfastrdma.so";
     void *dlhandle;
@@ -462,7 +462,11 @@ static int load_rdma_apis(SFNetworkHandler *handler)
 
     LOAD_API(handler, get_connection_size);
     LOAD_API(handler, init_connection);
-    LOAD_API(handler, alloc_pd);
+    if (sf_context->is_client) {
+        LOAD_API_EX(handler, client_, alloc_pd);
+    } else {
+        LOAD_API(handler, alloc_pd);
+    }
     LOAD_API_EX(handler, , create_server);
     LOAD_API_EX(handler, , close_server);
     LOAD_API(handler, accept_connection);
@@ -476,8 +480,8 @@ static int load_rdma_apis(SFNetworkHandler *handler)
     return 0;
 }
 
-static int init_network_handler(SFNetworkHandler *handler,
-        SFAddressFamilyHandler *fh)
+static int init_network_handler(SFContext *sf_context,
+        SFNetworkHandler *handler, SFAddressFamilyHandler *fh)
 {
     handler->fh = fh;
     handler->inner.handler = handler;
@@ -502,7 +506,7 @@ static int init_network_handler(SFNetworkHandler *handler,
     } else {
         handler->inner.id = NULL;
         handler->outer.id = NULL;
-        return load_rdma_apis(handler);
+        return load_rdma_apis(sf_context, handler);
     }
 }
 
@@ -724,7 +728,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
             if (!handler->enabled) {
                 continue;
             }
-            if ((result=init_network_handler(handler, fh)) != 0) {
+            if ((result=init_network_handler(sf_context, handler, fh)) != 0) {
                 return result;
             }
         }
