@@ -529,12 +529,19 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
     } extra_params;
     FCServerGroupInfo *server_group;
 
-    int htable_init_capacity;
+    int htable_capacity;
     int result;
 
-    htable_init_capacity = 4 * server_count;
-    if (htable_init_capacity < 256) {
-        htable_init_capacity = 256;
+    if (server_count <= 4) {
+        htable_capacity = 16;
+    } else if (server_count <= 16) {
+        htable_capacity = 64;
+    } else if (server_count <= 32) {
+        htable_capacity = 128;
+    } else if (server_count < 64) {
+        htable_capacity = 256;
+    } else {
+        htable_capacity = 4 * server_count;
     }
 
     if ((server_group=fc_server_get_group_by_index(server_cfg,
@@ -554,7 +561,7 @@ int sf_connection_manager_init_ex(SFConnectionManager *cm,
         extra_params.ptr = &extra_params.holder;
     }
     if ((result=conn_pool_init_ex1(&cm->cpool, common_cfg->connect_timeout,
-                    max_count_per_entry, max_idle_time, htable_init_capacity,
+                    max_count_per_entry, max_idle_time, htable_capacity,
                     connect_done_callback, args,
                     sf_cm_validate_connection_callback, cm,
                     sizeof(SFConnectionParameters),
