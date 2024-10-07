@@ -72,6 +72,7 @@ typedef struct binlog_writer_thread {
     bool use_fixed_buffer_size;
     bool passive_write;
     char order_mode;
+    int write_interval_ms;
     struct {
         int max_delay;  //in seconds
         volatile uint32_t last_timestamp;
@@ -125,8 +126,9 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_delay, const int max_record_size, const bool
-        use_fixed_buffer_size, const bool passive_write);
+        const int write_interval_ms, const int max_delay,
+        const int max_record_size, const bool use_fixed_buffer_size,
+        const bool passive_write);
 
 #define sf_binlog_writer_init_normal(writer, data_path, \
         subdir_name, max_record_size, buffer_size)      \
@@ -141,16 +143,16 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
             buffer_size, ring_size, SF_BINLOG_DEFAULT_ROTATE_SIZE, true)
 
 #define sf_binlog_writer_init_thread(thread, name, \
-        writer, max_delay, max_record_size) \
-    sf_binlog_writer_init_thread_ex(thread, name, writer, \
-            SF_BINLOG_THREAD_ORDER_MODE_FIXED, max_delay, \
-            max_record_size, true, false)
+        writer, write_interval_ms, max_delay, max_record_size)    \
+    sf_binlog_writer_init_thread_ex(thread, name, writer,         \
+            SF_BINLOG_THREAD_ORDER_MODE_FIXED, write_interval_ms, \
+            max_delay, max_record_size, true, false)
 
 static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
         const char *data_path, const char *subdir_name,
         const char *file_prefix, const int buffer_size,
-        const int max_delay, const int max_record_size,
-        const bool call_fsync)
+        const int write_interval_ms, const int max_delay,
+        const int max_record_size, const bool call_fsync)
 {
     int result;
     if ((result=sf_binlog_writer_init_normal_ex(&context->writer, data_path,
@@ -161,14 +163,14 @@ static inline int sf_binlog_writer_init_ex(SFBinlogWriterContext *context,
     }
 
     return sf_binlog_writer_init_thread(&context->thread, subdir_name,
-            &context->writer, max_delay, max_record_size);
+            &context->writer, write_interval_ms, max_delay, max_record_size);
 }
 
-#define sf_binlog_writer_init(context, data_path, subdir_name, \
-        buffer_size, max_delay, max_record_size) \
-    sf_binlog_writer_init_ex(context, data_path, subdir_name,  \
-            SF_BINLOG_FILE_PREFIX, buffer_size, max_delay,     \
-            max_record_size, true)
+#define sf_binlog_writer_init(context, data_path, subdir_name,      \
+        buffer_size, write_interval_ms, max_delay, max_record_size) \
+    sf_binlog_writer_init_ex(context, data_path, subdir_name,       \
+            SF_BINLOG_FILE_PREFIX, buffer_size, write_interval_ms,  \
+            max_delay, max_record_size, true)
 
 void sf_binlog_writer_finish(SFBinlogWriterInfo *writer);
 

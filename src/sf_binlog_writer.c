@@ -342,6 +342,7 @@ static void *binlog_writer_func(void *arg)
 {
     SFBinlogWriterThread *thread;
     SFBinlogWriterBuffer *wb_head;
+    uint32_t last_record_time;
     uint32_t current_timestamp;
     uint32_t last_timestamp;
     int result;
@@ -357,7 +358,7 @@ static void *binlog_writer_func(void *arg)
     }
 #endif
 
-    current_timestamp = last_timestamp = 0;
+    last_record_time = current_timestamp = last_timestamp = 0;
     thread->running = true;
     while (SF_G_CONTINUE_FLAG) {
         wb_head = (SFBinlogWriterBuffer *)fc_queue_pop_all(&thread->queue);
@@ -366,7 +367,7 @@ static void *binlog_writer_func(void *arg)
         }
 
         if ((result=deal_binlog_records(thread, wb_head,
-                        &current_timestamp)) != 0)
+                        &last_record_time)) != 0)
         {
             if (result != ERRNO_THREAD_EXIT) {
                 logCrit("file: "__FILE__", line: %d, "
@@ -379,6 +380,8 @@ static void *binlog_writer_func(void *arg)
 
         if (fc_queue_empty(&thread->queue)) {
             current_timestamp = 0;
+        } else {
+            current_timestamp = last_record_time;
         }
         if ((current_timestamp == 0 && last_timestamp != 0) ||
                 (current_timestamp > last_timestamp))
@@ -392,6 +395,12 @@ static void *binlog_writer_func(void *arg)
                 pthread_cond_broadcast(&thread->flow_ctrol.lcp.cond);
             }
             PTHREAD_MUTEX_UNLOCK(&thread->flow_ctrol.lcp.lock);
+        }
+
+        if (thread->write_interval_ms > 0 &&
+                last_record_time == g_current_time)
+        {
+            fc_sleep_ms(thread->write_interval_ms);
         }
     }
 
@@ -471,8 +480,9 @@ int sf_binlog_writer_init_by_version_ex(SFBinlogWriterInfo *writer,
 
 int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
         const char *name, SFBinlogWriterInfo *writer, const short order_mode,
-        const int max_delay, const int max_record_size, const bool
-        use_fixed_buffer_size, const bool passive_write)
+        const int write_interval_ms, const int max_delay,
+        const int max_record_size, const bool use_fixed_buffer_size,
+        const bool passive_write)
 {
     const int alloc_elements_once = 1024;
     const int64_t alloc_elements_limit = 0;
@@ -486,6 +496,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     thread->order_mode = order_mode;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
     thread->passive_write = passive_write;
+    thread->write_interval_ms = write_interval_ms;
     thread->flow_ctrol.max_delay = max_delay;
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
