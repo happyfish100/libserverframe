@@ -276,7 +276,9 @@ static inline SFBinlogWriterBuffer *sf_binlog_writer_alloc_buffer(
 {
     SFBinlogWriterBuffer *buffer;
 
-    if ((buffer=fast_mblock_alloc_object(&thread->mblock)) != NULL) {
+    if ((buffer=(SFBinlogWriterBuffer *)fast_mblock_alloc_object(
+                    &thread->mblock)) != NULL)
+    {
         buffer->type = SF_BINLOG_BUFFER_TYPE_WRITE_TO_FILE;
     }
     return buffer;

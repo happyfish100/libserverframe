@@ -132,6 +132,7 @@ fi
 
 cd ..
 cp Makefile.in Makefile
+sed_replace "s#\\\$(CC)#gcc#g" Makefile
 sed_replace "s#\\\$(CFLAGS)#$CFLAGS#g" Makefile
 sed_replace "s#\\\$(LIBS)#$LIBS#g" Makefile
 sed_replace "s#\\\$(TARGET_PREFIX)#$TARGET_PREFIX#g" Makefile
