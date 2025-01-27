@@ -26,16 +26,17 @@
 struct sf_connection_manager;
 
 typedef ConnectionInfo *(*sf_get_connection_func)(
-        struct sf_connection_manager *cm,
-        const int group_index, int *err_no);
+        struct sf_connection_manager *cm, const int group_index,
+        const bool shared, int *err_no);
 
 typedef ConnectionInfo *(*sf_get_server_connection_func)(
         struct sf_connection_manager *cm,
-        FCServerInfo *server, int *err_no);
+        FCServerInfo *server, const bool shared, int *err_no);
 
 typedef ConnectionInfo *(*sf_get_spec_connection_func)(
         struct sf_connection_manager *cm,
-        const ConnectionInfo *target, int *err_no);
+        const ConnectionInfo *target,
+        const bool shared, int *err_no);
 
 typedef void (*sf_release_connection_func)(
         struct sf_connection_manager *cm, ConnectionInfo *conn);

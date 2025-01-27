@@ -35,14 +35,14 @@ static int get_group_servers(SFConnectionManager *cm,
         SFCMConnGroupEntry *group);
 
 static ConnectionInfo *get_spec_connection(SFConnectionManager *cm,
-        const ConnectionInfo *target, int *err_no)
+        const ConnectionInfo *target, const bool shared, int *err_no)
 {
     return conn_pool_get_connection_ex(&cm->cpool,
-            target, cm->module_name, err_no);
+            target, cm->module_name, shared, err_no);
 }
 
 static ConnectionInfo *make_connection(SFConnectionManager *cm,
-        FCAddressPtrArray *addr_array, int *err_no)
+        FCAddressPtrArray *addr_array, const bool shared, int *err_no)
 {
     FCAddressInfo **current;
     FCAddressInfo **addr;
@@ -56,7 +56,7 @@ static ConnectionInfo *make_connection(SFConnectionManager *cm,
 
     current = addr_array->addrs + addr_array->index;
     if ((conn=get_spec_connection(cm, &(*current)->conn,
-                    err_no)) != NULL)
+                    shared, err_no)) != NULL)
     {
         return conn;
     }
@@ -72,7 +72,7 @@ static ConnectionInfo *make_connection(SFConnectionManager *cm,
         }
 
         if ((conn=get_spec_connection(cm, &(*addr)->conn,
-                        err_no)) != NULL)
+                        shared, err_no)) != NULL)
         {
             addr_array->index = addr - addr_array->addrs;
             return conn;
@@ -83,13 +83,13 @@ static ConnectionInfo *make_connection(SFConnectionManager *cm,
 }
 
 static ConnectionInfo *get_server_connection(SFConnectionManager *cm,
-        FCServerInfo *server, int *err_no)
+        FCServerInfo *server, const bool shared, int *err_no)
 {
     FCAddressPtrArray *addr_array;
     ConnectionInfo *conn;
 
     addr_array = &server->group_addrs[cm->server_group_index].address_array;
-    if ((conn=make_connection(cm, addr_array, err_no)) == NULL) {
+    if ((conn=make_connection(cm, addr_array, shared, err_no)) == NULL) {
         logError("file: "__FILE__", line: %d, "
                 "%s server id: %d, address count: %d, get_server_connection fail",
                 __LINE__, cm->module_name, server->id, addr_array->count);
@@ -98,7 +98,7 @@ static ConnectionInfo *get_server_connection(SFConnectionManager *cm,
 }
 
 static ConnectionInfo *get_connection(SFConnectionManager *cm,
-        const int group_index, int *err_no)
+        const int group_index, const bool shared, int *err_no)
 {
     SFCMServerArray *server_array;
     ConnectionInfo *conn;
@@ -110,7 +110,7 @@ static ConnectionInfo *get_connection(SFConnectionManager *cm,
     server_hash_code = rand();
     server_index = server_hash_code % server_array->count;
     if ((conn=make_connection(cm, server_array->servers[server_index].
-                    addr_array, err_no)) != NULL)
+                    addr_array, shared, err_no)) != NULL)
     {
         return conn;
     }
@@ -122,7 +122,7 @@ static ConnectionInfo *get_connection(SFConnectionManager *cm,
             }
 
             if ((conn=make_connection(cm, server_array->servers[i].
-                            addr_array, err_no)) != NULL)
+                            addr_array, shared, err_no)) != NULL)
             {
                 return conn;
             }
@@ -225,7 +225,7 @@ static int remove_from_alives(SFConnectionManager *cm,
 }
 
 static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
-        SFCMConnGroupEntry *group, int *err_no)
+        SFCMConnGroupEntry *group, const bool shared, int *err_no)
 {
     SFCMServerEntry *master;
     ConnectionInfo *conn;
@@ -234,7 +234,7 @@ static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
     master = (SFCMServerEntry *)FC_ATOMIC_GET(group->master);
     if (master != NULL) {
         if ((conn=make_connection(cm, master->addr_array,
-                        err_no)) != NULL)
+                        shared, err_no)) != NULL)
         {
             alives = (SFCMServerPtrArray *)FC_ATOMIC_GET(group->alives);
             set_connection_params(conn, master, alives);
@@ -254,12 +254,12 @@ static inline ConnectionInfo *make_master_connection(SFConnectionManager *cm,
 
 static inline ConnectionInfo *make_readable_connection(SFConnectionManager *cm,
         SFCMConnGroupEntry *group, SFCMServerPtrArray *alives,
-        const int index, int *err_no)
+        const int index, const bool shared, int *err_no)
 {
     ConnectionInfo *conn;
 
     if ((conn=make_connection(cm, alives->servers[index]->
-                    addr_array, err_no)) == NULL)
+                    addr_array, shared, err_no)) == NULL)
     {
         remove_from_alives(cm, group, alives, alives->servers[index]);
     } else {
@@ -270,7 +270,7 @@ static inline ConnectionInfo *make_readable_connection(SFConnectionManager *cm,
 }
 
 static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
-        const int group_index, int *err_no)
+        const int group_index, const bool shared, int *err_no)
 {
     SFCMConnGroupEntry *group;
     ConnectionInfo *conn;
@@ -283,7 +283,7 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
             &cm->common_cfg->net_retry_cfg.connect);
     retry_count = 0;
     while (1) {
-        if ((conn=make_master_connection(cm, group, err_no)) != NULL) {
+        if ((conn=make_master_connection(cm, group, shared, err_no)) != NULL) {
             return conn;
         }
 
@@ -313,7 +313,7 @@ static ConnectionInfo *get_master_connection(SFConnectionManager *cm,
 }
 
 static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
-        const int group_index, int *err_no)
+        const int group_index, const bool shared, int *err_no)
 {
     SFCMConnGroupEntry *group;
     SFCMServerPtrArray *alives;
@@ -326,7 +326,7 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
     if ((cm->common_cfg->read_rule == sf_data_read_rule_master_only) ||
             (group->all.count == 1))
     {
-        return get_master_connection(cm, group_index, err_no);
+        return get_master_connection(cm, group_index, shared, err_no);
     }
 
     sf_init_net_retry_interval_context(&net_retry_ctx,
@@ -338,14 +338,14 @@ static ConnectionInfo *get_readable_connection(SFConnectionManager *cm,
         if (alives->count > 0) {
             index = rand() % alives->count;
             if ((conn=make_readable_connection(cm, group, alives,
-                            index, err_no)) != NULL)
+                            index, shared, err_no)) != NULL)
             {
                 return conn;
             }
         }
 
         if (cm->common_cfg->read_rule == sf_data_read_rule_slave_first) {
-            if ((conn=make_master_connection(cm, group, err_no)) != NULL) {
+            if ((conn=make_master_connection(cm, group, shared, err_no)) != NULL) {
                 return conn;
             }
         }
@@ -400,7 +400,7 @@ static void close_connection(SFConnectionManager *cm, ConnectionInfo *conn)
 }
 
 static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
-        FCServerInfo *server, int *err_no)
+        FCServerInfo *server, const bool shared, int *err_no)
 {
     ConnectionInfo *conn;
     SFClientServerEntry leader;
@@ -416,7 +416,7 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
     while (1) {
         do {
             if ((conn=get_server_connection(cm, server,
-                            err_no)) == NULL)
+                            shared, err_no)) == NULL)
             {
                 connect_fails++;
                 break;
@@ -433,8 +433,9 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                 return conn;
             }
             release_connection(cm, conn);
+
             if ((conn=get_spec_connection(cm, &leader.conn,
-                            err_no)) == NULL)
+                            shared, err_no)) == NULL)
             {
                 if (cm->server_cfg != NULL) {
                     FCServerInfo *ls;
@@ -445,7 +446,7 @@ static ConnectionInfo *get_leader_connection(SFConnectionManager *cm,
                                 address_array.count > 1)
                         {
                             if ((conn=get_server_connection(cm, ls,
-                                            err_no)) != NULL)
+                                            shared, err_no)) != NULL)
                             {
                                 return conn;
                             }
@@ -777,6 +778,7 @@ static int do_get_group_servers(SFConnectionManager *cm,
 static int get_group_servers_by_active(SFConnectionManager *cm,
         SFCMConnGroupEntry *group)
 {
+    const bool shared = true;
     SFCMServerPtrArray *alives;
     SFCMServerEntry **server;
     SFCMServerEntry **end;
@@ -792,7 +794,7 @@ static int get_group_servers_by_active(SFConnectionManager *cm,
     end = alives->servers + alives->count;
     for (server=alives->servers; server<end; server++) {
         if ((conn=make_connection(cm, (*server)->addr_array,
-                        &result)) == NULL)
+                        shared, &result)) == NULL)
         {
             continue;
         }
@@ -810,6 +812,7 @@ static int get_group_servers_by_active(SFConnectionManager *cm,
 static int get_group_servers_by_all(SFConnectionManager *cm,
         SFCMConnGroupEntry *group)
 {
+    const bool shared = true;
     SFCMServerEntry *server;
     SFCMServerEntry *end;
     ConnectionInfo *conn;
@@ -827,7 +830,7 @@ static int get_group_servers_by_all(SFConnectionManager *cm,
         }
 
         if ((conn=make_connection(cm, server->addr_array,
-                        &result)) == NULL)
+                        shared, &result)) == NULL)
         {
             continue;
         }
