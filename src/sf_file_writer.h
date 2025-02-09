@@ -30,6 +30,11 @@
 #define SF_BINLOG_FILE_PREFIX          "binlog"
 #define SF_BINLOG_FILE_EXT_FMT         ".%06d"
 
+struct sf_file_writer_info;
+
+typedef void (*sf_file_write_done_callback)(
+        struct sf_file_writer_info *writer, void *args);
+
 typedef struct sf_file_writer_info {
     struct {
         const char *data_path;
@@ -60,6 +65,12 @@ typedef struct sf_file_writer_info {
         int64_t pending;
         volatile int64_t done;
     } last_versions;
+
+    struct {
+        sf_file_write_done_callback func;
+        void *args;
+    } write_done_callback;
+
 } SFFileWriterInfo;
 
 #ifdef __cplusplus
@@ -101,6 +112,14 @@ static inline void sf_file_writer_set_call_fsync(
         SFFileWriterInfo *writer, const bool call_fsync)
 {
     writer->cfg.call_fsync = call_fsync;
+}
+
+static inline void sf_file_writer_set_write_done_callback (
+        SFFileWriterInfo *writer, sf_file_write_done_callback callback,
+        void *args)
+{
+    writer->write_done_callback.func = callback;
+    writer->write_done_callback.args = args;
 }
 
 static inline int64_t sf_file_writer_get_last_version_ex(

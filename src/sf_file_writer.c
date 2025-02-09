@@ -244,6 +244,11 @@ static int do_write_to_file(SFFileWriterInfo *writer,
     }
 
     writer->file.size += len;
+    if (writer->write_done_callback.func != NULL) {
+        writer->write_done_callback.func(writer,
+                writer->write_done_callback.args);
+    }
+
     return 0;
 }
 
@@ -422,6 +427,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
     writer->last_versions.pending = 0;
     writer->last_versions.done = 0;
     writer->flags = 0;
+    sf_file_writer_set_write_done_callback(writer, NULL, NULL);
     if ((result=sf_binlog_buffer_init(&writer->
                     binlog_buffer, buffer_size)) != 0)
     {
