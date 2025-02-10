@@ -235,7 +235,14 @@ static inline int sf_binlog_writer_get_thread_waiting_count(
     return waiting_count;
 }
 
-int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer);
+int sf_binlog_writer_rotate_file_ex(SFBinlogWriterInfo *writer,
+        const bool skip_empty_file);
+
+static inline int sf_binlog_writer_rotate_file(SFBinlogWriterInfo *writer)
+{
+    const bool skip_empty_file = false;
+    return sf_binlog_writer_rotate_file_ex(writer, skip_empty_file);
+}
 
 int sf_binlog_writer_flush_file(SFBinlogWriterInfo *writer);
 
