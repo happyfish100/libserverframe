@@ -562,6 +562,16 @@ int sf_recv_response(ConnectionInfo *conn, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
         char *recv_data, const int expect_body_len);
 
+static inline int sf_recv_none_body_response(ConnectionInfo *conn,
+        SFResponseInfo *response, const int network_timeout,
+        const unsigned char expect_cmd)
+{
+    char *recv_data = NULL;
+    const int expect_body_len = 0;
+    return sf_recv_response(conn, response, network_timeout,
+            expect_cmd, recv_data, expect_body_len);
+}
+
 int sf_recv_vary_response(ConnectionInfo *conn, SFResponseInfo *response,
         const int network_timeout, const unsigned char expect_cmd,
         SFProtoRecvBuffer *buffer, const int min_body_len);
@@ -607,6 +617,35 @@ static inline int sf_proto_send_buf1(ConnectionInfo *conn, char *data,
     } else {
         result = tcpsenddata_nb(conn->sock, data, len, network_timeout);
     }
+    if (result != 0) {
+        response->error.length = snprintf(response->error.message,
+                sizeof(response->error.message),
+                "send data fail, errno: %d, error info: %s",
+                result, STRERROR(result));
+    }
+
+    return result;
+}
+
+static inline int sf_proto_send_buf2(ConnectionInfo *conn, char *buff1,
+        const int length1, char *buff2, const int length2,
+        SFResponseInfo *response, const int network_timeout)
+{
+    int result;
+
+    if (conn->comm_type == fc_comm_type_rdma) {
+        result = G_RDMA_CONNECTION_CALLBACKS.request_by_buf2(
+                conn, buff1, length1, buff2, length2,
+                network_timeout * 1000);
+    } else {
+        if ((result=tcpsenddata_nb(conn->sock, buff1, length1,
+                        network_timeout)) == 0)
+        {
+            result = tcpsenddata_nb(conn->sock, buff2, length2,
+                    network_timeout);
+        }
+    }
+
     if (result != 0) {
         response->error.length = snprintf(response->error.message,
                 sizeof(response->error.message),
