@@ -197,6 +197,7 @@ static int deal_binlog_records(SFBinlogWriterThread *thread,
                         thread->mblock, current);
                 break;
             case SF_BINLOG_BUFFER_TYPE_ROTATE_FILE:
+                flush_writer_files(thread);
                 skip_empty_file = current->version.first;
                 if (!(skip_empty_file && current->writer->fw.file.size == 0)) {
                     if ((result=sf_file_writer_set_binlog_write_index(&current->
