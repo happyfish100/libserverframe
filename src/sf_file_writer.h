@@ -236,6 +236,16 @@ int sf_file_writer_get_last_lines(const char *data_path,
         const char *subdir_name, const int current_write_index,
         char *buff, const int buff_size, int *count, int *length);
 
+int sf_file_writer_write_to_binlog_index_file_ex(const char *data_path,
+        const char *subdir_name, const char *file_prefix,
+        const int start_index, const int last_index,
+        const int compress_index);
+
+#define sf_file_writer_write_to_binlog_index_file(data_path,  \
+        subdir_name, start_index, last_index) \
+    sf_file_writer_write_to_binlog_index_file_ex(data_path, subdir_name, \
+            SF_BINLOG_FILE_PREFIX, start_index, last_index, 0)
+
 #ifdef __cplusplus
 }
 #endif

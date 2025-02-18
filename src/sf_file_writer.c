@@ -48,10 +48,6 @@
     snprintf(filename, size, "%s/%s/%s_index.dat", \
             data_path, subdir_name, file_prefix)
 
-#define GET_BINLOG_INDEX_FILENAME(writer, filename, size) \
-    GET_BINLOG_INDEX_FILENAME_EX(writer->cfg.data_path,   \
-            writer->cfg.subdir_name, writer->cfg.file_prefix, filename, size)
-
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size)
 {
@@ -60,23 +56,24 @@ const char *sf_file_writer_get_index_filename(const char *data_path,
     return filename;
 }
 
-static int write_to_binlog_index_file(SFFileWriterInfo *writer)
+int sf_file_writer_write_to_binlog_index_file_ex(const char *data_path,
+        const char *subdir_name, const char *file_prefix,
+        const int start_index, const int last_index,
+        const int compress_index)
 {
     char filename[PATH_MAX];
     char buff[256];
     int result;
     int len;
 
-    GET_BINLOG_INDEX_FILENAME(writer, filename, sizeof(filename));
+    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name,
+            file_prefix, filename, sizeof(filename));
     len = sprintf(buff, "%s=%d\n"
             "%s=%d\n"
             "%s=%d\n",
-            BINLOG_INDEX_ITEM_START_INDEX,
-            writer->binlog.start_index,
-            BINLOG_INDEX_ITEM_CURRENT_WRITE,
-            writer->binlog.last_index,
-            BINLOG_INDEX_ITEM_CURRENT_COMPRESS,
-            writer->binlog.compress_index);
+            BINLOG_INDEX_ITEM_START_INDEX, start_index,
+            BINLOG_INDEX_ITEM_CURRENT_WRITE, last_index,
+            BINLOG_INDEX_ITEM_CURRENT_COMPRESS, compress_index);
     if ((result=safeWriteToFile(filename, buff, len)) != 0) {
         logError("file: "__FILE__", line: %d, "
                 "write to file \"%s\" fail, errno: %d, error info: %s",
@@ -84,6 +81,14 @@ static int write_to_binlog_index_file(SFFileWriterInfo *writer)
     }
 
     return result;
+}
+
+static inline int write_to_binlog_index_file(SFFileWriterInfo *writer)
+{
+    return sf_file_writer_write_to_binlog_index_file_ex(
+            writer->cfg.data_path, writer->cfg.subdir_name,
+            writer->cfg.file_prefix, writer->binlog.start_index,
+            writer->binlog.last_index, writer->binlog.compress_index);
 }
 
 static int get_binlog_info_from_file(const char *data_path,
