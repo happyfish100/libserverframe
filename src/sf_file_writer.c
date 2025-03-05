@@ -394,7 +394,8 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
     return 0;
 }
 
-int sf_file_writer_save_buffer(SFFileWriterInfo *writer, const int length)
+int sf_file_writer_save_buffer_ex(SFFileWriterInfo *writer,
+        const int length, const bool flush)
 {
     int result;
 
@@ -408,9 +409,8 @@ int sf_file_writer_save_buffer(SFFileWriterInfo *writer, const int length)
     }
 
     writer->binlog_buffer.data_end += length;
-
-    if (SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(writer->binlog_buffer) <
-            writer->cfg.max_record_size)
+    if (flush || SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(writer->
+                binlog_buffer) < writer->cfg.max_record_size)
     {
         return sf_file_writer_flush(writer);
     } else {

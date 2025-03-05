@@ -100,7 +100,22 @@ int sf_file_writer_fsync(SFFileWriterInfo *writer);
 #define SF_FILE_WRITER_NEXT_DATA_VERSION(writer) \
     ++((writer)->last_versions.pending)
 
-int sf_file_writer_save_buffer(SFFileWriterInfo *writer, const int length);
+int sf_file_writer_save_buffer_ex(SFFileWriterInfo *writer,
+        const int length, const bool flush);
+
+static inline int sf_file_writer_save_buffer(
+        SFFileWriterInfo *writer, const int length)
+{
+    const bool flush = false;
+    return sf_file_writer_save_buffer_ex(writer, length, flush);
+}
+
+static inline int sf_file_writer_flush_buffer(
+        SFFileWriterInfo *writer, const int length)
+{
+    const bool flush = true;
+    return sf_file_writer_save_buffer_ex(writer, length, flush);
+}
 
 static inline void sf_file_writer_set_flags(
         SFFileWriterInfo *writer, const short flags)
