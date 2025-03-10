@@ -627,3 +627,22 @@ int sf_file_writer_get_last_lines(const char *data_path,
 
     return 0;
 }
+
+int sf_file_writer_get_last_line(const char *data_path,
+        const char *subdir_name, char *buff,
+        const int buff_size, int *length)
+{
+    int result;
+    int last_index;
+    int count = 1;
+
+    if ((result=sf_file_writer_get_binlog_last_index(data_path,
+                    subdir_name, &last_index)) != 0)
+    {
+        *length = 0;
+        return result;
+    }
+
+    return sf_file_writer_get_last_lines(data_path, subdir_name,
+            last_index, buff, buff_size, &count, length);
+}
