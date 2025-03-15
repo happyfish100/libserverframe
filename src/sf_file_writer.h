@@ -84,6 +84,9 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
 
 void sf_file_writer_destroy(SFFileWriterInfo *writer);
 
+int sf_file_writer_direct_write(SFFileWriterInfo *writer,
+        char *buff, const int len);
+
 int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
         BufferInfo *buffer, const int64_t version);
 
@@ -246,6 +249,13 @@ int sf_file_writer_set_binlog_start_index(SFFileWriterInfo *writer,
 
 int sf_file_writer_set_binlog_write_index(SFFileWriterInfo *writer,
         const int last_index);
+
+static inline int sf_file_writer_rotate_file(SFFileWriterInfo *writer)
+{
+    int last_index;
+    last_index = sf_file_writer_get_current_write_index(writer);
+    return sf_file_writer_set_binlog_write_index(writer, last_index + 1);
+}
 
 int sf_file_writer_get_last_lines(const char *data_path,
         const char *subdir_name, const int current_write_index,

@@ -44,6 +44,7 @@
 
 #define SF_BINLOG_BUFFER_PRODUCER_DATA_LENGTH(bf) ((bf).data_end - (bf).buff)
 #define SF_BINLOG_BUFFER_PRODUCER_BUFF_REMAIN(bf) ((bf).buff_end - (bf).data_end)
+#define SF_BINLOG_BUFFER_CONSUMER_DATA_LENGTH(bf) ((bf).current  - (bf).buff)
 #define SF_BINLOG_BUFFER_CONSUMER_DATA_REMAIN(bf) ((bf).data_end - (bf).current)
 
 typedef int (*sf_accept_done_callback)(struct fast_task_info *task,

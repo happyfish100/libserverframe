@@ -257,7 +257,7 @@ static int do_write_to_file(SFFileWriterInfo *writer,
     return 0;
 }
 
-static int check_write_to_file(SFFileWriterInfo *writer,
+int sf_file_writer_direct_write(SFFileWriterInfo *writer,
         char *buff, const int len)
 {
     int result;
@@ -293,7 +293,7 @@ int sf_file_writer_flush(SFFileWriterInfo *writer)
         return 0;
     }
 
-    if ((result=check_write_to_file(writer, writer->
+    if ((result=sf_file_writer_direct_write(writer, writer->
                     binlog_buffer.buff, len)) == 0)
     {
         if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
@@ -359,8 +359,8 @@ int sf_file_writer_deal_versioned_buffer(SFFileWriterInfo *writer,
             }
         }
 
-        if ((result=check_write_to_file(writer, buffer->buff,
-                        buffer->length)) == 0)
+        if ((result=sf_file_writer_direct_write(writer, buffer->
+                        buff, buffer->length)) == 0)
         {
             if (writer->flags & SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION) {
                 writer->last_versions.pending = version;
