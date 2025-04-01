@@ -3,7 +3,7 @@
 
 Name: libserverframe
 Version: 1.2.7
-Release: 3%{?dist}
+Release: 1%{?dist}
 Summary: network framework library
 License: AGPL v3.0
 Group: Arch/Tech
