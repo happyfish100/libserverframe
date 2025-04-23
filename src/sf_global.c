@@ -1028,11 +1028,16 @@ void sf_log_config_ex(const char *other_config)
     char sz_context_config[128];
 
     sf_global_config_to_string(sz_global_config, sizeof(sz_global_config));
-    sf_context_config_to_string(&g_sf_context,
-            sz_context_config, sizeof(sz_context_config));
 
-    logInfo("%s, %s%s%s",
-            sz_global_config, sz_context_config,
+    if (!g_sf_context.is_client) {
+        sf_context_config_to_string(&g_sf_context, sz_context_config,
+                sizeof(sz_context_config));
+    } else {
+        *sz_context_config = '\0';
+    }
+
+    logInfo("%s%s%s%s%s", sz_global_config, (*sz_context_config != '\0') ?
+            ", " : "", sz_context_config,
             (other_config != NULL && *other_config != '\0')  ? ", " : "",
             (other_config != NULL) ? other_config : ""
            );
