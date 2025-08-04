@@ -174,6 +174,7 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
         *channel, const uint32_t hash_code, const FCCommunicationType comm_type,
         const char *server_ip, const uint16_t port, int *err_no)
 {
+    int len;
     struct fast_task_info *task;
     SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
@@ -194,7 +195,12 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
         return NULL;
     }
 
-    snprintf(task->server_ip, sizeof(task->server_ip), "%s", server_ip);
+    len = strlen(server_ip);
+    if (len >= sizeof(task->server_ip)) {
+        len = sizeof(task->server_ip) - 1;
+    }
+    memcpy(task->server_ip, server_ip, len);
+    *(task->server_ip + len) = '\0';
     task->port = port;
     task->arg = channel;
     task->thread_data = g_sf_context.thread_data +
@@ -255,7 +261,10 @@ struct idempotency_client_channel *idempotency_client_channel_get(
     IdempotencyClientChannel *current;
     IdempotencyClientChannel *channel;
 
-    key_len = snprintf(key, sizeof(key), "%s-%u", server_ip, server_port);
+    key_len = strlen(server_ip);
+    memcpy(key, server_ip, key_len);
+    *(key + key_len++) = '-';
+    key_len += fc_itoa(server_port, key + key_len);
     hash_code = fc_simple_hash(key, key_len);
     bucket = channel_context.htable.buckets +
         hash_code % channel_context.htable.capacity;

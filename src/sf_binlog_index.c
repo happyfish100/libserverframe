@@ -186,9 +186,11 @@ static int save(SFBinlogIndexContext *ctx, const char *filename)
     result = 0;
     p = buff;
     bend = buff + sizeof(buff);
-    p += sprintf(p, "%d %"PRId64"\n",
-            ctx->index_array.count,
-            ctx->last_version);
+
+    p += fc_itoa(ctx->index_array.count, p);
+    *p++ = ' ';
+    p += fc_itoa(ctx->last_version, p);
+    *p++ = '\n';
 
     index = ctx->index_array.indexes;
     for (i=0; i<ctx->index_array.count; i++) {

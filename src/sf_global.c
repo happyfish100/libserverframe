@@ -865,8 +865,7 @@ static void combine_bind_addr(char *bind_addr, const char *ip_addr)
         p = bind_addr + strlen(bind_addr);
         *p++ = ',';
     }
-
-    sprintf(p, "%s", ip_addr);
+    strcpy(p, ip_addr);
 }
 
 static const char *get_address_family_caption(
