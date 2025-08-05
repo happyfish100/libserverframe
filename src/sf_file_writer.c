@@ -34,24 +34,67 @@
 #include "sf_func.h"
 #include "sf_file_writer.h"
 
-#define BINLOG_INDEX_ITEM_START_INDEX       "start_index"
-#define BINLOG_INDEX_ITEM_CURRENT_WRITE     "current_write"
-#define BINLOG_INDEX_ITEM_CURRENT_COMPRESS  "current_compress"
+#define BINLOG_INDEX_ITEM_START_INDEX_STR       "start_index"
+#define BINLOG_INDEX_ITEM_START_INDEX_LEN      \
+    (sizeof(BINLOG_INDEX_ITEM_START_INDEX_STR) - 1)
 
-#define GET_BINLOG_FILENAME(writer) \
-    sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT, \
-            writer->cfg.data_path, writer->cfg.subdir_name, \
-            writer->cfg.file_prefix, writer->binlog.last_index)
+#define BINLOG_INDEX_ITEM_CURRENT_WRITE_STR     "current_write"
+#define BINLOG_INDEX_ITEM_CURRENT_WRITE_LEN      \
+    (sizeof(BINLOG_INDEX_ITEM_CURRENT_WRITE_STR) - 1)
 
-#define GET_BINLOG_INDEX_FILENAME_EX(data_path,    \
-        subdir_name, file_prefix, filename, size)  \
-    snprintf(filename, size, "%s/%s/%s_index.dat", \
-            data_path, subdir_name, file_prefix)
+#define BINLOG_INDEX_ITEM_CURRENT_COMPRESS_STR  "current_compress"
+#define BINLOG_INDEX_ITEM_CURRENT_COMPRESS_LEN      \
+    (sizeof(BINLOG_INDEX_ITEM_CURRENT_COMPRESS_STR) - 1)
+
+static inline void sf_file_writer_get_binlog_filename(SFFileWriterInfo *writer)
+{
+    sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
+            writer->cfg.data_path, writer->cfg.subdir_name,
+            writer->cfg.file_prefix, writer->binlog.last_index);
+}
+
+static inline void sf_file_writer_get_index_filename_ex(const char *data_path,
+        const char *subdir_name, const char *file_prefix,
+        char *filename, const int size)
+{
+#define INDEX_FILENAME_AFFIX_STR "_index.dat"
+#define INDEX_FILENAME_AFFIX_LEN (sizeof(INDEX_FILENAME_AFFIX_STR) - 1)
+
+    char *p;
+    int data_path_len;
+    int subdir_name_len;
+    int file_prefix_len;
+
+    data_path_len = strlen(data_path);
+    subdir_name_len = strlen(subdir_name);
+    file_prefix_len = strlen(file_prefix);
+    if (data_path_len + 1 + subdir_name_len + 1 + file_prefix_len +
+            INDEX_FILENAME_AFFIX_LEN >= size)
+    {
+        *filename = '\0';
+        return;
+    }
+
+    memcpy(filename, data_path, data_path_len);
+    p = filename + data_path_len;
+    *p++ = '/';
+
+    memcpy(p, subdir_name, subdir_name_len);
+    p += subdir_name_len;
+    *p++ = '/';
+
+    memcpy(p, file_prefix, file_prefix_len);
+    p += file_prefix_len;
+
+    memcpy(p, INDEX_FILENAME_AFFIX_STR, INDEX_FILENAME_AFFIX_LEN);
+    p += INDEX_FILENAME_AFFIX_LEN;
+    *p = '\0';
+}
 
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size)
 {
-    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name,
+    sf_file_writer_get_index_filename_ex(data_path, subdir_name,
             SF_BINLOG_FILE_PREFIX, filename, size);
     return filename;
 }
@@ -63,17 +106,35 @@ int sf_file_writer_write_to_binlog_index_file_ex(const char *data_path,
 {
     char filename[PATH_MAX];
     char buff[256];
+    char *p;
     int result;
     int len;
 
-    GET_BINLOG_INDEX_FILENAME_EX(data_path, subdir_name,
+    sf_file_writer_get_index_filename_ex(data_path, subdir_name,
             file_prefix, filename, sizeof(filename));
-    len = sprintf(buff, "%s=%d\n"
-            "%s=%d\n"
-            "%s=%d\n",
-            BINLOG_INDEX_ITEM_START_INDEX, start_index,
-            BINLOG_INDEX_ITEM_CURRENT_WRITE, last_index,
-            BINLOG_INDEX_ITEM_CURRENT_COMPRESS, compress_index);
+    p = buff;
+    memcpy(p, BINLOG_INDEX_ITEM_START_INDEX_STR,
+            BINLOG_INDEX_ITEM_START_INDEX_LEN);
+    p += BINLOG_INDEX_ITEM_START_INDEX_LEN;
+    *p++ = '=';
+    p += fc_itoa(start_index, p);
+    *p++ = '\n';
+
+    memcpy(p, BINLOG_INDEX_ITEM_CURRENT_WRITE_STR,
+            BINLOG_INDEX_ITEM_CURRENT_WRITE_LEN);
+    p += BINLOG_INDEX_ITEM_CURRENT_WRITE_LEN;
+    *p++ = '=';
+    p += fc_itoa(last_index, p);
+    *p++ = '\n';
+
+    memcpy(p, BINLOG_INDEX_ITEM_CURRENT_COMPRESS_STR,
+            BINLOG_INDEX_ITEM_CURRENT_COMPRESS_LEN);
+    p += BINLOG_INDEX_ITEM_CURRENT_COMPRESS_LEN;
+    *p++ = '=';
+    p += fc_itoa(compress_index, p);
+    *p++ = '\n';
+
+    len = p - buff;
     if ((result=safeWriteToFile(filename, buff, len)) != 0) {
         logError("file: "__FILE__", line: %d, "
                 "write to file \"%s\" fail, errno: %d, error info: %s",
@@ -99,7 +160,7 @@ static int get_binlog_info_from_file(const char *data_path,
     IniContext ini_context;
     int result;
 
-    GET_BINLOG_INDEX_FILENAME_EX(data_path,
+    sf_file_writer_get_index_filename_ex(data_path,
             subdir_name, SF_BINLOG_FILE_PREFIX,
             full_filename, sizeof(full_filename));
     if (access(full_filename, F_OK) != 0) {
@@ -114,13 +175,13 @@ static int get_binlog_info_from_file(const char *data_path,
     }
 
     *start_index = iniGetIntValue(NULL,
-            BINLOG_INDEX_ITEM_START_INDEX,
+            BINLOG_INDEX_ITEM_START_INDEX_STR,
             &ini_context, 0);
     *last_index = iniGetIntValue(NULL,
-            BINLOG_INDEX_ITEM_CURRENT_WRITE,
+            BINLOG_INDEX_ITEM_CURRENT_WRITE_STR,
             &ini_context, 0);
     *compress_index = iniGetIntValue(NULL,
-            BINLOG_INDEX_ITEM_CURRENT_COMPRESS,
+            BINLOG_INDEX_ITEM_CURRENT_COMPRESS_STR,
             &ini_context, 0);
 
     iniFreeContext(&ini_context);
@@ -170,7 +231,7 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
         close(writer->file.fd);
     }
 
-    GET_BINLOG_FILENAME(writer);
+    sf_file_writer_get_binlog_filename(writer);
     writer->file.fd = open(writer->file.name, O_WRONLY |
             O_CREAT | O_APPEND | O_CLOEXEC, 0644);
     if (writer->file.fd < 0) {
@@ -197,7 +258,7 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
 
 static int open_next_binlog(SFFileWriterInfo *writer)
 {
-    GET_BINLOG_FILENAME(writer);
+    sf_file_writer_get_binlog_filename(writer);
     if (access(writer->file.name, F_OK) == 0) {
         char bak_filename[PATH_MAX];
         char date_str[32];

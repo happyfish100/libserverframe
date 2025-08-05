@@ -23,7 +23,7 @@ static int calc_cluster_config_sign(SFClusterConfig *cluster)
     FastBuffer buffer;
     int result;
 
-    if ((result=fast_buffer_init_ex(&buffer, 1024)) != 0) {
+    if ((result=fast_buffer_init1(&buffer, 1024)) != 0) {
         return result;
     }
     fc_server_to_config_string(&cluster->server_cfg, &buffer);
