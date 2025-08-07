@@ -106,7 +106,7 @@ void sf_ordered_writer_finish(SFOrderedWriterContext *ctx)
 {
     int count;
 
-    if (ctx->writer.fw.file.name != NULL) {
+    if (ctx->writer.fw.file.name.str != NULL) {
         fc_queue_terminate(&ctx->thread.queues.version);
 
         count = 0;
@@ -120,8 +120,8 @@ void sf_ordered_writer_finish(SFOrderedWriterContext *ctx)
                     __LINE__, ctx->writer.fw.cfg.subdir_name);
         }
 
-        free(ctx->writer.fw.file.name);
-        ctx->writer.fw.file.name = NULL;
+        free(ctx->writer.fw.file.name.str);
+        ctx->writer.fw.file.name.str = NULL;
     }
 
     if (ctx->writer.fw.file.fd >= 0) {

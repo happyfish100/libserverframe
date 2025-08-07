@@ -32,6 +32,7 @@ typedef struct sf_connection_stat {
 typedef struct sf_global_variables {
     struct {
         char str[MAX_PATH_SIZE];
+        int len;
         bool inited;
         bool created;
     } base_path;
@@ -79,6 +80,7 @@ extern SFGlobalVariables         g_sf_global_vars;
 extern SFContext                 g_sf_context;
 
 #define SF_G_BASE_PATH_STR       g_sf_global_vars.base_path.str
+#define SF_G_BASE_PATH_LEN       g_sf_global_vars.base_path.len
 #define SF_G_BASE_PATH_INITED    g_sf_global_vars.base_path.inited
 #define SF_G_BASE_PATH_CREATED   g_sf_global_vars.base_path.created
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
@@ -317,8 +319,8 @@ static inline void sf_set_global_base_path(const char *base_path)
     string_t path_string;
 
     FC_SET_STRING(path_string, (char *)base_path);
-    normalize_path(NULL, &path_string, SF_G_BASE_PATH_STR,
-            sizeof(SF_G_BASE_PATH_STR));
+    SF_G_BASE_PATH_LEN = normalize_path(NULL, &path_string,
+            SF_G_BASE_PATH_STR, sizeof(SF_G_BASE_PATH_STR));
     SF_G_BASE_PATH_INITED = true;
 }
 

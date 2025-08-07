@@ -250,6 +250,7 @@ int sf_get_base_path_from_conf_file(const char *config_filename)
         }
     }
 
+    SF_G_BASE_PATH_LEN = strlen(SF_G_BASE_PATH_STR);
     SF_G_BASE_PATH_INITED = true;
     return 0;
 }
@@ -271,6 +272,7 @@ int sf_load_global_base_path(IniFullContext *ini_ctx)
     }
 
     chopPath(SF_G_BASE_PATH_STR);
+    SF_G_BASE_PATH_LEN = strlen(SF_G_BASE_PATH_STR);
     if (!fileExists(SF_G_BASE_PATH_STR)) {
         if ((result=fc_check_mkdir_ex(SF_G_BASE_PATH_STR, 0775,
                         &SF_G_BASE_PATH_CREATED)) != 0)
@@ -525,7 +527,7 @@ static void set_bind_address(const char *bind_addr, char *ipv4_bind_addr,
         return;
     }
 
-    snprintf(new_bind_addr, sizeof(new_bind_addr), "%s", bind_addr);
+    fc_safe_strcpy(new_bind_addr, bind_addr);
     count = splitEx(new_bind_addr, ',', cols, 2);
     for (i=0; i<count; i++) {
         ip_addr = cols[i];
@@ -535,9 +537,13 @@ static void set_bind_address(const char *bind_addr, char *ipv4_bind_addr,
                 ++ip_addr;
                 len -= 2;
             }
-            snprintf(ipv6_bind_addr, addr_size, "%.*s", len, ip_addr);
+            if (len >= addr_size) {
+                len = addr_size - 1;
+            }
+            memcpy(ipv6_bind_addr, ip_addr, len);
+            *(ipv6_bind_addr + len) = '\0';
         } else {
-            snprintf(ipv4_bind_addr, addr_size, "%s", ip_addr);
+            fc_strlcpy(ipv4_bind_addr, ip_addr, addr_size);
         }
     }
 }
@@ -1046,6 +1052,8 @@ int sf_load_data_path_config_ex(IniFullContext *ini_ctx,
         const char *item_name, const char *default_value, string_t *path)
 {
     const char *data_path;
+    int data_path_len;
+    int path_size;
 
     data_path = iniGetStrValue(ini_ctx->section_name,
             item_name, ini_ctx->context);
@@ -1061,20 +1069,23 @@ int sf_load_data_path_config_ex(IniFullContext *ini_ctx,
         return EINVAL;
     }
 
+    data_path_len = strlen(data_path);
     if (*data_path == '/') {
-        path->len = strlen(data_path);
+        path->len = data_path_len;
         path->str = fc_strdup1(data_path, path->len);
         if (path->str == NULL) {
             return ENOMEM;
         }
     } else {
-        path->len = strlen(SF_G_BASE_PATH_STR) + strlen(data_path) + 1;
-        path->str = (char *)fc_malloc(path->len + 1);
+        path_size = SF_G_BASE_PATH_LEN + data_path_len + 2;
+        path->str = (char *)fc_malloc(path_size);
         if (path->str == NULL) {
             return ENOMEM;
         }
-        path->len = sprintf(path->str, "%s/%s",
-                SF_G_BASE_PATH_STR, data_path);
+
+        path->len = fc_get_full_filepath_ex(SF_G_BASE_PATH_STR,
+                SF_G_BASE_PATH_LEN, data_path, data_path_len,
+                path->str, path_size);
     }
     chopPath(path->str);
     path->len = strlen(path->str);

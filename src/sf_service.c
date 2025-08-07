@@ -115,7 +115,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     pthread_t tid;
     pthread_attr_t thread_attr;
 
-    snprintf(sf_context->name, sizeof(sf_context->name), "%s", name);
+    fc_safe_strcpy(sf_context->name, name);
     sf_context->connect_need_log = true;
     sf_context->realloc_task_buffer = sf_context->net_buffer_cfg.
         min_buff_size < sf_context->net_buffer_cfg.max_buff_size;

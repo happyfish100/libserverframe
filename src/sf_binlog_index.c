@@ -229,7 +229,7 @@ int sf_binlog_index_save(SFBinlogIndexContext *ctx)
     int result;
     char tmp_filename[PATH_MAX];
 
-    snprintf(tmp_filename, sizeof(tmp_filename), "%s.tmp", ctx->filename);
+    fc_combine_two_string(ctx->filename, "tmp", '.', tmp_filename);
     if ((result=save(ctx, tmp_filename)) != 0) {
         return result;
     }

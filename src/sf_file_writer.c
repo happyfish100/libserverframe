@@ -48,9 +48,10 @@
 
 static inline void sf_file_writer_get_binlog_filename(SFFileWriterInfo *writer)
 {
-    sprintf(writer->file.name, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
+    sf_file_writer_get_filename_ex(
             writer->cfg.data_path, writer->cfg.subdir_name,
-            writer->cfg.file_prefix, writer->binlog.last_index);
+            writer->cfg.file_prefix, writer->binlog.last_index,
+            writer->file.name.str, writer->file.name.size);
 }
 
 static inline void sf_file_writer_get_index_filename_ex(const char *data_path,
@@ -232,13 +233,13 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
     }
 
     sf_file_writer_get_binlog_filename(writer);
-    writer->file.fd = open(writer->file.name, O_WRONLY |
+    writer->file.fd = open(writer->file.name.str, O_WRONLY |
             O_CREAT | O_APPEND | O_CLOEXEC, 0644);
     if (writer->file.fd < 0) {
         logError("file: "__FILE__", line: %d, "
                 "open file \"%s\" fail, "
                 "errno: %d, error info: %s",
-                __LINE__, writer->file.name,
+                __LINE__, writer->file.name.str,
                 errno, STRERROR(errno));
         return errno != 0 ? errno : EACCES;
     }
@@ -248,7 +249,7 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
         logError("file: "__FILE__", line: %d, "
                 "lseek file \"%s\" fail, "
                 "errno: %d, error info: %s",
-                __LINE__, writer->file.name,
+                __LINE__, writer->file.name.str,
                 errno, STRERROR(errno));
         return errno != 0 ? errno : EIO;
     }
@@ -259,22 +260,23 @@ static int open_writable_binlog(SFFileWriterInfo *writer)
 static int open_next_binlog(SFFileWriterInfo *writer)
 {
     sf_file_writer_get_binlog_filename(writer);
-    if (access(writer->file.name, F_OK) == 0) {
+    if (access(writer->file.name.str, F_OK) == 0) {
         char bak_filename[PATH_MAX];
         char date_str[32];
 
-        snprintf(bak_filename, sizeof(bak_filename), "%s.%s",
-                writer->file.name, formatDatetime(g_current_time,
-                    "%Y%m%d%H%M%S", date_str, sizeof(date_str)));
-        if (rename(writer->file.name, bak_filename) == 0) {
+        formatDatetime(g_current_time, "%Y%m%d%H%M%S",
+                date_str, sizeof(date_str));
+        fc_combine_two_string(writer->file.name.str,
+                date_str, '.', bak_filename);
+        if (rename(writer->file.name.str, bak_filename) == 0) {
             logWarning("file: "__FILE__", line: %d, "
                     "binlog file %s exist, rename to %s",
-                    __LINE__, writer->file.name, bak_filename);
+                    __LINE__, writer->file.name.str, bak_filename);
         } else {
             logError("file: "__FILE__", line: %d, "
                     "rename binlog %s to backup %s fail, "
                     "errno: %d, error info: %s",
-                    __LINE__, writer->file.name, bak_filename,
+                    __LINE__, writer->file.name.str, bak_filename,
                     errno, STRERROR(errno));
             return errno != 0 ? errno : EPERM;
         }
@@ -293,7 +295,7 @@ static int do_write_to_file(SFFileWriterInfo *writer,
         logError("file: "__FILE__", line: %d, "
                 "write to binlog file \"%s\" fail, "
                 "errno: %d, error info: %s",
-                __LINE__, writer->file.name,
+                __LINE__, writer->file.name.str,
                 result, STRERROR(result));
         return result;
     }
@@ -303,7 +305,7 @@ static int do_write_to_file(SFFileWriterInfo *writer,
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
                     "fsync to binlog file \"%s\" fail, errno: %d, "
-                    "error info: %s", __LINE__, writer->file.name,
+                    "error info: %s", __LINE__, writer->file.name.str,
                     result, STRERROR(result));
             return result;
         }
@@ -337,7 +339,7 @@ int sf_file_writer_direct_write(SFFileWriterInfo *writer,
     if (result != 0) {
         logError("file: "__FILE__", line: %d, "
                 "open binlog file \"%s\" fail",
-                __LINE__, writer->file.name);
+                __LINE__, writer->file.name.str);
         return result;
     }
 
@@ -380,7 +382,7 @@ int sf_file_writer_fsync(SFFileWriterInfo *writer)
         result = errno != 0 ? errno : EIO;
         logError("file: "__FILE__", line: %d, "
                 "fsync to binlog file \"%s\" fail, errno: %d, "
-                "error info: %s", __LINE__, writer->file.name,
+                "error info: %s", __LINE__, writer->file.name.str,
                 result, STRERROR(result));
         return result;
     }
@@ -504,8 +506,7 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
     writer->cfg.call_fsync = call_fsync;
     writer->cfg.file_rotate_size = file_rotate_size;
     writer->cfg.data_path = data_path;
-    path_len = snprintf(filepath, sizeof(filepath),
-            "%s/%s", data_path, subdir_name);
+    path_len = fc_combine_full_filepath(data_path, subdir_name, filepath);
     if ((result=fc_check_mkdir_ex(filepath, 0775, &create)) != 0) {
         return result;
     }
@@ -514,14 +515,11 @@ int sf_file_writer_init(SFFileWriterInfo *writer, const char *data_path,
     }
 
     writer->file.fd = -1;
-    snprintf(writer->cfg.subdir_name,
-            sizeof(writer->cfg.subdir_name),
-            "%s", subdir_name);
-    snprintf(writer->cfg.file_prefix,
-            sizeof(writer->cfg.file_prefix),
-            "%s", file_prefix);
-    writer->file.name = (char *)fc_malloc(path_len + 32);
-    if (writer->file.name == NULL) {
+    fc_safe_strcpy(writer->cfg.subdir_name, subdir_name);
+    fc_safe_strcpy(writer->cfg.file_prefix, file_prefix);
+    writer->file.name.size = path_len + 32;
+    writer->file.name.str = (char *)fc_malloc(writer->file.name.size);
+    if (writer->file.name.str == NULL) {
         return ENOMEM;
     }
 
@@ -542,9 +540,9 @@ void sf_file_writer_destroy(SFFileWriterInfo *writer)
         close(writer->file.fd);
         writer->file.fd = -1;
     }
-    if (writer->file.name != NULL) {
-        free(writer->file.name);
-        writer->file.name = NULL;
+    if (writer->file.name.str != NULL) {
+        free(writer->file.name.str);
+        writer->file.name.str = NULL;
     }
     sf_binlog_buffer_destroy(&writer->binlog_buffer);
 }

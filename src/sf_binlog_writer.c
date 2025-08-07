@@ -305,7 +305,7 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
     uint32_t last_timestamp;
     int count;
 
-    if (writer->fw.file.name != NULL) {
+    if (writer->fw.file.name.str != NULL) {
         while (writer->thread->running && !fc_queue_empty(
                     &writer->thread->queue))
         {
@@ -333,8 +333,8 @@ void sf_binlog_writer_finish(SFBinlogWriterInfo *writer)
             deal_binlog_records(writer->thread, wb_head, &last_timestamp);
         }
 
-        free(writer->fw.file.name);
-        writer->fw.file.name = NULL;
+        free(writer->fw.file.name.str);
+        writer->fw.file.name.str = NULL;
     }
 
     if (writer->fw.file.fd >= 0) {

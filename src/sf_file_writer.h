@@ -28,7 +28,8 @@
 #define SF_BINLOG_DEFAULT_ROTATE_SIZE  (1024 * 1024 * 1024)
 #define SF_BINLOG_NEVER_ROTATE_FILE    0
 #define SF_BINLOG_FILE_PREFIX          "binlog"
-#define SF_BINLOG_FILE_EXT_FMT         ".%06d"
+#define SF_BINLOG_FILE_EXT_LEN         6
+#define SF_BINLOG_FILE_EXT_FMT         ".%0"FC_MACRO_TOSTRING(SF_BINLOG_FILE_EXT_LEN)"d"
 
 struct sf_file_writer_info;
 
@@ -53,8 +54,11 @@ typedef struct sf_file_writer_info {
 
     struct {
         int fd;
-        int64_t size;
-        char *name;
+        int64_t size;  //file size
+        struct {
+            char *str;
+            int size;
+        } name;
     } file;
 
     int64_t total_count;
@@ -222,7 +226,8 @@ static inline const char *sf_file_writer_get_filepath(
         const char *data_path, const char *subdir_name,
         char *filepath, const int size)
 {
-    snprintf(filepath, size, "%s/%s", data_path, subdir_name);
+    fc_get_full_filepath_ex(data_path, strlen(data_path),
+            subdir_name, strlen(subdir_name), filepath, size);
     return filepath;
 }
 
@@ -231,8 +236,34 @@ static inline const char *sf_file_writer_get_filename_ex(
         const char *file_prefix, const int binlog_index,
         char *filename, const int size)
 {
-    snprintf(filename, size, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
-            data_path, subdir_name, file_prefix, binlog_index);
+    char *p;
+    int data_path_len;
+    int subdir_name_len;
+    int file_prefix_len;
+
+    data_path_len = strlen(data_path);
+    subdir_name_len = strlen(subdir_name);
+    file_prefix_len = strlen(file_prefix);
+    if (data_path_len + subdir_name_len + file_prefix_len +
+            4 + SF_BINLOG_FILE_EXT_LEN >= size)
+    {
+        snprintf(filename, size, "%s/%s/%s"SF_BINLOG_FILE_EXT_FMT,
+                data_path, subdir_name, file_prefix, binlog_index);
+        return filename;
+    }
+
+    p = filename;
+    memcpy(p, data_path, data_path_len);
+    p += data_path_len;
+    *p++ = '/';
+    memcpy(p, subdir_name, subdir_name_len);
+    p += subdir_name_len;
+    *p++ = '/';
+    memcpy(p, file_prefix, file_prefix_len);
+    p += file_prefix_len;
+    *p++ = '.';
+    fc_ltostr_ex(binlog_index, p, SF_BINLOG_FILE_EXT_LEN);
+
     return filename;
 }
 
