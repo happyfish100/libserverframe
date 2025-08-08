@@ -357,8 +357,7 @@ static void *binlog_writer_func(void *arg)
 #ifdef OS_LINUX
     {
         char thread_name[64];
-        snprintf(thread_name, sizeof(thread_name),
-                "%s-writer", thread->name);
+        fc_combine_two_string(thread->name, "writer", '-', thread_name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif
@@ -497,7 +496,7 @@ int sf_binlog_writer_init_thread_ex(SFBinlogWriterThread *thread,
     pthread_t tid;
     struct fast_mblock_object_callbacks callbacks;
 
-    snprintf(thread->name, sizeof(thread->name), "%s", name);
+    fc_safe_strcpy(thread->name, name);
     thread->order_mode = order_mode;
     thread->use_fixed_buffer_size = use_fixed_buffer_size;
     thread->passive_write = passive_write;

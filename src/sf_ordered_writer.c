@@ -142,8 +142,7 @@ static void *binlog_writer_func(void *arg)
 #ifdef OS_LINUX
     {
         char thread_name[64];
-        snprintf(thread_name, sizeof(thread_name),
-                "%s-writer", thread->name);
+        fc_combine_two_string(thread->name, "writer", '-', thread_name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif
@@ -203,7 +202,7 @@ static int sf_ordered_writer_init_thread(SFOrderedWriterContext *context,
 
     thread = &context->thread;
     writer = &context->writer;
-    snprintf(thread->name, sizeof(thread->name), "%s", name);
+    fc_safe_strcpy(thread->name, name);
     writer->fw.cfg.max_record_size = max_record_size;
     writer->thread = thread;
 

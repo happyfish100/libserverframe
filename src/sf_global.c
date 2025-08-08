@@ -220,9 +220,7 @@ int sf_load_slow_log_config_ex(IniFullContext *ini_ctx, LogContext *log_ctx,
     if (filename_prefix == NULL || *filename_prefix == '\0') {
         strcpy(slow_log_cfg->filename_prefix, "slow");
     } else {
-        snprintf(slow_log_cfg->filename_prefix,
-                sizeof(slow_log_cfg->filename_prefix),
-                "%s", filename_prefix);
+        fc_safe_strcpy(slow_log_cfg->filename_prefix, filename_prefix);
     }
 
     return 0;
@@ -331,9 +329,7 @@ int sf_load_global_config_ex(const char *log_filename_prefix,
         *g_sf_global_vars.run_by.group = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by.group,
-                sizeof(g_sf_global_vars.run_by.group),
-                "%s", pRunByGroup);
+        fc_safe_strcpy(g_sf_global_vars.run_by.group, pRunByGroup);
     }
     if (*(g_sf_global_vars.run_by.group) == '\0') {
         g_sf_global_vars.run_by.gid = getegid();
@@ -358,9 +354,7 @@ int sf_load_global_config_ex(const char *log_filename_prefix,
         *g_sf_global_vars.run_by.user = '\0';
     }
     else {
-        snprintf(g_sf_global_vars.run_by.user,
-                sizeof(g_sf_global_vars.run_by.user),
-                "%s", pRunByUser);
+        fc_safe_strcpy(g_sf_global_vars.run_by.user, pRunByUser);
     }
     if (*(g_sf_global_vars.run_by.user) == '\0') {
         g_sf_global_vars.run_by.uid = geteuid();
