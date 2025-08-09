@@ -142,7 +142,7 @@ static void *binlog_writer_func(void *arg)
 #ifdef OS_LINUX
     {
         char thread_name[64];
-        fc_combine_two_string(thread->name, "writer", '-', thread_name);
+        fc_combine_two_strings(thread->name, "writer", '-', thread_name);
         prctl(PR_SET_NAME, thread_name);
     }
 #endif

@@ -266,7 +266,7 @@ static int open_next_binlog(SFFileWriterInfo *writer)
 
         formatDatetime(g_current_time, "%Y%m%d%H%M%S",
                 date_str, sizeof(date_str));
-        fc_combine_two_string(writer->file.name.str,
+        fc_combine_two_strings(writer->file.name.str,
                 date_str, '.', bak_filename);
         if (rename(writer->file.name.str, bak_filename) == 0) {
             logWarning("file: "__FILE__", line: %d, "
