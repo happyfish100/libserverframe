@@ -54,8 +54,9 @@ static inline void sf_file_writer_get_binlog_filename(SFFileWriterInfo *writer)
             writer->file.name.str, writer->file.name.size);
 }
 
-static inline void sf_file_writer_get_index_filename_ex(const char *data_path,
-        const char *subdir_name, const char *file_prefix,
+static inline void sf_file_writer_get_index_filename_ex(
+        const char *data_path, const char *subdir_name,
+        const char *file_prefix, const int file_prefix_len,
         char *filename, const int size)
 {
 #define INDEX_FILENAME_AFFIX_STR "_index.dat"
@@ -64,11 +65,9 @@ static inline void sf_file_writer_get_index_filename_ex(const char *data_path,
     char *p;
     int data_path_len;
     int subdir_name_len;
-    int file_prefix_len;
 
     data_path_len = strlen(data_path);
     subdir_name_len = strlen(subdir_name);
-    file_prefix_len = strlen(file_prefix);
     if (data_path_len + 1 + subdir_name_len + 1 + file_prefix_len +
             INDEX_FILENAME_AFFIX_LEN >= size)
     {
@@ -96,7 +95,8 @@ const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size)
 {
     sf_file_writer_get_index_filename_ex(data_path, subdir_name,
-            SF_BINLOG_FILE_PREFIX, filename, size);
+            SF_BINLOG_FILE_PREFIX_STR, SF_BINLOG_FILE_PREFIX_LEN,
+            filename, size);
     return filename;
 }
 
@@ -111,8 +111,8 @@ int sf_file_writer_write_to_binlog_index_file_ex(const char *data_path,
     int result;
     int len;
 
-    sf_file_writer_get_index_filename_ex(data_path, subdir_name,
-            file_prefix, filename, sizeof(filename));
+    sf_file_writer_get_index_filename_ex(data_path, subdir_name, file_prefix,
+            strlen(file_prefix), filename, sizeof(filename));
     p = buff;
     memcpy(p, BINLOG_INDEX_ITEM_START_INDEX_STR,
             BINLOG_INDEX_ITEM_START_INDEX_LEN);
@@ -161,8 +161,8 @@ static int get_binlog_info_from_file(const char *data_path,
     IniContext ini_context;
     int result;
 
-    sf_file_writer_get_index_filename_ex(data_path,
-            subdir_name, SF_BINLOG_FILE_PREFIX,
+    sf_file_writer_get_index_filename_ex(data_path, subdir_name,
+            SF_BINLOG_FILE_PREFIX_STR, SF_BINLOG_FILE_PREFIX_LEN,
             full_filename, sizeof(full_filename));
     if (access(full_filename, F_OK) != 0) {
         return errno != 0 ? errno : EPERM;

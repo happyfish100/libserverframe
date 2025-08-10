@@ -24,12 +24,13 @@
 #define SF_FILE_WRITER_FLAGS_WANT_DONE_VERSION  1
 
 #define SF_BINLOG_SUBDIR_NAME_SIZE     128
-#define SF_BINLOG_FILE_PREFIX_SIZE      64
+#define SF_BINLOG_FILE_PREFIX_STR_SIZE 64
 #define SF_BINLOG_DEFAULT_ROTATE_SIZE  (1024 * 1024 * 1024)
 #define SF_BINLOG_NEVER_ROTATE_FILE    0
-#define SF_BINLOG_FILE_PREFIX          "binlog"
-#define SF_BINLOG_FILE_EXT_LEN         6
-#define SF_BINLOG_FILE_EXT_FMT         ".%0"FC_MACRO_TOSTRING(SF_BINLOG_FILE_EXT_LEN)"d"
+#define SF_BINLOG_FILE_PREFIX_STR      "binlog"
+#define SF_BINLOG_FILE_PREFIX_LEN      (sizeof(SF_BINLOG_FILE_PREFIX_STR) - 1)
+#define SF_BINLOG_FILE_EXT_LEN 6
+#define SF_BINLOG_FILE_EXT_FMT ".%0"FC_MACRO_TOSTRING(SF_BINLOG_FILE_EXT_LEN)"d"
 
 struct sf_file_writer_info;
 
@@ -40,7 +41,7 @@ typedef struct sf_file_writer_info {
     struct {
         const char *data_path;
         char subdir_name[SF_BINLOG_SUBDIR_NAME_SIZE];
-        char file_prefix[SF_BINLOG_FILE_PREFIX_SIZE];
+        char file_prefix[SF_BINLOG_FILE_PREFIX_STR_SIZE];
         int64_t file_rotate_size;
         int max_record_size;
         bool call_fsync;
@@ -270,7 +271,7 @@ static inline const char *sf_file_writer_get_filename_ex(
 #define sf_file_writer_get_filename(data_path, subdir_name, \
         binlog_index, filename, size) \
     sf_file_writer_get_filename_ex(data_path, subdir_name, \
-        SF_BINLOG_FILE_PREFIX, binlog_index, filename, size)
+        SF_BINLOG_FILE_PREFIX_STR, binlog_index, filename, size)
 
 const char *sf_file_writer_get_index_filename(const char *data_path,
         const char *subdir_name, char *filename, const int size);
@@ -313,7 +314,7 @@ int sf_file_writer_write_to_binlog_index_file_ex(const char *data_path,
 #define sf_file_writer_write_to_binlog_index_file(data_path,  \
         subdir_name, start_index, last_index) \
     sf_file_writer_write_to_binlog_index_file_ex(data_path, subdir_name, \
-            SF_BINLOG_FILE_PREFIX, start_index, last_index, 0)
+            SF_BINLOG_FILE_PREFIX_STR, start_index, last_index, 0)
 
 #ifdef __cplusplus
 }

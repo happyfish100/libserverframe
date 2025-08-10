@@ -71,7 +71,7 @@ int sf_ordered_writer_init_ex(SFOrderedWriterContext *context,
 #define sf_ordered_writer_init(context, data_path, \
         subdir_name, buffer_size, max_record_size) \
     sf_ordered_writer_init_ex(context, data_path, subdir_name,   \
-            SF_BINLOG_FILE_PREFIX, buffer_size, max_record_size, \
+            SF_BINLOG_FILE_PREFIX_STR, buffer_size, max_record_size, \
             SF_BINLOG_DEFAULT_ROTATE_SIZE, true)
 
 #define sf_ordered_writer_set_flags(ctx, flags) \
