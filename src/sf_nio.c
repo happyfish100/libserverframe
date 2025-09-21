@@ -68,10 +68,6 @@ void sf_task_detach_thread(struct fast_task_info *task)
                 &task->event.timer);
         task->event.timer.expires = 0;
     }
-
-    if (SF_CTX->remove_from_ready_list) {
-        ioevent_remove(&task->thread_data->ev_puller, task);
-    }
 }
 
 void sf_task_switch_thread(struct fast_task_info *task,

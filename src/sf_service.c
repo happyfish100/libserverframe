@@ -161,7 +161,11 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 
     if (SF_G_EPOLL_EDGE_TRIGGER) {
 #ifdef OS_LINUX
+#if IOEVENT_USE_EPOLL
         extra_events = EPOLLET;
+#else
+        extra_events = 0;
+#endif
 #elif defined(OS_FREEBSD)
         extra_events = EV_CLEAR;
 #else

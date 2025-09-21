@@ -68,15 +68,6 @@ static inline void sf_set_connect_done_callback_ex(SFContext *sf_context,
     sf_set_connect_done_callback_ex(&g_sf_context, done_callback)
 
 
-static inline void sf_set_remove_from_ready_list_ex(
-        SFContext *sf_context, const bool enabled)
-{
-    sf_context->remove_from_ready_list = enabled;
-}
-
-#define sf_set_remove_from_ready_list(enabled) \
-    sf_set_remove_from_ready_list_ex(&g_sf_context, enabled);
-
 static inline TaskCleanUpCallback sf_get_task_cleanup_callback_ex(
         SFContext *sf_context)
 {

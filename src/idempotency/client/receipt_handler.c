@@ -565,7 +565,6 @@ int receipt_handler_init(FCAddressPtrArray *address_array)
     }
 
     sf_enable_thread_notify(true);
-    sf_set_remove_from_ready_list(false);
     fc_sleep_ms(100);
 
     return 0;
