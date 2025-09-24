@@ -498,10 +498,16 @@ static int init_network_handler(SFContext *sf_context,
         handler->send_data = sf_socket_send_data;
         handler->recv_data = sf_socket_recv_data;
         handler->post_recv = NULL;
+#if IOEVENT_USE_URING
+        handler->use_iouring = true;
+#else
+        handler->use_iouring = false;
+#endif
         return 0;
     } else {
         handler->inner.id = NULL;
         handler->outer.id = NULL;
+        handler->use_iouring = false;
         return load_rdma_apis(sf_context, handler);
     }
 }

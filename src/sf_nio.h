@@ -92,8 +92,6 @@ static inline void sf_nio_reset_task_length(struct fast_task_info *task)
 
 void sf_recv_notify_read(int sock, short event, void *arg);
 int sf_send_add_event(struct fast_task_info *task);
-int sf_client_sock_write(int sock, short event, void *arg);
-int sf_client_sock_read(int sock, short event, void *arg);
 
 void sf_task_finish_clean_up(struct fast_task_info *task);
 
@@ -147,11 +145,6 @@ static inline int sf_nio_forward_request(struct fast_task_info *task,
 {
     sf_task_switch_thread(task, new_thread_index);
     return sf_nio_notify(task, SF_NIO_STAGE_FORWARDED);
-}
-
-static inline bool sf_client_sock_in_read_stage(struct fast_task_info *task)
-{
-    return (task->event.callback == (IOEventCallback)sf_client_sock_read);
 }
 
 static inline void sf_nio_add_to_deleted_list(struct nio_thread_data
