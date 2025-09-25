@@ -119,7 +119,8 @@ struct sf_address_family_handler;
 typedef struct sf_network_handler {
     bool enabled;
     bool explicit_post_recv;
-    bool use_iouring; //since v1.2.9
+    bool use_io_uring; //since v1.2.9
+    bool use_send_zc;  //since v1.2.9
     FCCommunicationType comm_type;
     struct sf_address_family_handler *fh;
     struct ibv_pd *pd;
