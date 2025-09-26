@@ -96,6 +96,8 @@
 #define SF_BINLOG_SOURCE_USER        'U'  //by user call
 #define SF_BINLOG_SOURCE_REPLAY      'R'  //by binlog replay
 
+#define SF_LOG_SCHEDULE_ENTRIES_COUNT 3
+
 #ifdef __cplusplus
 extern "C" {
 #endif

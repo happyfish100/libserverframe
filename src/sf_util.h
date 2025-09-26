@@ -96,14 +96,14 @@ void sf_parse_cmd_option_bool(int argc, char *argv[],
 
 int sf_logger_init(LogContext *pContext, const char *filename_prefix);
 
-ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
+ScheduleEntry *sf_logger_set_schedule_entries(struct log_context *pContext,
         SFLogConfig *log_cfg, ScheduleEntry *pScheduleEntry);
 
-static inline void sf_setup_schedule(struct log_context *pContext,
+static inline void sf_logger_setup_schedule(struct log_context *pContext,
         SFLogConfig *log_cfg, ScheduleArray *scheduleArray)
 {
     ScheduleEntry *scheduleEntry;
-    scheduleEntry = sf_logger_set_schedule_entry(pContext,
+    scheduleEntry = sf_logger_set_schedule_entries(pContext,
             log_cfg, scheduleArray->entries);
     scheduleArray->count = scheduleEntry - scheduleArray->entries;
 }

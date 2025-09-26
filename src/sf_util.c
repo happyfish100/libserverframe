@@ -281,7 +281,7 @@ int sf_logger_init(LogContext *pContext, const char *filename_prefix)
     return 0;
 }
 
-ScheduleEntry *sf_logger_set_schedule_entry(struct log_context *pContext,
+ScheduleEntry *sf_logger_set_schedule_entries(struct log_context *pContext,
         SFLogConfig *log_cfg, ScheduleEntry *pScheduleEntry)
 {
     INIT_SCHEDULE_ENTRY(*pScheduleEntry, sched_generate_next_id(),

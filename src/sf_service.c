@@ -782,15 +782,13 @@ int sf_setup_signal_handler()
     return 0;
 }
 
-#define LOG_SCHEDULE_ENTRIES_COUNT 3
-
 int sf_startup_schedule(pthread_t *schedule_tid)
 {
     ScheduleArray scheduleArray;
-    ScheduleEntry scheduleEntries[LOG_SCHEDULE_ENTRIES_COUNT];
+    ScheduleEntry scheduleEntries[SF_LOG_SCHEDULE_ENTRIES_COUNT];
 
     scheduleArray.entries = scheduleEntries;
-    sf_setup_schedule(&g_log_context, &g_sf_global_vars.error_log,
+    sf_logger_setup_schedule(&g_log_context, &g_sf_global_vars.error_log,
             &scheduleArray);
     return sched_start(&scheduleArray, schedule_tid,
             g_sf_global_vars.thread_stack_size, (bool * volatile)
@@ -801,7 +799,7 @@ int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx)
 {
     int result;
     ScheduleArray scheduleArray;
-    ScheduleEntry scheduleEntries[LOG_SCHEDULE_ENTRIES_COUNT];
+    ScheduleEntry scheduleEntries[SF_LOG_SCHEDULE_ENTRIES_COUNT];
 
     if (!slowlog_ctx->cfg.enabled) {
         return 0;
@@ -814,8 +812,8 @@ int sf_add_slow_log_schedule(SFSlowLogContext *slowlog_ctx)
     }
 
     scheduleArray.entries = scheduleEntries;
-    sf_setup_schedule(&slowlog_ctx->ctx, &slowlog_ctx->cfg.log_cfg,
-            &scheduleArray);
+    sf_logger_setup_schedule(&slowlog_ctx->ctx, &slowlog_ctx->
+            cfg.log_cfg, &scheduleArray);
     return sched_add_entries(&scheduleArray);
 }
 
