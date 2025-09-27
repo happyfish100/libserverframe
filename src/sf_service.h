@@ -25,6 +25,7 @@
 #include "fastcommon/ioevent.h"
 #include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
+#include "sf_global.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);
 typedef void (*sf_sig_quit_handler)(int sig);
@@ -108,8 +109,6 @@ int sf_socket_create_server(SFListener *listener,
 void sf_socket_close_server(SFListener *listener);
 struct fast_task_info *sf_socket_accept_connection(SFListener *listener);
 
-void sf_socket_close_connection(struct fast_task_info *task);
-
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)
 
@@ -170,9 +169,9 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
     return task;
 }
 
-#define sf_hold_task_ex(task, inc_count) __sync_add_and_fetch( \
-        &task->reffer_count, inc_count)
-#define sf_hold_task(task)  sf_hold_task_ex(task, 1)
+#define sf_hold_task_ex(task, inc_count)  \
+    fc_hold_task_ex(task, inc_count)
+#define sf_hold_task(task)  fc_hold_task(task)
 
 #define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
 
@@ -187,6 +186,14 @@ static inline void sf_release_task(struct fast_task_info *task)
                 "used: %d, freed: %d", __LINE__, task,
                 alloc_count, alloc_count - free_count, free_count);
                 */
+
+#if IOEVENT_USE_URING
+        if (task->handler->use_io_uring) {
+            task->handler->close_connection(task);
+            __sync_fetch_and_sub(&g_sf_global_vars.
+                    connection_stat.current_count, 1);
+        }
+#endif
         free_queue_push(task);
     }
 }

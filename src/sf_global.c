@@ -993,19 +993,19 @@ void sf_slow_log_config_to_string(SFSlowLogConfig *slow_log_cfg,
 void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
         char *output, const int size)
 {
-    int i;
     int len;
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
 #if IOEVENT_USE_URING
+    int i;
     bool use_io_uring;
     bool use_send_zc;
-#endif
-    char pkg_buff[256];
     SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
     SFNetworkHandler *end;
+#endif
+    char pkg_buff[256];
 
     max_pkg_size = g_sf_global_vars.net_buffer_cfg.max_pkg_size -
         g_sf_global_vars.task_buffer_extra_size;

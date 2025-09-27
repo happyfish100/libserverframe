@@ -35,7 +35,6 @@
 #include "fastcommon/fc_memory.h"
 #include "sf_nio.h"
 #include "sf_util.h"
-#include "sf_global.h"
 #include "sf_service.h"
 
 #if defined(OS_LINUX)
@@ -500,12 +499,6 @@ struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
             sizeof(task->client_ip), &port);
     task->port = port;
     return task;
-}
-
-void sf_socket_close_connection(struct fast_task_info *task)
-{
-    close(task->event.fd);
-    task->event.fd = -1;
 }
 
 void sf_socket_close_ex(SFContext *sf_context)
