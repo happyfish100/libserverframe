@@ -220,10 +220,17 @@ static inline int set_read_event(struct fast_task_info *task)
 
 #if IOEVENT_USE_URING
     if (task->handler->use_io_uring) {
-        if (FC_URING_OP_TYPE(task) == IORING_OP_RECV) {
-            logWarning("file: "__FILE__", line: %d, "
-                    "trigger recv again!", __LINE__);
-            return 0;
+        if (FC_URING_OP_TYPE(task) != IORING_OP_NOP) {
+            if (FC_URING_OP_TYPE(task) == IORING_OP_RECV) {
+                logWarning("file: "__FILE__", line: %d, "
+                        "trigger recv again!", __LINE__);
+                return 0;
+            } else {
+                logWarning("file: "__FILE__", line: %d, "
+                        "another operation in progress, op_type: %d!",
+                        __LINE__, FC_URING_OP_TYPE(task));
+                return EBUSY;
+            }
         }
 
         if (task->event.callback != (IOEventCallback)sf_client_sock_read) {
@@ -316,16 +323,31 @@ static int sf_client_connect_done(int sock, short event, void *arg)
 
     task = (struct fast_task_info *)arg;
     if (task->canceled) {
+#if IOEVENT_USE_URING
+        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
+            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+        }
+#endif
         return ENOTCONN;
     }
 
     if (event & IOEVENT_TIMEOUT) {
         result = ETIMEDOUT;
     } else {
-        result = task->handler->async_connect_check(task);
-        if (result == EINPROGRESS) {
-            return 0;
+#if IOEVENT_USE_URING
+        if (task->handler->use_io_uring) {
+            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+            result = (task->event.res < 0 ? -1 * task->event.res :
+                    task->event.res);
+        } else {
+#endif
+            result = task->handler->async_connect_check(task);
+            if (result == EINPROGRESS) {
+                return 0;
+            }
+#if IOEVENT_USE_URING
         }
+#endif
     }
 
     if (SF_CTX->callbacks.connect_done != NULL) {
@@ -356,14 +378,26 @@ static int sf_client_connect_done(int sock, short event, void *arg)
 int sf_socket_async_connect_server(struct fast_task_info *task)
 {
     int result;
-    if ((task->event.fd=socketCreateEx2(AF_UNSPEC, task->server_ip,
-                    O_NONBLOCK, NULL, &result)) < 0)
-    {
-        return result > 0 ? -1 * result : result;
-    }
 
-    return asyncconnectserverbyip(task->event.fd,
-            task->server_ip, task->port);
+#if IOEVENT_USE_URING
+    if (task->handler->use_io_uring) {
+        if ((result=uring_prep_connect(task)) != 0) {
+            return result;
+        }
+        return EINPROGRESS;
+    } else {
+#endif
+        if ((task->event.fd=socketCreateEx2(AF_UNSPEC, task->server_ip,
+                        O_NONBLOCK, NULL, &result)) < 0)
+        {
+            return result > 0 ? -1 * result : result;
+        }
+
+        return asyncconnectserverbyip(task->event.fd,
+                task->server_ip, task->port);
+#if IOEVENT_USE_URING
+    }
+#endif
 }
 
 static int sf_async_connect_server(struct fast_task_info *task)
