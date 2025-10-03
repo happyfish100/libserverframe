@@ -269,6 +269,12 @@ static inline int set_read_event(struct fast_task_info *task)
 
 int sf_set_read_event(struct fast_task_info *task)
 {
+#if IOEVENT_USE_URING
+    if (task->handler->use_io_uring) {
+        return 0;
+    }
+#endif
+
     task->recv.ptr->offset = 0;
     task->recv.ptr->length = 0;
     task->nio_stages.current = SF_NIO_STAGE_RECV;
@@ -561,7 +567,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
         {
             result = errno != 0 ? errno : EIO;
             logError("file: "__FILE__", line: %d, "
-                    "write eventfd %d fail, errno: %d, error info: %s",
+                    "write to fd %d fail, errno: %d, error info: %s",
                     __LINE__, FC_NOTIFY_WRITE_FD(task->thread_data),
                     result, STRERROR(result));
             return result;
@@ -589,26 +595,32 @@ static inline void deal_notified_task(struct fast_task_info *task,
     }
 }
 
-void sf_recv_notify_read(int sock, short event, void *arg)
+void sf_recv_notify_read(int fd, short event, void *arg)
 {
     int64_t n;
     int stage;
-    struct nio_thread_data *thread_data;
+    struct ioevent_notify_entry *notify_entry;
     struct fast_task_info *task;
     struct fast_task_info *current;
 
-    thread_data = ((struct ioevent_notify_entry *)arg)->thread_data;
-    if (read(sock, &n, sizeof(n)) < 0) {
+    notify_entry = (struct ioevent_notify_entry *)arg;
+    if (read(fd, &n, sizeof(n)) < 0) {
+#if IOEVENT_USE_URING
+        if (errno == EAGAIN) {
+            return;
+        }
+#endif
+
         logWarning("file: "__FILE__", line: %d, "
-                "read from eventfd %d fail, errno: %d, error info: %s",
-                __LINE__, sock, errno, STRERROR(errno));
+                "read from fd %d fail, errno: %d, error info: %s",
+                __LINE__, fd, errno, STRERROR(errno));
     }
 
-    PTHREAD_MUTEX_LOCK(&thread_data->waiting_queue.lock);
-    current = thread_data->waiting_queue.head;
-    thread_data->waiting_queue.head = NULL;
-    thread_data->waiting_queue.tail = NULL;
-    PTHREAD_MUTEX_UNLOCK(&thread_data->waiting_queue.lock);
+    PTHREAD_MUTEX_LOCK(&notify_entry->thread_data->waiting_queue.lock);
+    current = notify_entry->thread_data->waiting_queue.head;
+    notify_entry->thread_data->waiting_queue.head = NULL;
+    notify_entry->thread_data->waiting_queue.tail = NULL;
+    PTHREAD_MUTEX_UNLOCK(&notify_entry->thread_data->waiting_queue.lock);
 
     while (current != NULL) {
         task = current;
@@ -772,9 +784,9 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
         }
     } else if (bytes == 0) {
         logWarning("file: "__FILE__", line: %d, "
-                "client ip: %s, sock: %d, task length: %d, offset: %d, "
+                "client ip: %s, task length: %d, offset: %d, "
                 "send failed, connection disconnected", __LINE__,
-                task->client_ip, task->event.fd, task->send.ptr->length,
+                task->client_ip, task->send.ptr->length,
                 task->send.ptr->offset);
         return -1;
     }

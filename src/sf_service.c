@@ -490,7 +490,9 @@ struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
     }
     FC_SET_CLOEXEC(incomesock);
 
-    if ((task=sf_alloc_init_task(listener->handler, incomesock)) == NULL) {
+    if ((task=sf_alloc_init_server_task(listener->handler,
+                    incomesock)) == NULL)
+    {
         close(incomesock);
         return NULL;
     }

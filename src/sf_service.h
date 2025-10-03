@@ -169,11 +169,41 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
     return task;
 }
 
-#define sf_hold_task_ex(task, inc_count)  \
-    fc_hold_task_ex(task, inc_count)
+#define sf_hold_task_ex(task, inc_count)  fc_hold_task_ex(task, inc_count)
 #define sf_hold_task(task)  fc_hold_task(task)
 
 #define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
+
+static inline struct fast_task_info *sf_alloc_init_server_task(
+        SFNetworkHandler *handler, const int fd)
+{
+    const int reffer_count = 1;
+    struct fast_task_info *task;
+
+    if ((task=sf_alloc_init_task_ex(handler, fd, reffer_count)) != NULL) {
+#if IOEVENT_USE_URING
+        FC_URING_IS_CLIENT(task) = false;
+#endif
+    }
+
+    return task;
+}
+
+static inline struct fast_task_info *sf_alloc_init_client_task(
+        SFNetworkHandler *handler)
+{
+    const int fd = -1;
+    const int reffer_count = 1;
+    struct fast_task_info *task;
+
+    if ((task=sf_alloc_init_task_ex(handler, fd, reffer_count)) != NULL) {
+#if IOEVENT_USE_URING
+        FC_URING_IS_CLIENT(task) = true;
+#endif
+    }
+
+    return task;
+}
 
 static inline void sf_release_task(struct fast_task_info *task)
 {
@@ -194,6 +224,7 @@ static inline void sf_release_task(struct fast_task_info *task)
                     connection_stat.current_count, 1);
         }
 #endif
+
         free_queue_push(task);
     }
 }
@@ -267,6 +298,19 @@ static inline SFNetworkHandler *sf_get_rdma_network_handler3(
         return handler;
     }
     return sf_get_rdma_network_handler(sf_context3);
+}
+
+static inline bool sf_get_double_buffers_flag(FCServerGroupInfo *server_group)
+{
+    if (server_group->comm_type == fc_comm_type_sock) {
+#if IOEVENT_USE_URING
+        return true;
+#else
+        return false;
+#endif
+    } else {  //RDMA
+        return true;
+    }
 }
 
 #ifdef __cplusplus

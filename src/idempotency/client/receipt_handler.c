@@ -49,6 +49,10 @@ static IdempotencyReceiptGlobalVars receipt_global_vars;
 
 static int receipt_init_task(struct fast_task_info *task, void *arg)
 {
+#if IOEVENT_USE_URING
+    FC_URING_IS_CLIENT(task) = true;
+#endif
+
     if (RDMA_INIT_CONNECTION != NULL) {
         return RDMA_INIT_CONNECTION(task, arg);
     } else {
@@ -92,7 +96,6 @@ static void receipt_task_finish_cleanup(struct fast_task_info *task)
 
     if (task->event.fd >= 0) {
         sf_task_detach_thread(task);
-        task->handler->close_connection(task);
     }
 
     sf_nio_reset_task_length(task);
@@ -282,7 +285,7 @@ static int deal_setup_channel_response(struct fast_task_info *task)
     }
 
     channel = (IdempotencyClientChannel *)task->arg;
-    if (__sync_add_and_fetch(&channel->established, 0)) {
+    if (FC_ATOMIC_GET(channel->established)) {
         format_ip_address(task->server_ip, formatted_ip);
         logWarning("file: "__FILE__", line: %d, "
                 "response from server %s:%u, unexpected cmd: "

@@ -76,13 +76,13 @@ static inline void idempotency_client_channel_set_id_key(
 static inline int idempotency_client_channel_check_wait_ex(
         struct idempotency_client_channel *channel, const int timeout)
 {
-    if (__sync_add_and_fetch(&channel->established, 0)) {
+    if (FC_ATOMIC_GET(channel->established)) {
         return 0;
     }
 
     idempotency_client_channel_check_reconnect(channel);
     lcp_timedwait_sec(&channel->lcp, timeout);
-    if (__sync_add_and_fetch(&channel->established, 0)) {
+    if (FC_ATOMIC_GET(channel->established)) {
         return 0;
     } else {
         /*
