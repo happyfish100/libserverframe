@@ -34,6 +34,7 @@
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_memory.h"
 #include "sf_nio.h"
+#include "sf_proto.h"
 #include "sf_util.h"
 #include "sf_service.h"
 
@@ -60,9 +61,9 @@ struct worker_thread_context {
 static void *worker_thread_entrance(void *arg);
 
 static int sf_init_free_queue(SFContext *sf_context, const char *name,
-        const bool double_buffers, const int task_padding_size,
-        const int task_arg_size, TaskInitCallback init_callback,
-        void *init_arg)
+        const bool double_buffers, const bool need_shrink_task_buffer,
+        const int task_padding_size, const int task_arg_size,
+        TaskInitCallback init_callback, void *init_arg)
 {
     int result;
     int m;
@@ -82,9 +83,9 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
     }
     alloc_conn_once = 256 / m;
     return free_queue_init_ex2(&sf_context->free_queue, name, double_buffers,
-            sf_context->net_buffer_cfg.max_connections, alloc_conn_once,
-            sf_context->net_buffer_cfg.min_buff_size, sf_context->
-            net_buffer_cfg.max_buff_size, task_padding_size,
+            need_shrink_task_buffer, sf_context->net_buffer_cfg.max_connections,
+            alloc_conn_once, sf_context->net_buffer_cfg.min_buff_size,
+            sf_context->net_buffer_cfg.max_buff_size, task_padding_size,
             task_arg_size, init_callback, init_arg);
 }
 
@@ -100,8 +101,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
-        const bool explicit_post_recv, TaskInitCallback init_callback,
-        void *init_arg, sf_release_buffer_callback release_buffer_callback)
+        const bool need_shrink_task_buffer, const bool explicit_post_recv,
+        TaskInitCallback init_callback, void *init_arg,
+        sf_release_buffer_callback release_buffer_callback)
 {
     int result;
     int bytes;
@@ -131,8 +133,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     }
 
     if ((result=sf_init_free_queue(sf_context, name, double_buffers,
-                    task_padding_size, task_arg_size, init_callback,
-                    init_arg)) != 0)
+                    need_shrink_task_buffer, task_padding_size,
+                    task_arg_size, init_callback, init_arg)) != 0)
     {
         return result;
     }

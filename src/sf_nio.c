@@ -269,14 +269,16 @@ static inline int set_read_event(struct fast_task_info *task)
 
 int sf_set_read_event(struct fast_task_info *task)
 {
+    /* reset recv offset and length */
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
+
 #if IOEVENT_USE_URING
     if (task->handler->use_io_uring) {
         return 0;
     }
 #endif
 
-    task->recv.ptr->offset = 0;
-    task->recv.ptr->length = 0;
     task->nio_stages.current = SF_NIO_STAGE_RECV;
     return set_read_event(task);
 }

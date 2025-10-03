@@ -25,6 +25,7 @@
 #include "fastcommon/ioevent.h"
 #include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
+#include "sf_proto.h"
 #include "sf_global.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);
@@ -46,8 +47,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
-        const bool explicit_post_recv, TaskInitCallback init_callback,
-        void *init_arg, sf_release_buffer_callback release_buffer_callback);
+        const bool need_shrink_task_buffer, const bool explicit_post_recv,
+        TaskInitCallback init_callback, void *init_arg,
+        sf_release_buffer_callback release_buffer_callback);
 
 #define sf_service_init_ex(sf_context, name, alloc_thread_extra_data_callback,\
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -57,7 +59,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         thread_loop_callback, accept_done_callback, set_body_length_func,     \
         NULL, send_done_callback, deal_func, task_cleanup_func, \
         timeout_callback, net_timeout_ms, proto_header_size, \
-        0, task_arg_size, false, false, NULL, NULL, NULL)
+        0, task_arg_size, false, true, false, NULL, NULL, NULL)
 
 #define sf_service_init(name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -66,8 +68,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     sf_service_init_ex2(&g_sf_context, name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func, NULL,\
         send_done_callback, deal_func, task_cleanup_func, timeout_callback, \
-        net_timeout_ms, proto_header_size, 0, task_arg_size, false, false,  \
-        NULL, NULL, NULL)
+        net_timeout_ms, proto_header_size, 0, task_arg_size, false, true,   \
+        false, NULL, NULL, NULL)
 
 int sf_service_destroy_ex(SFContext *sf_context);
 
@@ -160,6 +162,11 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
                 "increase the parameter: max_connections",
                 __LINE__);
         return NULL;
+    }
+
+    if (task->shrinked) {
+        task->shrinked = false;
+        sf_proto_init_task_magic(task);
     }
 
     __sync_add_and_fetch(&task->reffer_count, reffer_count);
