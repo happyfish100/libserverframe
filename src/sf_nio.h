@@ -91,7 +91,7 @@ static inline void sf_nio_reset_task_length(struct fast_task_info *task)
 }
 
 void sf_socket_close_connection(struct fast_task_info *task);
-void sf_recv_notify_read(int sock, short event, void *arg);
+void sf_recv_notify_read(int sock, const int event, void *arg);
 int sf_send_add_event(struct fast_task_info *task);
 
 void sf_task_finish_clean_up(struct fast_task_info *task);

@@ -41,8 +41,8 @@
 #include "sf_service.h"
 #include "sf_nio.h"
 
-static int sf_client_sock_write(int sock, short event, void *arg);
-static int sf_client_sock_read(int sock, short event, void *arg);
+static int sf_client_sock_write(int sock, const int event, void *arg);
+static int sf_client_sock_read(int sock, const int event, void *arg);
 
 void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
         sf_set_body_length_callback set_body_length_func,
@@ -67,12 +67,14 @@ void sf_set_parameters_ex(SFContext *sf_context, const int header_size,
     FC_URING_OP_TYPE(task) = IORING_OP_NOP;  \
     sf_release_task(task)
 
-static int sf_uring_cancel_done(int sock, short event, void *arg)
+static int sf_uring_cancel_done(int sock, const int event, void *arg)
 {
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
-    CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+    if (event != IOEVENT_TIMEOUT) {
+        CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+    }
     return 0;
 }
 #endif
@@ -269,15 +271,15 @@ static inline int set_read_event(struct fast_task_info *task)
 
 int sf_set_read_event(struct fast_task_info *task)
 {
-    /* reset recv offset and length */
-    task->recv.ptr->offset = 0;
-    task->recv.ptr->length = 0;
-
 #if IOEVENT_USE_URING
     if (task->handler->use_io_uring) {
         return 0;
     }
 #endif
+
+    /* reset recv offset and length */
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
 
     task->nio_stages.current = SF_NIO_STAGE_RECV;
     return set_read_event(task);
@@ -323,7 +325,7 @@ int sf_socket_async_connect_check(struct fast_task_info *task)
     return result;
 }
 
-static int sf_client_connect_done(int sock, short event, void *arg)
+static int sf_client_connect_done(int sock, const int event, void *arg)
 {
     int result;
     struct fast_task_info *task;
@@ -339,7 +341,7 @@ static int sf_client_connect_done(int sock, short event, void *arg)
         return ENOTCONN;
     }
 
-    if (event & IOEVENT_TIMEOUT) {
+    if (event == IOEVENT_TIMEOUT) {
         result = ETIMEDOUT;
     } else {
 #if IOEVENT_USE_URING
@@ -597,7 +599,7 @@ static inline void deal_notified_task(struct fast_task_info *task,
     }
 }
 
-void sf_recv_notify_read(int fd, short event, void *arg)
+void sf_recv_notify_read(int fd, const int event, void *arg)
 {
     int64_t n;
     int stage;
@@ -672,7 +674,7 @@ int sf_send_add_event(struct fast_task_info *task)
 }
 
 static inline int check_task(struct fast_task_info *task,
-        const short event, const int expect_stage)
+        const int event, const int expect_stage)
 {
     if (task->canceled) {
         return ENOTCONN;
@@ -1160,7 +1162,7 @@ int sf_rdma_busy_polling_callback(struct nio_thread_data *thread_data)
     return 0;
 }
 
-static int sf_client_sock_read(int sock, short event, void *arg)
+static int sf_client_sock_read(int sock, const int event, void *arg)
 {
     int result;
     int bytes;
@@ -1171,14 +1173,14 @@ static int sf_client_sock_read(int sock, short event, void *arg)
     task = (struct fast_task_info *)arg;
     if ((result=check_task(task, event, SF_NIO_STAGE_RECV)) != 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring && (event != IOEVENT_TIMEOUT)) {
+        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
             CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
         }
 #endif
         return result >= 0 ? 0 : -1;
     }
 
-    if (event & IOEVENT_TIMEOUT) {
+    if (event == IOEVENT_TIMEOUT) {
         if (task->recv.ptr->offset == 0 && task->req_count > 0) {
             if (SF_CTX->callbacks.task_timeout != NULL) {
                 if (SF_CTX->callbacks.task_timeout(task) != 0) {
@@ -1262,7 +1264,7 @@ static int sf_client_sock_read(int sock, short event, void *arg)
     return total_read;
 }
 
-static int sf_client_sock_write(int sock, short event, void *arg)
+static int sf_client_sock_write(int sock, const int event, void *arg)
 {
     int result;
     int bytes;
@@ -1276,14 +1278,14 @@ static int sf_client_sock_write(int sock, short event, void *arg)
     task = (struct fast_task_info *)arg;
     if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring && (event != IOEVENT_TIMEOUT)) {
+        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
             CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
         }
 #endif
         return result >= 0 ? 0 : -1;
     }
 
-    if (event & IOEVENT_TIMEOUT) {
+    if (event == IOEVENT_TIMEOUT) {
         logError("file: "__FILE__", line: %d, "
             "client ip: %s, send timeout. total length: %d, offset: %d, "
             "remain: %d", __LINE__, task->client_ip, task->send.ptr->length,
