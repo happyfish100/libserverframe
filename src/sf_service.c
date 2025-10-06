@@ -200,9 +200,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&thread_data->ev_puller, 2 + sf_context->
-                    net_buffer_cfg.max_connections, net_timeout_ms,
-                    extra_events) != 0)
+        if (ioevent_init(&thread_data->ev_puller, sf_context->name,
+                    2 + sf_context->net_buffer_cfg.max_connections,
+                    net_timeout_ms, extra_events) != 0)
         {
             result  = errno != 0 ? errno : ENOMEM;
             logError("file: "__FILE__", line: %d, "

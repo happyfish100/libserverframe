@@ -694,6 +694,18 @@ static inline int check_task(struct fast_task_info *task,
         return 0;
     }
 
+#if IOEVENT_USE_URING
+    if (task->handler->use_io_uring) {
+        logWarning("file: "__FILE__", line: %d, "
+                "client ip: %s, event: %d, expect stage: %d, "
+                "but current stage: %d, close connection",
+                __LINE__, task->client_ip, event,
+                expect_stage, task->nio_stages.current);
+        ioevent_add_to_deleted_list(task);
+        return -1;
+    }
+#endif
+
     if (task->handler->comm_type == fc_comm_type_sock) {
         if (tcp_socket_connected(task->event.fd)) {
             return EAGAIN;

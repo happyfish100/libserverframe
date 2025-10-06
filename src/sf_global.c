@@ -678,6 +678,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     int inner_port;
     int outer_port;
     int port;
+    bool global_use_send_zc;
     bool use_send_zc;
     int i;
     int result;
@@ -715,8 +716,15 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         outer_port = config->default_outer_port;
     }
 
-    use_send_zc = iniGetBoolValue(config->ini_ctx.section_name,
-                "use_send_zc", config->ini_ctx.context, false);
+    global_use_send_zc = iniGetBoolValue(NULL, "use_send_zc",
+            config->ini_ctx.context, false);
+    if (config->ini_ctx.section_name == NULL) {
+        use_send_zc = global_use_send_zc;
+    } else {
+        use_send_zc = iniGetBoolValue(config->ini_ctx.section_name,
+                "use_send_zc", config->ini_ctx.context, global_use_send_zc);
+    }
+
     for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
         fh = sf_context->handlers + i;
         fh->ctx = sf_context;
@@ -899,6 +907,29 @@ static const char *get_address_family_caption(
     }
 }
 
+static void get_io_uring_configs(const SFContext *sf_context,
+        bool *use_io_uring, bool *use_send_zc)
+{
+    int i;
+    const SFAddressFamilyHandler *fh;
+    const SFNetworkHandler *handler;
+    const SFNetworkHandler *end;
+
+    *use_io_uring = false;
+    *use_send_zc = false;
+    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
+        fh = sf_context->handlers + i;
+        end = fh->handlers + SF_NETWORK_HANDLER_COUNT;
+        for (handler=fh->handlers; handler<end; handler++) {
+            if (handler->enabled && handler->use_io_uring) {
+                *use_io_uring = true;
+                *use_send_zc = handler->use_send_zc;
+                return;
+            }
+        }
+    }
+}
+
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)
 {
@@ -908,6 +939,10 @@ void sf_context_config_to_string(const SFContext *sf_context,
     char outer_bind_addr[2 * IP_ADDRESS_SIZE + 2];
     int i;
     int len;
+#if IOEVENT_USE_URING
+    bool use_io_uring;
+    bool use_send_zc;
+#endif
 
     *inner_bind_addr = '\0';
     *outer_bind_addr = '\0';
@@ -948,6 +983,12 @@ void sf_context_config_to_string(const SFContext *sf_context,
             ", address_family=%s, accept_threads=%d, work_threads=%d",
             get_address_family_caption(sf_context->address_family),
             sf_context->accept_threads, sf_context->work_threads);
+
+#if IOEVENT_USE_URING
+    get_io_uring_configs(sf_context, &use_io_uring, &use_send_zc);
+    len += snprintf(output + len, size - len, ", use_io_uring=%d"
+            ", use_send_zc=%d", use_io_uring, use_send_zc);
+#endif
 }
 
 void sf_log_config_to_string_ex(SFLogConfig *log_cfg, const char *caption,
@@ -998,12 +1039,8 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
     int min_buff_size;
     int max_buff_size;
 #if IOEVENT_USE_URING
-    int i;
     bool use_io_uring;
     bool use_send_zc;
-    SFAddressFamilyHandler *fh;
-    SFNetworkHandler *handler;
-    SFNetworkHandler *end;
 #endif
     char pkg_buff[256];
 
@@ -1024,22 +1061,6 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
                 min_buff_size / 1024, max_buff_size / 1024);
     }
 
-#if IOEVENT_USE_URING
-    use_io_uring = false;
-    use_send_zc = false;
-    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
-        fh = g_sf_context.handlers + i;
-        end = fh->handlers + SF_NETWORK_HANDLER_COUNT;
-        for (handler=fh->handlers; handler<end; handler++) {
-            if (handler->enabled && handler->use_io_uring) {
-                use_io_uring = true;
-                use_send_zc = handler->use_send_zc;
-                break;
-            }
-        }
-    }
-#endif
-
     len = snprintf(output, size,
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%d KB, %s, ",
@@ -1050,6 +1071,7 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             g_sf_global_vars.thread_stack_size / 1024, pkg_buff);
 
 #if IOEVENT_USE_URING
+    get_io_uring_configs(&g_sf_context, &use_io_uring, &use_send_zc);
     len += snprintf(output + len, size - len,
             "use_io_uring=%d, use_send_zc=%d, ",
             use_io_uring, use_send_zc);
