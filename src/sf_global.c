@@ -717,7 +717,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
     global_use_send_zc = iniGetBoolValue(NULL, "use_send_zc",
-            config->ini_ctx.context, false);
+            config->ini_ctx.context, true);
     if (config->ini_ctx.section_name == NULL) {
         use_send_zc = global_use_send_zc;
     } else {
