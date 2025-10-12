@@ -66,7 +66,9 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
         TaskInitCallback init_callback, void *init_arg)
 {
     int result;
+    int buffer_size;
     int m;
+    int max_m;
     int alloc_conn_once;
 
     if ((result=set_rand_seed()) != 0) {
@@ -75,11 +77,19 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
         return result;
     }
 
-    m = sf_context->net_buffer_cfg.min_buff_size / (64 * 1024);
+    if (strcmp(name, "service") == 0) {
+        buffer_size = sf_context->net_buffer_cfg.min_buff_size;
+        max_m = 16;
+    } else {
+        buffer_size = FC_MAX(4 * 1024 * 1024, sf_context->
+                net_buffer_cfg.max_buff_size);
+        max_m = 64;
+    }
+    m = buffer_size / (64 * 1024);
     if (m == 0) {
         m = 1;
-    } else if (m > 16) {
-        m = 16;
+    } else if (m > max_m) {
+        m = max_m;
     }
     alloc_conn_once = 256 / m;
     return free_queue_init_ex2(&sf_context->free_queue, name, double_buffers,
@@ -177,6 +187,36 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         extra_events = 0;
     }
 
+    max_entries = (sf_context->net_buffer_cfg.max_connections +
+            sf_context->work_threads - 1) / sf_context->work_threads;
+    if (strcmp(sf_context->name, "service") == 0) {
+        if (max_entries < 4 * 1024) {
+            max_entries = max_entries * 2;
+        } else if (max_entries < 8 * 1024) {
+            max_entries = (max_entries * 3) / 2;
+        } else if (max_entries < 16 * 1024) {
+            max_entries = (max_entries * 5) / 4;
+        } else if (max_entries < 32 * 1024) {
+            max_entries = (max_entries * 6) / 5;
+#if IOEVENT_USE_URING
+            if (max_entries > 32 * 1024) {
+                max_entries = 32 * 1024;
+            }
+#else
+        } else if (max_entries < 64 * 1024) {
+            max_entries = (max_entries * 11) / 10;
+        } else if (max_entries < 128 * 1024) {
+            max_entries = (max_entries * 21) / 20;
+#endif
+        }
+    } else {
+        if (max_entries < 1024) {
+            max_entries += 8;
+        } else {
+            max_entries = 1024;
+        }
+    }
+
     g_current_time = time(NULL);
     sf_context->thread_count = 0;
     data_end = sf_context->thread_data + sf_context->work_threads;
@@ -201,15 +241,6 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-#if IOEVENT_USE_URING
-        if (sf_context->net_buffer_cfg.max_connections < 16 * 1024) {
-            max_entries = 2 * sf_context->net_buffer_cfg.max_connections;
-        } else {
-            max_entries = sf_context->net_buffer_cfg.max_connections;
-        }
-#else
-        max_entries = 2 + sf_context->net_buffer_cfg.max_connections;
-#endif
         if ((result=ioevent_init(&thread_data->ev_puller, sf_context->name,
                         max_entries, net_timeout_ms, extra_events)) != 0)
         {
@@ -218,8 +249,10 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             if (result == EPERM) {
                 strcpy(prompt, " make sure kernel.io_uring_disabled set to 0");
             } else if (result == EINVAL) {
-                sprintf(prompt, " maybe max_connections: %d is too large",
-                        sf_context->net_buffer_cfg.max_connections);
+                sprintf(prompt, " maybe max_connections: %d is too large"
+                        " or [%s]'s work_threads: %d is too small",
+                        sf_context->net_buffer_cfg.max_connections,
+                        sf_context->name, sf_context->work_threads);
             } else {
                 *prompt = '\0';
             }
