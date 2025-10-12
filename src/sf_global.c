@@ -907,6 +907,7 @@ static const char *get_address_family_caption(
     }
 }
 
+#if IOEVENT_USE_URING
 static void get_io_uring_configs(const SFContext *sf_context,
         bool *use_io_uring, bool *use_send_zc)
 {
@@ -929,6 +930,7 @@ static void get_io_uring_configs(const SFContext *sf_context,
         }
     }
 }
+#endif
 
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)

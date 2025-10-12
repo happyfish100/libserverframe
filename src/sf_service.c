@@ -108,6 +108,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     int result;
     int bytes;
     int extra_events;
+    int max_entries;
     int i;
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
@@ -200,15 +201,35 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&thread_data->ev_puller, sf_context->name,
-                    2 + sf_context->net_buffer_cfg.max_connections,
-                    net_timeout_ms, extra_events) != 0)
+#if IOEVENT_USE_URING
+        if (sf_context->net_buffer_cfg.max_connections < 16 * 1024) {
+            max_entries = 2 * sf_context->net_buffer_cfg.max_connections;
+        } else {
+            max_entries = sf_context->net_buffer_cfg.max_connections;
+        }
+#else
+        max_entries = 2 + sf_context->net_buffer_cfg.max_connections;
+#endif
+        if ((result=ioevent_init(&thread_data->ev_puller, sf_context->name,
+                        max_entries, net_timeout_ms, extra_events)) != 0)
         {
-            result  = errno != 0 ? errno : ENOMEM;
+            char prompt[256];
+#if IOEVENT_USE_URING
+            if (result == EPERM) {
+                strcpy(prompt, " make sure kernel.io_uring_disabled set to 0");
+            } else if (result == EINVAL) {
+                sprintf(prompt, " maybe max_connections: %d is too large",
+                        sf_context->net_buffer_cfg.max_connections);
+            } else {
+                *prompt = '\0';
+            }
+#else
+            *prompt = '\0';
+#endif
+
             logError("file: "__FILE__", line: %d, "
-                "ioevent_init fail, "
-                "errno: %d, error info: %s",
-                __LINE__, result, strerror(result));
+                "ioevent_init fail, errno: %d, error info: %s.%s"
+                , __LINE__, result, strerror(result), prompt);
             return result;
         }
 
