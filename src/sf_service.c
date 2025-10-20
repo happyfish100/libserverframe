@@ -77,13 +77,13 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
         return result;
     }
 
-    if (strcmp(name, "service") == 0) {
-        buffer_size = sf_context->net_buffer_cfg.min_buff_size;
-        max_m = 16;
-    } else {
+    if (strcmp(name, "cluster") == 0 || strcmp(name, "replica") == 0) {
         buffer_size = FC_MAX(4 * 1024 * 1024, sf_context->
                 net_buffer_cfg.max_buff_size);
         max_m = 64;
+    } else {
+        buffer_size = sf_context->net_buffer_cfg.min_buff_size;
+        max_m = 16;
     }
     m = buffer_size / (64 * 1024);
     if (m == 0) {
@@ -92,6 +92,7 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
         m = max_m;
     }
     alloc_conn_once = 256 / m;
+
     return free_queue_init_ex2(&sf_context->free_queue, name, double_buffers,
             need_shrink_task_buffer, sf_context->net_buffer_cfg.max_connections,
             alloc_conn_once, sf_context->net_buffer_cfg.min_buff_size,
@@ -265,6 +266,12 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
                 , __LINE__, result, strerror(result), prompt);
             return result;
         }
+
+#if IOEVENT_USE_URING
+        if (send_done_callback != NULL) {
+            ioevent_set_send_zc_done_notify(&thread_data->ev_puller, true);
+        }
+#endif
 
         result = fast_timer_init(&thread_data->timer, 2 * sf_context->
                 net_buffer_cfg.network_timeout, g_current_time);

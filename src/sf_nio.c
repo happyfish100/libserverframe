@@ -809,13 +809,25 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
 
     task->send.ptr->offset += bytes;
     if (task->send.ptr->offset >= task->send.ptr->length) {
-        if (task->send.ptr != task->recv.ptr) {  //double buffers
-            task->send.ptr->offset = 0;
-            task->send.ptr->length = 0;
-        }
+#if IOEVENT_USE_URING
+        if (FC_URING_IS_SEND_ZC(task) && task->thread_data->
+                ev_puller.send_zc_done_notify)
+        {
+            *action = sf_comm_action_break;
+            *send_done = false;
+        } else {
+#endif
+            if (task->send.ptr != task->recv.ptr) {  //double buffers
+                task->send.ptr->offset = 0;
+                task->send.ptr->length = 0;
+            }
 
-        *action = sf_comm_action_finish;
-        *send_done = true;
+            *action = sf_comm_action_finish;
+            *send_done = true;
+#if IOEVENT_USE_URING
+        }
+#endif
+
     } else {
         /* set next writev iovec array */
         if (task->iovec_array.iovs != NULL) {
@@ -848,8 +860,12 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
 
 #if IOEVENT_USE_URING
         if (task->handler->use_io_uring) {
-            if (prepare_next_send(task) != 0) {
-                return -1;
+            if (!(FC_URING_IS_SEND_ZC(task) && task->thread_data->
+                        ev_puller.send_zc_done_notify))
+            {
+                if (prepare_next_send(task) != 0) {
+                    return -1;
+                }
             }
             *action = sf_comm_action_break;
         } else {
@@ -1276,13 +1292,44 @@ static int sf_client_sock_read(int sock, const int event, void *arg)
     return total_read;
 }
 
+static int sock_write_done(struct fast_task_info *task,
+        const int length, const bool send_done)
+{
+    int next_stage;
+
+    release_iovec_buffer(task);
+    task->recv.ptr->offset = 0;
+    task->recv.ptr->length = 0;
+
+    if (SF_CTX->callbacks.send_done == NULL || !send_done) {
+        task->nio_stages.current = SF_NIO_STAGE_RECV;
+    } else {
+        if (SF_CTX->callbacks.send_done(task,
+                    length, &next_stage) != 0)
+        {
+            return -1;
+        }
+
+        if (task->nio_stages.current != next_stage) {
+            task->nio_stages.current = next_stage;
+        }
+    }
+
+    if (task->nio_stages.current == SF_NIO_STAGE_RECV) {
+        if (set_read_event(task) != 0) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 static int sf_client_sock_write(int sock, const int event, void *arg)
 {
     int result;
     int bytes;
     int total_write;
     int length;
-    int next_stage;
     SFCommAction action;
     bool send_done;
     struct fast_task_info *task;
@@ -1291,7 +1338,11 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
     if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
 #if IOEVENT_USE_URING
         if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
-            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+            if (event == IOEVENT_NOTIFY || !(FC_URING_IS_SEND_ZC(task) &&
+                        task->thread_data->ev_puller.send_zc_done_notify))
+            {
+                CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+            }
         }
 #endif
         return result >= 0 ? 0 : -1;
@@ -1309,8 +1360,38 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
     }
 
 #if IOEVENT_USE_URING
+    if (event == IOEVENT_NOTIFY) {
+        if (!FC_URING_IS_SEND_ZC(task)) {
+            logWarning("file: "__FILE__", line: %d, "
+                    "unexpected io_uring notify!", __LINE__);
+            return -1;
+        }
+
+        FC_URING_OP_TYPE(task) = IORING_OP_NOP;
+        if (!task->canceled) {
+            if (task->send.ptr->offset >= task->send.ptr->length) {
+                length = task->send.ptr->length;
+                if (task->send.ptr != task->recv.ptr) {  //double buffers
+                    task->send.ptr->offset = 0;
+                    task->send.ptr->length = 0;
+                }
+
+                result = sock_write_done(task, length, true);
+            } else {
+                result = prepare_next_send(task);
+            }
+        }
+
+        sf_release_task(task);
+        return result == 0 ? 0 : -1;
+    }
+
     if (task->handler->use_io_uring) {
-        CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+        if (!(FC_URING_IS_SEND_ZC(task) && task->thread_data->
+                    ev_puller.send_zc_done_notify))
+        {
+            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+        }
     }
 #endif
 
@@ -1329,30 +1410,9 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
 
         total_write += bytes;
         if (action == sf_comm_action_finish) {
-            release_iovec_buffer(task);
-            task->recv.ptr->offset = 0;
-            task->recv.ptr->length = 0;
-
-            if (SF_CTX->callbacks.send_done == NULL || !send_done) {
-                task->nio_stages.current = SF_NIO_STAGE_RECV;
-            } else {
-                if (SF_CTX->callbacks.send_done(task,
-                            length, &next_stage) != 0)
-                {
-                    return -1;
-                }
-
-                if (task->nio_stages.current != next_stage) {
-                    task->nio_stages.current = next_stage;
-                }
+            if (sock_write_done(task, length, send_done) != 0) {
+                return -1;
             }
-
-            if (task->nio_stages.current == SF_NIO_STAGE_RECV) {
-                if (set_read_event(task) != 0) {
-                    return -1;
-                }
-            }
-
             break;
         } else if (action == sf_comm_action_break) {
             break;
