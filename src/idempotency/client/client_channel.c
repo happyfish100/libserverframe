@@ -174,7 +174,6 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
         *channel, const uint32_t hash_code, const FCCommunicationType comm_type,
         const char *server_ip, const uint16_t port, int *err_no)
 {
-    int len;
     struct fast_task_info *task;
     SFAddressFamilyHandler *fh;
     SFNetworkHandler *handler;
@@ -195,12 +194,7 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
         return NULL;
     }
 
-    len = strlen(server_ip);
-    if (len >= sizeof(task->server_ip)) {
-        len = sizeof(task->server_ip) - 1;
-    }
-    memcpy(task->server_ip, server_ip, len);
-    *(task->server_ip + len) = '\0';
+    fc_safe_strcpy(task->server_ip, server_ip);
     task->port = port;
     task->arg = channel;
     task->thread_data = g_sf_context.thread_data +
@@ -209,7 +203,8 @@ static struct fast_task_info *alloc_channel_task(IdempotencyClientChannel
     channel->last_connect_time = g_current_time;
     if ((*err_no=sf_nio_notify(task, SF_NIO_STAGE_CONNECT)) != 0) {
         channel->in_ioevent = 0;   //rollback
-        sf_release_task(task);
+        __sync_sub_and_fetch(&task->reffer_count, 1);
+        free_queue_push(task);
         return NULL;
     }
     return task;
@@ -220,6 +215,12 @@ int idempotency_client_channel_check_reconnect(
 {
     int result;
     char formatted_ip[FORMATTED_IP_SIZE];
+
+#if IOEVENT_USE_URING
+    if (FC_ATOMIC_GET(channel->task->reffer_count) > 1) {
+        return 0;
+    }
+#endif
 
     if (!__sync_bool_compare_and_swap(&channel->in_ioevent, 0, 1)) {
         return 0;
@@ -237,6 +238,9 @@ int idempotency_client_channel_check_reconnect(
                 formatted_ip, channel->task->port);
     }
 
+    if (channel->task->event.fd >= 0) {
+        channel->task->handler->close_connection(channel->task);
+    }
     __sync_bool_compare_and_swap(&channel->task->canceled, 1, 0);
     if ((result=sf_nio_notify(channel->task, SF_NIO_STAGE_CONNECT)) == 0) {
         channel->last_connect_time = g_current_time;
@@ -348,8 +352,8 @@ int idempotency_client_channel_push(struct idempotency_client_channel *channel,
     receipt->req_id = req_id;
     fc_queue_push_ex(&channel->queue, receipt, &notify);
     if (notify) {
-        if (__sync_add_and_fetch(&channel->in_ioevent, 0)) {
-            if (__sync_add_and_fetch(&channel->established, 0)) {
+        if (FC_ATOMIC_GET(channel->in_ioevent)) {
+            if (FC_ATOMIC_GET(channel->established)) {
                 sf_nio_notify(channel->task, SF_NIO_STAGE_CONTINUE);
             }
         } else {

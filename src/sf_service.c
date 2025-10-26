@@ -34,8 +34,8 @@
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_memory.h"
 #include "sf_nio.h"
+#include "sf_proto.h"
 #include "sf_util.h"
-#include "sf_global.h"
 #include "sf_service.h"
 
 #if defined(OS_LINUX)
@@ -61,12 +61,14 @@ struct worker_thread_context {
 static void *worker_thread_entrance(void *arg);
 
 static int sf_init_free_queue(SFContext *sf_context, const char *name,
-        const bool double_buffers, const int task_padding_size,
-        const int task_arg_size, TaskInitCallback init_callback,
-        void *init_arg)
+        const bool double_buffers, const bool need_shrink_task_buffer,
+        const int task_padding_size, const int task_arg_size,
+        TaskInitCallback init_callback, void *init_arg)
 {
     int result;
+    int buffer_size;
     int m;
+    int max_m;
     int alloc_conn_once;
 
     if ((result=set_rand_seed()) != 0) {
@@ -75,17 +77,26 @@ static int sf_init_free_queue(SFContext *sf_context, const char *name,
         return result;
     }
 
-    m = sf_context->net_buffer_cfg.min_buff_size / (64 * 1024);
+    if (strcmp(name, "cluster") == 0 || strcmp(name, "replica") == 0) {
+        buffer_size = FC_MAX(4 * 1024 * 1024, sf_context->
+                net_buffer_cfg.max_buff_size);
+        max_m = 64;
+    } else {
+        buffer_size = sf_context->net_buffer_cfg.min_buff_size;
+        max_m = 16;
+    }
+    m = buffer_size / (64 * 1024);
     if (m == 0) {
         m = 1;
-    } else if (m > 16) {
-        m = 16;
+    } else if (m > max_m) {
+        m = max_m;
     }
     alloc_conn_once = 256 / m;
+
     return free_queue_init_ex2(&sf_context->free_queue, name, double_buffers,
-            sf_context->net_buffer_cfg.max_connections, alloc_conn_once,
-            sf_context->net_buffer_cfg.min_buff_size, sf_context->
-            net_buffer_cfg.max_buff_size, task_padding_size,
+            need_shrink_task_buffer, sf_context->net_buffer_cfg.max_connections,
+            alloc_conn_once, sf_context->net_buffer_cfg.min_buff_size,
+            sf_context->net_buffer_cfg.max_buff_size, task_padding_size,
             task_arg_size, init_callback, init_arg);
 }
 
@@ -101,12 +112,14 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
-        const bool explicit_post_recv, TaskInitCallback init_callback,
-        void *init_arg, sf_release_buffer_callback release_buffer_callback)
+        const bool need_shrink_task_buffer, const bool explicit_post_recv,
+        TaskInitCallback init_callback, void *init_arg,
+        sf_release_buffer_callback release_buffer_callback)
 {
     int result;
     int bytes;
     int extra_events;
+    int max_entries;
     int i;
     struct worker_thread_context *thread_contexts;
     struct worker_thread_context *thread_ctx;
@@ -132,8 +145,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     }
 
     if ((result=sf_init_free_queue(sf_context, name, double_buffers,
-                    task_padding_size, task_arg_size, init_callback,
-                    init_arg)) != 0)
+                    need_shrink_task_buffer, task_padding_size,
+                    task_arg_size, init_callback, init_arg)) != 0)
     {
         return result;
     }
@@ -161,7 +174,11 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 
     if (SF_G_EPOLL_EDGE_TRIGGER) {
 #ifdef OS_LINUX
+#if IOEVENT_USE_EPOLL
         extra_events = EPOLLET;
+#else
+        extra_events = 0;
+#endif
 #elif defined(OS_FREEBSD)
         extra_events = EV_CLEAR;
 #else
@@ -169,6 +186,36 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 #endif
     } else {
         extra_events = 0;
+    }
+
+    max_entries = (sf_context->net_buffer_cfg.max_connections +
+            sf_context->work_threads - 1) / sf_context->work_threads;
+    if (strcmp(sf_context->name, "service") == 0) {
+        if (max_entries < 4 * 1024) {
+            max_entries = max_entries * 2;
+        } else if (max_entries < 8 * 1024) {
+            max_entries = (max_entries * 3) / 2;
+        } else if (max_entries < 16 * 1024) {
+            max_entries = (max_entries * 5) / 4;
+        } else if (max_entries < 32 * 1024) {
+            max_entries = (max_entries * 6) / 5;
+#if IOEVENT_USE_URING
+            if (max_entries > 32 * 1024) {
+                max_entries = 32 * 1024;
+            }
+#else
+        } else if (max_entries < 64 * 1024) {
+            max_entries = (max_entries * 11) / 10;
+        } else if (max_entries < 128 * 1024) {
+            max_entries = (max_entries * 21) / 20;
+#endif
+        }
+    } else {
+        if (max_entries < 1024) {
+            max_entries += 8;
+        } else {
+            max_entries = 1024;
+        }
     }
 
     g_current_time = time(NULL);
@@ -195,17 +242,36 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if (ioevent_init(&thread_data->ev_puller, 2 + sf_context->
-                    net_buffer_cfg.max_connections, net_timeout_ms,
-                    extra_events) != 0)
+        if ((result=ioevent_init(&thread_data->ev_puller, sf_context->name,
+                        max_entries, net_timeout_ms, extra_events)) != 0)
         {
-            result  = errno != 0 ? errno : ENOMEM;
+            char prompt[256];
+#if IOEVENT_USE_URING
+            if (result == EPERM) {
+                strcpy(prompt, " make sure kernel.io_uring_disabled set to 0");
+            } else if (result == EINVAL) {
+                sprintf(prompt, " maybe max_connections: %d is too large"
+                        " or [%s]'s work_threads: %d is too small",
+                        sf_context->net_buffer_cfg.max_connections,
+                        sf_context->name, sf_context->work_threads);
+            } else {
+                *prompt = '\0';
+            }
+#else
+            *prompt = '\0';
+#endif
+
             logError("file: "__FILE__", line: %d, "
-                "ioevent_init fail, "
-                "errno: %d, error info: %s",
-                __LINE__, result, strerror(result));
+                "ioevent_init fail, errno: %d, error info: %s.%s"
+                , __LINE__, result, strerror(result), prompt);
             return result;
         }
+
+#if IOEVENT_USE_URING
+        if (send_done_callback != NULL) {
+            ioevent_set_send_zc_done_notify(&thread_data->ev_puller, true);
+        }
+#endif
 
         result = fast_timer_init(&thread_data->timer, 2 * sf_context->
                 net_buffer_cfg.network_timeout, g_current_time);
@@ -487,7 +553,9 @@ struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
     }
     FC_SET_CLOEXEC(incomesock);
 
-    if ((task=sf_alloc_init_task(listener->handler, incomesock)) == NULL) {
+    if ((task=sf_alloc_init_server_task(listener->handler,
+                    incomesock)) == NULL)
+    {
         close(incomesock);
         return NULL;
     }
@@ -496,12 +564,6 @@ struct fast_task_info *sf_socket_accept_connection(SFListener *listener)
             sizeof(task->client_ip), &port);
     task->port = port;
     return task;
-}
-
-void sf_socket_close_connection(struct fast_task_info *task)
-{
-    close(task->event.fd);
-    task->event.fd = -1;
 }
 
 void sf_socket_close_ex(SFContext *sf_context)

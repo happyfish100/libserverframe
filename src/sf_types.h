@@ -115,9 +115,12 @@ typedef struct sf_listener {
 
 struct sf_context;
 struct sf_address_family_handler;
+
 typedef struct sf_network_handler {
     bool enabled;
     bool explicit_post_recv;
+    bool use_io_uring; //since v1.2.9
+    bool use_send_zc;  //since v1.2.9
     FCCommunicationType comm_type;
     struct sf_address_family_handler *fh;
     struct ibv_pd *pd;
@@ -179,7 +182,6 @@ typedef struct sf_context {
     struct nio_thread_data *thread_data;
     volatile int thread_count;
 
-    //int rdma_port_offset;
     bool is_client;   //since v1.2.5
     SFAddressFamily address_family;
     SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
@@ -190,7 +192,6 @@ typedef struct sf_context {
     int work_threads;
 
     int header_size;
-    bool remove_from_ready_list;
     bool realloc_task_buffer;
     bool connect_need_log;  //for client connect
     FCSmartPollingConfig smart_polling;

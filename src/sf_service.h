@@ -25,6 +25,8 @@
 #include "fastcommon/ioevent.h"
 #include "fastcommon/fast_task_queue.h"
 #include "sf_types.h"
+#include "sf_proto.h"
+#include "sf_global.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);
 typedef void (*sf_sig_quit_handler)(int sig);
@@ -45,8 +47,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         sf_recv_timeout_callback timeout_callback, const int net_timeout_ms,
         const int proto_header_size, const int task_padding_size,
         const int task_arg_size, const bool double_buffers,
-        const bool explicit_post_recv, TaskInitCallback init_callback,
-        void *init_arg, sf_release_buffer_callback release_buffer_callback);
+        const bool need_shrink_task_buffer, const bool explicit_post_recv,
+        TaskInitCallback init_callback, void *init_arg,
+        sf_release_buffer_callback release_buffer_callback);
 
 #define sf_service_init_ex(sf_context, name, alloc_thread_extra_data_callback,\
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -56,7 +59,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         thread_loop_callback, accept_done_callback, set_body_length_func,     \
         NULL, send_done_callback, deal_func, task_cleanup_func, \
         timeout_callback, net_timeout_ms, proto_header_size, \
-        0, task_arg_size, false, false, NULL, NULL, NULL)
+        0, task_arg_size, false, true, false, NULL, NULL, NULL)
 
 #define sf_service_init(name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func,   \
@@ -65,8 +68,8 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
     sf_service_init_ex2(&g_sf_context, name, alloc_thread_extra_data_callback, \
         thread_loop_callback, accept_done_callback, set_body_length_func, NULL,\
         send_done_callback, deal_func, task_cleanup_func, timeout_callback, \
-        net_timeout_ms, proto_header_size, 0, task_arg_size, false, false,  \
-        NULL, NULL, NULL)
+        net_timeout_ms, proto_header_size, 0, task_arg_size, false, true,   \
+        false, NULL, NULL, NULL)
 
 int sf_service_destroy_ex(SFContext *sf_context);
 
@@ -107,8 +110,6 @@ int sf_socket_create_server(SFListener *listener,
         int af, const char *bind_addr);
 void sf_socket_close_server(SFListener *listener);
 struct fast_task_info *sf_socket_accept_connection(SFListener *listener);
-
-void sf_socket_close_connection(struct fast_task_info *task);
 
 int sf_socket_server_ex(SFContext *sf_context);
 #define sf_socket_server() sf_socket_server_ex(&g_sf_context)
@@ -163,6 +164,11 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
         return NULL;
     }
 
+    if (task->shrinked) {
+        task->shrinked = false;
+        sf_proto_init_task_magic(task);
+    }
+
     __sync_add_and_fetch(&task->reffer_count, reffer_count);
     __sync_bool_compare_and_swap(&task->canceled, 1, 0);
     task->handler = handler;
@@ -170,11 +176,41 @@ static inline struct fast_task_info *sf_alloc_init_task_ex(
     return task;
 }
 
-#define sf_hold_task_ex(task, inc_count) __sync_add_and_fetch( \
-        &task->reffer_count, inc_count)
-#define sf_hold_task(task)  sf_hold_task_ex(task, 1)
+#define sf_hold_task_ex(task, inc_count)  fc_hold_task_ex(task, inc_count)
+#define sf_hold_task(task)  fc_hold_task(task)
 
 #define sf_alloc_init_task(handler, fd) sf_alloc_init_task_ex(handler, fd, 1)
+
+static inline struct fast_task_info *sf_alloc_init_server_task(
+        SFNetworkHandler *handler, const int fd)
+{
+    const int reffer_count = 1;
+    struct fast_task_info *task;
+
+    if ((task=sf_alloc_init_task_ex(handler, fd, reffer_count)) != NULL) {
+#if IOEVENT_USE_URING
+        FC_URING_IS_CLIENT(task) = false;
+#endif
+    }
+
+    return task;
+}
+
+static inline struct fast_task_info *sf_alloc_init_client_task(
+        SFNetworkHandler *handler)
+{
+    const int fd = -1;
+    const int reffer_count = 1;
+    struct fast_task_info *task;
+
+    if ((task=sf_alloc_init_task_ex(handler, fd, reffer_count)) != NULL) {
+#if IOEVENT_USE_URING
+        FC_URING_IS_CLIENT(task) = true;
+#endif
+    }
+
+    return task;
+}
 
 static inline void sf_release_task(struct fast_task_info *task)
 {
@@ -187,6 +223,15 @@ static inline void sf_release_task(struct fast_task_info *task)
                 "used: %d, freed: %d", __LINE__, task,
                 alloc_count, alloc_count - free_count, free_count);
                 */
+
+#if IOEVENT_USE_URING
+        if (task->handler->use_io_uring) {
+            task->handler->close_connection(task);
+            __sync_fetch_and_sub(&g_sf_global_vars.
+                    connection_stat.current_count, 1);
+        }
+#endif
+
         free_queue_push(task);
     }
 }
@@ -260,6 +305,19 @@ static inline SFNetworkHandler *sf_get_rdma_network_handler3(
         return handler;
     }
     return sf_get_rdma_network_handler(sf_context3);
+}
+
+static inline bool sf_get_double_buffers_flag(FCServerGroupInfo *server_group)
+{
+    if (server_group->comm_type == fc_comm_type_sock) {
+#if IOEVENT_USE_URING
+        return true;
+#else
+        return false;
+#endif
+    } else {  //RDMA
+        return true;
+    }
 }
 
 #ifdef __cplusplus
