@@ -1315,11 +1315,19 @@ static int sock_write_done(struct fast_task_info *task,
         }
     }
 
-    if (task->nio_stages.current == SF_NIO_STAGE_RECV) {
+#if IOEVENT_USE_URING
+    if (!task->handler->use_io_uring || task->nio_stages.
+            current == SF_NIO_STAGE_RECV)
+    {
+#endif
+
         if (set_read_event(task) != 0) {
             return -1;
         }
+
+#if IOEVENT_USE_URING
     }
+#endif
 
     return 0;
 }
