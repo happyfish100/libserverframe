@@ -1429,3 +1429,8 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
 
     return total_write;
 }
+
+bool sf_client_sock_in_read_stage(struct fast_task_info *task)
+{
+    return (task->event.callback == (IOEventCallback)sf_client_sock_read);
+}

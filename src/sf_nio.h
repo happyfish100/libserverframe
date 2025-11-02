@@ -158,6 +158,8 @@ static inline void sf_nio_add_to_deleted_list(struct nio_thread_data
     }
 }
 
+bool sf_client_sock_in_read_stage(struct fast_task_info *task);
+
 #ifdef __cplusplus
 }
 #endif
