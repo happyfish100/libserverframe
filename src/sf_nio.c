@@ -72,8 +72,12 @@ static int sf_uring_cancel_done(int sock, const int event, void *arg)
     struct fast_task_info *task;
 
     task = (struct fast_task_info *)arg;
-    if (event != IOEVENT_TIMEOUT) {
-        CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+    if (event != IOEVENT_TIMEOUT) ECANCEL{
+        if (task->handler->use_io_uring || (FC_URING_OP_TYPE(task) !=
+                    IORING_OP_NOP && task->event.res == -ECANCELED))
+        {
+            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
+        }
     }
     return 0;
 }
