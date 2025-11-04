@@ -119,8 +119,6 @@ struct sf_address_family_handler;
 typedef struct sf_network_handler {
     bool enabled;
     bool explicit_post_recv;
-    bool use_io_uring; //since v1.2.9
-    bool use_send_zc;  //since v1.2.9
     FCCommunicationType comm_type;
     struct sf_address_family_handler *fh;
     struct ibv_pd *pd;
@@ -182,7 +180,11 @@ typedef struct sf_context {
     struct nio_thread_data *thread_data;
     volatile int thread_count;
 
-    bool is_client;   //since v1.2.5
+    bool is_client;    //since v1.2.5
+#if IOEVENT_USE_URING
+    bool use_io_uring; //since v1.2.9
+    bool use_send_zc;  //since v1.2.9
+#endif
     SFAddressFamily address_family;
     SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
 

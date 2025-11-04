@@ -47,9 +47,13 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {{'\0'}, NULL, 0, false, sf_address_family_auto,
-    {{AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}},
-        {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},
+SFContext g_sf_context = {{'\0'}, NULL, 0, false,
+#if IOEVENT_USE_URING
+    false, false,
+#endif
+    sf_address_family_auto, {{AF_UNSPEC, {{true, fc_comm_type_sock},
+        {false, fc_comm_type_rdma}}},
+    {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},
     {DEFAULT_MAX_CONNECTONS, SF_DEF_MAX_PACKAGE_SIZE, SF_DEF_MIN_BUFF_SIZE,
     SF_DEF_MAX_BUFF_SIZE}, 1, DEFAULT_WORK_THREADS, 0, true, true,
     {false, 0, 0}, {sf_task_finish_clean_up}
@@ -477,8 +481,7 @@ static int load_rdma_apis(SFContext *sf_context, SFNetworkHandler *handler)
 }
 
 static int init_network_handler(SFContext *sf_context,
-        SFNetworkHandler *handler, SFAddressFamilyHandler *fh,
-        const bool use_send_zc)
+        SFNetworkHandler *handler, SFAddressFamilyHandler *fh)
 {
     handler->fh = fh;
     handler->inner.handler = handler;
@@ -499,18 +502,10 @@ static int init_network_handler(SFContext *sf_context,
         handler->send_data = sf_socket_send_data;
         handler->recv_data = sf_socket_recv_data;
         handler->post_recv = NULL;
-#if IOEVENT_USE_URING
-        handler->use_io_uring = true;
-        handler->use_send_zc = use_send_zc;
-#else
-        handler->use_io_uring = false;
-        handler->use_send_zc = false;
-#endif
         return 0;
     } else {
         handler->inner.id = NULL;
         handler->outer.id = NULL;
-        handler->use_io_uring = false;
         return load_rdma_apis(sf_context, handler);
     }
 }
@@ -748,9 +743,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
             if (!handler->enabled) {
                 continue;
             }
-            if ((result=init_network_handler(sf_context, handler,
-                            fh, use_send_zc)) != 0)
-            {
+            if ((result=init_network_handler(sf_context, handler, fh)) != 0) {
                 return result;
             }
         }
@@ -769,8 +762,12 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         rdma_handler->inner.enabled = sock_handler->inner.enabled;
         rdma_handler->outer.port = sock_handler->outer.port;
         rdma_handler->outer.enabled = sock_handler->outer.enabled;
-
     }
+
+#if IOEVENT_USE_URING
+    sf_context->use_io_uring = (config->comm_type == fc_comm_type_sock);
+    sf_context->use_send_zc = use_send_zc;
+#endif
 
     sf_context->accept_threads = iniGetIntValue(
             config->ini_ctx.section_name,
@@ -907,31 +904,6 @@ static const char *get_address_family_caption(
     }
 }
 
-#if IOEVENT_USE_URING
-static void get_io_uring_configs(const SFContext *sf_context,
-        bool *use_io_uring, bool *use_send_zc)
-{
-    int i;
-    const SFAddressFamilyHandler *fh;
-    const SFNetworkHandler *handler;
-    const SFNetworkHandler *end;
-
-    *use_io_uring = false;
-    *use_send_zc = false;
-    for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
-        fh = sf_context->handlers + i;
-        end = fh->handlers + SF_NETWORK_HANDLER_COUNT;
-        for (handler=fh->handlers; handler<end; handler++) {
-            if (handler->enabled && handler->use_io_uring) {
-                *use_io_uring = true;
-                *use_send_zc = handler->use_send_zc;
-                return;
-            }
-        }
-    }
-}
-#endif
-
 void sf_context_config_to_string(const SFContext *sf_context,
         char *output, const int size)
 {
@@ -941,10 +913,6 @@ void sf_context_config_to_string(const SFContext *sf_context,
     char outer_bind_addr[2 * IP_ADDRESS_SIZE + 2];
     int i;
     int len;
-#if IOEVENT_USE_URING
-    bool use_io_uring;
-    bool use_send_zc;
-#endif
 
     *inner_bind_addr = '\0';
     *outer_bind_addr = '\0';
@@ -987,9 +955,9 @@ void sf_context_config_to_string(const SFContext *sf_context,
             sf_context->accept_threads, sf_context->work_threads);
 
 #if IOEVENT_USE_URING
-    get_io_uring_configs(sf_context, &use_io_uring, &use_send_zc);
-    len += snprintf(output + len, size - len, ", use_io_uring=%d"
-            ", use_send_zc=%d", use_io_uring, use_send_zc);
+    len += snprintf(output + len, size - len, ", use_io_uring=%d, "
+            "use_send_zc=%d", sf_context->use_io_uring,
+            sf_context->use_send_zc);
 #endif
 }
 
@@ -1040,10 +1008,6 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
-#if IOEVENT_USE_URING
-    bool use_io_uring;
-    bool use_send_zc;
-#endif
     char pkg_buff[256];
 
     max_pkg_size = g_sf_global_vars.net_buffer_cfg.max_pkg_size -
@@ -1073,10 +1037,9 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             g_sf_global_vars.thread_stack_size / 1024, pkg_buff);
 
 #if IOEVENT_USE_URING
-    get_io_uring_configs(&g_sf_context, &use_io_uring, &use_send_zc);
-    len += snprintf(output + len, size - len,
-            "use_io_uring=%d, use_send_zc=%d, ",
-            use_io_uring, use_send_zc);
+    len += snprintf(output + len, size - len, "use_io_uring=%d, "
+            "use_send_zc=%d, ", g_sf_context.use_io_uring,
+            g_sf_context.use_send_zc);
 #endif
 
     len += snprintf(output + len, size - len,

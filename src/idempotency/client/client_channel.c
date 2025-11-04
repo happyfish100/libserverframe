@@ -217,7 +217,9 @@ int idempotency_client_channel_check_reconnect(
     char formatted_ip[FORMATTED_IP_SIZE];
 
 #if IOEVENT_USE_URING
-    if (FC_ATOMIC_GET(channel->task->reffer_count) > 1) {
+    struct fast_task_info *task;
+    task = channel->task;
+    if (SF_CTX->use_io_uring && FC_ATOMIC_GET(task->reffer_count) > 1) {
         return 0;
     }
 #endif

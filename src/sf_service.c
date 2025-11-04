@@ -33,7 +33,6 @@
 #include "fastcommon/sched_thread.h"
 #include "fastcommon/ioevent_loop.h"
 #include "fastcommon/fc_memory.h"
-#include "sf_nio.h"
 #include "sf_proto.h"
 #include "sf_util.h"
 #include "sf_service.h"
@@ -242,8 +241,9 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             thread_data->arg = NULL;
         }
 
-        if ((result=ioevent_init(&thread_data->ev_puller, sf_context->name,
-                        max_entries, net_timeout_ms, extra_events)) != 0)
+        if ((result=ioevent_init(&thread_data->ev_puller, sf_context->
+                        name, sf_context->use_io_uring, max_entries,
+                        net_timeout_ms, extra_events)) != 0)
         {
             char prompt[256];
 #if IOEVENT_USE_URING

@@ -27,6 +27,7 @@
 #include "sf_types.h"
 #include "sf_proto.h"
 #include "sf_global.h"
+#include "sf_nio.h"
 
 typedef void* (*sf_alloc_thread_extra_data_callback)(const int thread_index);
 typedef void (*sf_sig_quit_handler)(int sig);
@@ -225,7 +226,7 @@ static inline void sf_release_task(struct fast_task_info *task)
                 */
 
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             task->handler->close_connection(task);
             __sync_fetch_and_sub(&g_sf_global_vars.
                     connection_stat.current_count, 1);

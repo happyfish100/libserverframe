@@ -73,11 +73,7 @@ static int sf_uring_cancel_done(int sock, const int event, void *arg)
 
     task = (struct fast_task_info *)arg;
     if (event != IOEVENT_TIMEOUT) {
-        if (task->handler->use_io_uring || (FC_URING_OP_TYPE(task) !=
-                    IORING_OP_NOP && task->event.res == -ECANCELED))
-        {
-            CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
-        }
+        CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
     }
     return 0;
 }
@@ -86,18 +82,16 @@ static int sf_uring_cancel_done(int sock, const int event, void *arg)
 void sf_task_detach_thread(struct fast_task_info *task)
 {
 #if IOEVENT_USE_URING
-    bool need_cancel;
-    if (task->handler->use_io_uring) {
-        need_cancel = (FC_URING_OP_TYPE(task) != IORING_OP_NOP);
+    if (SF_CTX->use_io_uring) {
+        if (FC_URING_OP_TYPE(task) != IORING_OP_NOP) {
+            task->event.callback = (IOEventCallback)sf_uring_cancel_done;
+            uring_prep_cancel(task);
+        }
     } else {
-        need_cancel = true;
+#endif
+        ioevent_detach(&task->thread_data->ev_puller, task->event.fd);
+#if IOEVENT_USE_URING
     }
-    if (need_cancel) {
-        task->event.callback = (IOEventCallback)sf_uring_cancel_done;
-        uring_prep_cancel(task);
-    }
-#else
-    ioevent_detach(&task->thread_data->ev_puller, task->event.fd);
 #endif
 
     if (task->event.timer.expires > 0) {
@@ -128,7 +122,7 @@ static inline void release_iovec_buffer(struct fast_task_info *task)
 void sf_socket_close_connection(struct fast_task_info *task)
 {
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         if (uring_prep_close_fd(task) != 0) {
             close(task->event.fd);
         }
@@ -152,7 +146,7 @@ void sf_task_finish_clean_up(struct fast_task_info *task)
     sf_task_detach_thread(task);
 
 #if IOEVENT_USE_URING
-    if (!task->handler->use_io_uring) {
+    if (!SF_CTX->use_io_uring) {
 #endif
         task->handler->close_connection(task);
         __sync_fetch_and_sub(&g_sf_global_vars.
@@ -225,7 +219,7 @@ static inline int set_read_event(struct fast_task_info *task)
     int result;
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         if (FC_URING_OP_TYPE(task) != IORING_OP_NOP) {
             if (FC_URING_OP_TYPE(task) == IORING_OP_RECV) {
                 logWarning("file: "__FILE__", line: %d, "
@@ -276,7 +270,7 @@ static inline int set_read_event(struct fast_task_info *task)
 int sf_set_read_event(struct fast_task_info *task)
 {
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         return 0;
     }
 #endif
@@ -295,8 +289,7 @@ static inline int sf_ioevent_add(struct fast_task_info *task)
 
     result = ioevent_set(task, task->thread_data, task->event.fd,
             IOEVENT_READ, (IOEventCallback)sf_client_sock_read,
-            SF_CTX->net_buffer_cfg.network_timeout,
-            task->handler->use_io_uring);
+            SF_CTX->net_buffer_cfg.network_timeout);
     return result > 0 ? -1 * result : result;
 }
 
@@ -338,7 +331,7 @@ static int sf_client_connect_done(int sock, const int event, void *arg)
     task = (struct fast_task_info *)arg;
     if (task->canceled) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
+        if (SF_CTX->use_io_uring && event != IOEVENT_TIMEOUT) {
             CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
         }
 #endif
@@ -349,7 +342,7 @@ static int sf_client_connect_done(int sock, const int event, void *arg)
         result = ETIMEDOUT;
     } else {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
             result = (task->event.res < 0 ? -1 * task->event.res :
                     task->event.res);
@@ -394,7 +387,7 @@ int sf_socket_async_connect_server(struct fast_task_info *task)
     int result;
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         if ((result=uring_prep_connect(task)) != 0) {
             return result;
         }
@@ -423,7 +416,7 @@ static int sf_async_connect_server(struct fast_task_info *task)
         result = ioevent_set(task, task->thread_data, task->event.fd,
                 IOEVENT_READ | IOEVENT_WRITE, (IOEventCallback)
                 sf_client_connect_done, SF_CTX->net_buffer_cfg.
-                connect_timeout, task->handler->use_io_uring);
+                connect_timeout);
         return result > 0 ? -1 * result : result;
     } else {
         if (SF_CTX->callbacks.connect_done != NULL) {
@@ -472,7 +465,7 @@ static int sf_nio_deal_task(struct fast_task_info *task, const int stage)
         case SF_NIO_STAGE_RECV:
             task->nio_stages.current = SF_NIO_STAGE_RECV;
             if ((result=set_read_event(task)) == 0) {
-                if (!task->handler->use_io_uring) {
+                if (!SF_CTX->use_io_uring) {
                     if (sf_client_sock_read(task->event.fd,
                                 IOEVENT_READ, task) < 0)
                     {
@@ -655,11 +648,11 @@ int sf_send_add_event(struct fast_task_info *task)
         /* direct send */
         task->nio_stages.current = SF_NIO_STAGE_SEND;
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             if (task->event.callback != (IOEventCallback)sf_client_sock_write) {
                 task->event.callback = (IOEventCallback)sf_client_sock_write;
             }
-            if (task->handler->use_send_zc) {
+            if (SF_CTX->use_send_zc) {
                 return uring_prep_first_send_zc(task);
             } else {
                 return uring_prep_first_send(task);
@@ -699,7 +692,7 @@ static inline int check_task(struct fast_task_info *task,
     }
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         logWarning("file: "__FILE__", line: %d, "
                 "client ip: %s, event: %d, expect stage: %d, "
                 "but current stage: %d, close connection",
@@ -729,7 +722,7 @@ static inline int check_task(struct fast_task_info *task,
 #if IOEVENT_USE_URING
 static inline int prepare_next_send(struct fast_task_info *task)
 {
-    if (task->handler->use_send_zc) {
+    if (SF_CTX->use_send_zc) {
         return uring_prep_next_send_zc(task);
     } else {
         return uring_prep_next_send(task);
@@ -744,7 +737,7 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
     int result;
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         bytes = task->event.res;
     } else {
 #endif
@@ -762,7 +755,7 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
 
     if (bytes < 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             result = -bytes;
         } else {
 #endif
@@ -772,7 +765,7 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
 #endif
         if (result == EAGAIN || result == EWOULDBLOCK) {
 #if IOEVENT_USE_URING
-            if (task->handler->use_io_uring) {
+            if (SF_CTX->use_io_uring) {
                 if (prepare_next_send(task) != 0) {
                     return -1;
                 }
@@ -787,7 +780,7 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
 
             *action = sf_comm_action_break;
             return 0;
-        } else if (result == EINTR && !task->handler->use_io_uring) {
+        } else if (result == EINTR && !SF_CTX->use_io_uring) {
             /* should try again */
             logDebug("file: "__FILE__", line: %d, "
                     "client ip: %s, ignore interupt signal",
@@ -814,8 +807,8 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
     task->send.ptr->offset += bytes;
     if (task->send.ptr->offset >= task->send.ptr->length) {
 #if IOEVENT_USE_URING
-        if (FC_URING_IS_SEND_ZC(task) && task->thread_data->
-                ev_puller.send_zc_done_notify)
+        if (SF_CTX->use_io_uring && FC_URING_IS_SEND_ZC(task) &&
+                task->thread_data->ev_puller.send_zc_done_notify)
         {
             *action = sf_comm_action_break;
             *send_done = false;
@@ -863,7 +856,7 @@ ssize_t sf_socket_send_data(struct fast_task_info *task,
         }
 
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             if (!(FC_URING_IS_SEND_ZC(task) && task->thread_data->
                         ev_puller.send_zc_done_notify))
             {
@@ -894,7 +887,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
     bool new_alloc;
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         bytes = task->event.res;
     } else {
 #endif
@@ -919,7 +912,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
 
     if (bytes < 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             result = -bytes;
         } else {
 #endif
@@ -929,7 +922,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
 #endif
         if (result == EAGAIN || result == EWOULDBLOCK) {
 #if IOEVENT_USE_URING
-            if (task->handler->use_io_uring) {
+            if (SF_CTX->use_io_uring) {
                 if (prepare_next_recv(task) != 0) {
                     return -1;
                 }
@@ -937,7 +930,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
 #endif
             *action = sf_comm_action_break;
             return 0;
-        } else if (result == EINTR && !task->handler->use_io_uring) {
+        } else if (result == EINTR && !SF_CTX->use_io_uring) {
             /* should try again */
             logDebug("file: "__FILE__", line: %d, "
                     "client ip: %s, ignore interupt signal",
@@ -982,7 +975,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
     if (task->recv.ptr->length == 0) { //pkg header
         if (task->recv.ptr->offset < SF_CTX->header_size) {
 #if IOEVENT_USE_URING
-            if (task->handler->use_io_uring) {
+            if (SF_CTX->use_io_uring) {
                 if (prepare_next_recv(task) != 0) {
                     return -1;
                 }
@@ -1046,7 +1039,7 @@ ssize_t sf_socket_recv_data(struct fast_task_info *task,
         *action = sf_comm_action_finish;
     } else {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring) {
+        if (SF_CTX->use_io_uring) {
             if (prepare_next_recv(task) != 0) {
                 return -1;
             }
@@ -1205,7 +1198,7 @@ static int sf_client_sock_read(int sock, const int event, void *arg)
     task = (struct fast_task_info *)arg;
     if ((result=check_task(task, event, SF_NIO_STAGE_RECV)) != 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
+        if (SF_CTX->use_io_uring && event != IOEVENT_TIMEOUT) {
             CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
         }
 #endif
@@ -1245,7 +1238,7 @@ static int sf_client_sock_read(int sock, const int event, void *arg)
     }
 
 #if IOEVENT_USE_URING
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         CLEAR_OP_TYPE_AND_RELEASE_TASK(task);
     }
 #endif
@@ -1320,7 +1313,7 @@ static int sock_write_done(struct fast_task_info *task,
     }
 
 #if IOEVENT_USE_URING
-    if (!task->handler->use_io_uring || task->nio_stages.
+    if (!SF_CTX->use_io_uring || task->nio_stages.
             current == SF_NIO_STAGE_RECV)
     {
 #endif
@@ -1349,7 +1342,7 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
     task = (struct fast_task_info *)arg;
     if ((result=check_task(task, event, SF_NIO_STAGE_SEND)) != 0) {
 #if IOEVENT_USE_URING
-        if (task->handler->use_io_uring && event != IOEVENT_TIMEOUT) {
+        if (SF_CTX->use_io_uring && event != IOEVENT_TIMEOUT) {
             if (event == IOEVENT_NOTIFY || !(FC_URING_IS_SEND_ZC(task) &&
                         task->thread_data->ev_puller.send_zc_done_notify))
             {
@@ -1398,7 +1391,7 @@ static int sf_client_sock_write(int sock, const int event, void *arg)
         return result == 0 ? 0 : -1;
     }
 
-    if (task->handler->use_io_uring) {
+    if (SF_CTX->use_io_uring) {
         if (!(FC_URING_IS_SEND_ZC(task) && task->thread_data->
                     ev_puller.send_zc_done_notify))
         {
