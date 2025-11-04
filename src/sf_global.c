@@ -47,9 +47,9 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {{'\0'}, NULL, 0, false,
+SFContext g_sf_context = {{'\0'}, NULL, 0, false, false,
 #if IOEVENT_USE_URING
-    false, false,
+    false,
 #endif
     sf_address_family_auto, {{AF_UNSPEC, {{true, fc_comm_type_sock},
         {false, fc_comm_type_rdma}}},
@@ -673,8 +673,10 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     int inner_port;
     int outer_port;
     int port;
+#if IOEVENT_USE_URING
     bool global_use_send_zc;
     bool use_send_zc;
+#endif
     int i;
     int result;
 
@@ -711,6 +713,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         outer_port = config->default_outer_port;
     }
 
+#if IOEVENT_USE_URING
     global_use_send_zc = iniGetBoolValue(NULL, "use_send_zc",
             config->ini_ctx.context, true);
     if (config->ini_ctx.section_name == NULL) {
@@ -719,6 +722,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
         use_send_zc = iniGetBoolValue(config->ini_ctx.section_name,
                 "use_send_zc", config->ini_ctx.context, global_use_send_zc);
     }
+#endif
 
     for (i=0; i<SF_ADDRESS_FAMILY_COUNT; i++) {
         fh = sf_context->handlers + i;
@@ -767,6 +771,8 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
 #if IOEVENT_USE_URING
     sf_context->use_io_uring = (config->comm_type == fc_comm_type_sock);
     sf_context->use_send_zc = use_send_zc;
+#else
+    sf_context->use_io_uring = false;
 #endif
 
     sf_context->accept_threads = iniGetIntValue(

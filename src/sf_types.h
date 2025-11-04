@@ -181,8 +181,8 @@ typedef struct sf_context {
     volatile int thread_count;
 
     bool is_client;    //since v1.2.5
-#if IOEVENT_USE_URING
     bool use_io_uring; //since v1.2.9
+#if IOEVENT_USE_URING
     bool use_send_zc;  //since v1.2.9
 #endif
     SFAddressFamily address_family;
