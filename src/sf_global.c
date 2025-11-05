@@ -770,7 +770,7 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
 
 #if IOEVENT_USE_URING
     sf_context->use_io_uring = (config->comm_type == fc_comm_type_sock);
-    sf_context->use_send_zc = use_send_zc;
+    sf_context->use_send_zc = sf_context->use_io_uring ? use_send_zc : false;
 #else
     sf_context->use_io_uring = false;
 #endif

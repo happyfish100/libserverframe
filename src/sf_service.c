@@ -189,7 +189,15 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
 
     max_entries = (sf_context->net_buffer_cfg.max_connections +
             sf_context->work_threads - 1) / sf_context->work_threads;
-    if (strcmp(sf_context->name, "service") == 0) {
+    if (strcmp(sf_context->name, "cluster") == 0 ||
+            strcmp(sf_context->name, "replica") == 0)
+    {
+        if (max_entries < 1024) {
+            max_entries += 8;
+        } else {
+            max_entries = 1024;
+        }
+    } else {
         if (max_entries < 4 * 1024) {
             max_entries = max_entries * 2;
         } else if (max_entries < 8 * 1024) {
@@ -198,23 +206,19 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
             max_entries = (max_entries * 5) / 4;
         } else if (max_entries < 32 * 1024) {
             max_entries = (max_entries * 6) / 5;
-#if IOEVENT_USE_URING
-            if (max_entries > 32 * 1024) {
-                max_entries = 32 * 1024;
-            }
-#else
         } else if (max_entries < 64 * 1024) {
             max_entries = (max_entries * 11) / 10;
         } else if (max_entries < 128 * 1024) {
             max_entries = (max_entries * 21) / 20;
+        }
+
+#if IOEVENT_USE_URING
+        if (sf_context->use_io_uring) {
+            if (max_entries > 32 * 1024) {
+                max_entries = 32 * 1024;
+            }
+        }
 #endif
-        }
-    } else {
-        if (max_entries < 1024) {
-            max_entries += 8;
-        } else {
-            max_entries = 1024;
-        }
     }
 
     g_current_time = time(NULL);
@@ -247,18 +251,23 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         {
             char prompt[256];
 #if IOEVENT_USE_URING
-            if (result == EPERM) {
-                strcpy(prompt, " make sure kernel.io_uring_disabled set to 0");
-            } else if (result == EINVAL) {
-                sprintf(prompt, " maybe max_connections: %d is too large"
-                        " or [%s]'s work_threads: %d is too small",
-                        sf_context->net_buffer_cfg.max_connections,
-                        sf_context->name, sf_context->work_threads);
+            if (sf_context->use_io_uring) {
+                if (result == EPERM) {
+                    strcpy(prompt, " make sure kernel."
+                            "io_uring_disabled set to 0");
+                } else if (result == EINVAL) {
+                    sprintf(prompt, " maybe max_connections: %d is too large"
+                            " or [%s]'s work_threads: %d is too small",
+                            sf_context->net_buffer_cfg.max_connections,
+                            sf_context->name, sf_context->work_threads);
+                } else {
+                    *prompt = '\0';
+                }
             } else {
+#endif
                 *prompt = '\0';
+#if IOEVENT_USE_URING
             }
-#else
-            *prompt = '\0';
 #endif
 
             logError("file: "__FILE__", line: %d, "
@@ -268,7 +277,7 @@ int sf_service_init_ex2(SFContext *sf_context, const char *name,
         }
 
 #if IOEVENT_USE_URING
-        if (send_done_callback != NULL) {
+        if (sf_context->use_io_uring && send_done_callback != NULL) {
             ioevent_set_send_zc_done_notify(&thread_data->ev_puller, true);
         }
 #endif
