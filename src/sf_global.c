@@ -47,10 +47,7 @@ SFGlobalVariables g_sf_global_vars = {
     {0, 0}, NULL, {NULL, 0}
 };
 
-SFContext g_sf_context = {{'\0'}, NULL, 0, false, false,
-#if IOEVENT_USE_URING
-    false,
-#endif
+SFContext g_sf_context = {{'\0'}, NULL, 0, false, false, false,
     sf_address_family_auto, {{AF_UNSPEC, {{true, fc_comm_type_sock},
         {false, fc_comm_type_rdma}}},
     {AF_UNSPEC, {{true, fc_comm_type_sock}, {false, fc_comm_type_rdma}}}},

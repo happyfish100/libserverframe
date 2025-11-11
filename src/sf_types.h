@@ -182,9 +182,7 @@ typedef struct sf_context {
 
     bool is_client;    //since v1.2.5
     bool use_io_uring; //since v1.2.9
-#if IOEVENT_USE_URING
     bool use_send_zc;  //since v1.2.9
-#endif
     SFAddressFamily address_family;
     SFAddressFamilyHandler handlers[SF_ADDRESS_FAMILY_COUNT];
 
