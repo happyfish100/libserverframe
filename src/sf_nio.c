@@ -137,11 +137,6 @@ void sf_socket_close_connection(struct fast_task_info *task)
 
 void sf_task_finish_clean_up(struct fast_task_info *task)
 {
-    if (task->finish_callback != NULL) {
-        task->finish_callback(task);
-        task->finish_callback = NULL;
-    }
-
     release_iovec_buffer(task);
     sf_task_detach_thread(task);
 
