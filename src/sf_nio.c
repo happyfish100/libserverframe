@@ -544,6 +544,7 @@ int sf_nio_notify(struct fast_task_info *task, const int stage)
         }
     }
 
+    sf_hold_task(task);  //since 1.2.11
     PTHREAD_MUTEX_LOCK(&task->thread_data->waiting_queue.lock);
     task->notify_next = NULL;
     if (task->thread_data->waiting_queue.tail == NULL) {
@@ -633,6 +634,7 @@ void sf_recv_notify_read(int fd, const int event, void *arg)
             __sync_bool_compare_and_swap(&task->nio_stages.notify,
                     stage, SF_NIO_STAGE_NONE);
         }
+        sf_release_task(task);  //since 1.2.11
     }
 }
 
@@ -1299,6 +1301,7 @@ static int sock_write_done(struct fast_task_info *task,
         if (SF_CTX->callbacks.send_done(task,
                     length, &next_stage) != 0)
         {
+            ioevent_add_to_deleted_list(task);
             return -1;
         }
 
