@@ -671,7 +671,9 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     int outer_port;
     int port;
 #if IOEVENT_USE_URING
+    bool global_use_io_uring;
     bool global_use_send_zc;
+    bool use_io_uring;
     bool use_send_zc;
 #endif
     int i;
@@ -711,6 +713,15 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
 #if IOEVENT_USE_URING
+    global_use_io_uring = iniGetBoolValue(NULL, "use_io_uring",
+            config->ini_ctx.context, false);
+    if (config->ini_ctx.section_name == NULL) {
+        use_io_uring = global_use_io_uring;
+    } else {
+        use_io_uring = iniGetBoolValue(config->ini_ctx.section_name,
+                "use_io_uring", config->ini_ctx.context, global_use_io_uring);
+    }
+
     global_use_send_zc = iniGetBoolValue(NULL, "use_send_zc",
             config->ini_ctx.context, true);
     if (config->ini_ctx.section_name == NULL) {
@@ -766,7 +777,11 @@ int sf_load_context_from_config_ex(SFContext *sf_context,
     }
 
 #if IOEVENT_USE_URING
-    sf_context->use_io_uring = (config->comm_type == fc_comm_type_sock);
+    if (config->comm_type == fc_comm_type_sock) {
+        sf_context->use_io_uring = use_io_uring;
+    } else {
+        sf_context->use_io_uring = false;
+    }
     sf_context->use_send_zc = sf_context->use_io_uring ? use_send_zc : false;
 #else
     sf_context->use_io_uring = false;
