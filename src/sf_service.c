@@ -892,7 +892,7 @@ void sf_set_current_time()
 {
     g_current_time = time(NULL);
     g_sf_global_vars.up_time = g_current_time;
-    srand(g_sf_global_vars.up_time);
+    set_rand_seed();
 }
 
 int sf_global_init(const char *log_filename_prefix)
