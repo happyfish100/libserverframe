@@ -295,7 +295,8 @@ static inline void inc_connection_current_count()
     current_connections = FC_ATOMIC_INC(g_sf_global_vars.
             connection_stat.current_count);
     if (current_connections > g_sf_global_vars.connection_stat.max_count) {
-        g_sf_global_vars.connection_stat.max_count = current_connections;
+        FC_ATOMIC_SET_LARGER(g_sf_global_vars.connection_stat.
+                max_count, current_connections);
     }
 }
 
