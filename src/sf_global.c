@@ -32,6 +32,8 @@
 #include "fastcommon/process_ctrl.h"
 #include "fastcommon/local_ip_func.h"
 #include "fastcommon/logger.h"
+#include "fastcommon/fc_version.h"
+#include "sf_version.h"
 #include "sf_nio.h"
 #include "sf_service.h"
 #include "sf_global.h"
@@ -1026,6 +1028,8 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
     int max_pkg_size;
     int min_buff_size;
     int max_buff_size;
+    Version fc_ver;
+    Version sf_ver;
     char pkg_buff[256];
 
     max_pkg_size = g_sf_global_vars.net_buffer_cfg.max_pkg_size -
@@ -1045,9 +1049,18 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
                 min_buff_size / 1024, max_buff_size / 1024);
     }
 
-    len = snprintf(output, size,
+    fc_version(&fc_ver);
+    sf_version(&sf_ver);
+    len = snprintf(output, size, "libfastcommon version "
+            "{compile: %d.%d.%d, runtime: %d.%d.%d}, "
+            "libserverframe version "
+            "{compile: %d.%d.%d, runtime: %d.%d.%d}, "
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%d KB, %s, ",
+            FC_MAJOR_VERSION, FC_MINOR_VERSION, FC_PATCH_VERSION,
+            fc_ver.major, fc_ver.minor, fc_ver.patch,
+            SF_MAJOR_VERSION, SF_MINOR_VERSION, SF_PATCH_VERSION,
+            sf_ver.major, sf_ver.minor, sf_ver.patch,
             SF_G_BASE_PATH_STR,
             g_sf_global_vars.net_buffer_cfg.max_connections,
             g_sf_global_vars.net_buffer_cfg.connect_timeout,
