@@ -15,9 +15,10 @@
 
 #include "sf_version.h"
 
-void sf_version(Version *version)
+int sf_version(Version *version)
 {
     version->major = SF_MAJOR_VERSION;
     version->minor = SF_MINOR_VERSION;
     version->patch = SF_PATCH_VERSION;
+    return FC_VERSION_TO_INT1(*version);
 }

@@ -1030,6 +1030,8 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
     int max_buff_size;
     Version fc_ver;
     Version sf_ver;
+    int fc_ver_int;
+    int sf_ver_int;
     char pkg_buff[256];
 
     max_pkg_size = g_sf_global_vars.net_buffer_cfg.max_pkg_size -
@@ -1049,17 +1051,19 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
                 min_buff_size / 1024, max_buff_size / 1024);
     }
 
-    fc_version(&fc_ver);
-    sf_version(&sf_ver);
+    fc_ver_int = fc_version(&fc_ver);
+    sf_ver_int = sf_version(&sf_ver);
     len = snprintf(output, size, "libfastcommon version "
-            "{compile: %d.%d.%d, runtime: %d.%d.%d}, "
+            "{compile: %d.%d.%d %s runtime: %d.%d.%d}, "
             "libserverframe version "
-            "{compile: %d.%d.%d, runtime: %d.%d.%d}, "
+            "{compile: %d.%d.%d %s runtime: %d.%d.%d}, "
             "base_path=%s, max_connections=%d, connect_timeout=%d, "
             "network_timeout=%d, thread_stack_size=%d KB, %s, ",
             FC_MAJOR_VERSION, FC_MINOR_VERSION, FC_PATCH_VERSION,
+            FC_COMPARE_INT_VERSIONS_TO_OPERATOR_STR(FC_VERSION_INT, fc_ver_int),
             fc_ver.major, fc_ver.minor, fc_ver.patch,
             SF_MAJOR_VERSION, SF_MINOR_VERSION, SF_PATCH_VERSION,
+            FC_COMPARE_INT_VERSIONS_TO_OPERATOR_STR(SF_VERSION_INT, sf_ver_int),
             sf_ver.major, sf_ver.minor, sf_ver.patch,
             SF_G_BASE_PATH_STR,
             g_sf_global_vars.net_buffer_cfg.max_connections,

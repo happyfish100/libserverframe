@@ -24,11 +24,14 @@
 #define SF_MINOR_VERSION   2
 #define SF_PATCH_VERSION  13
 
+#define SF_VERSION_INT  FC_VERSION_TO_INT(SF_MAJOR_VERSION, \
+        SF_MINOR_VERSION, SF_PATCH_VERSION)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    void sf_version(Version *version);
+    int sf_version(Version *version);
 
 #ifdef __cplusplus
 }
