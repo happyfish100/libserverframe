@@ -641,12 +641,12 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
     char time_buff[32];
 
     if (ctx->log_level != LOG_NOTHING && ctx->response.error.length > 0) {
+        format_ip_address(task->client_ip, formatted_ip);
         log_it_ex(&g_log_context, ctx->log_level,
                 "file: "__FILE__", line: %d, %s "
                 "peer %s:%u, cmd: %d (%s), req body length: %d, "
                 "resp status: %d, %s", __LINE__, service_name,
-                format_ip_address(task->client_ip, formatted_ip),
-                task->port, ctx->request.header.cmd,
+                formatted_ip, task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.status,
                 ctx->response.error.message);
@@ -656,11 +656,11 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         if (sf_handler_ctx.callbacks.get_cmd_log_level != NULL) {
             time_used = get_current_time_us() - ctx->req_start_time;
             log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
+            format_ip_address(task->client_ip, formatted_ip);
             log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
                     "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
                     "resp status: %d, time used: %s us", __LINE__, service_name,
-                    format_ip_address(task->client_ip, formatted_ip),
-                    task->port, ctx->request.header.cmd,
+                    formatted_ip, task->port, ctx->request.header.cmd,
                     GET_CMD_CAPTION(ctx->request.header.cmd),
                     ctx->request.header.body_len, ctx->response.header.status,
                     long_to_comma_str(time_used, time_buff));
@@ -698,12 +698,12 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
         char buff[256];
         int blen;
 
+        format_ip_address(task->client_ip, formatted_ip);
         blen = sprintf(buff, "timed used: %s us, %s client %s:%u, "
                 "req cmd: %d (%s), req body len: %d, resp cmd: %d (%s), "
                 "status: %d, resp body len: %d", long_to_comma_str(time_used,
-                    time_buff), service_name, format_ip_address(task->
-                        client_ip, formatted_ip), task->port, ctx->request.
-                header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
+                    time_buff), service_name, formatted_ip, task->port, ctx->
+                request.header.cmd, GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
                 GET_CMD_CAPTION(ctx->response.header.cmd),
                 ctx->response.header.status, ctx->response.header.body_len);
@@ -712,12 +712,12 @@ int sf_proto_deal_task_done(struct fast_task_info *task,
 
     if (sf_handler_ctx.callbacks.get_cmd_log_level != NULL) {
         log_level = GET_CMD_LOG_LEVEL(ctx->request.header.cmd);
+        format_ip_address(task->client_ip, formatted_ip);
         log_it_ex(&g_log_context, log_level, "file: "__FILE__", line: %d, "
                 "%s client %s:%u, req cmd: %d (%s), req body_len: %d, "
                 "resp cmd: %d (%s), status: %d, resp body_len: %d, "
                 "time used: %s us", __LINE__, service_name,
-                format_ip_address(task->client_ip, formatted_ip),
-                task->port, ctx->request.header.cmd,
+                formatted_ip, task->port, ctx->request.header.cmd,
                 GET_CMD_CAPTION(ctx->request.header.cmd),
                 ctx->request.header.body_len, ctx->response.header.cmd,
                 GET_CMD_CAPTION(ctx->response.header.cmd),
