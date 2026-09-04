@@ -161,9 +161,9 @@ int sf_load_log_config(IniFullContext *ini_ctx, LogContext *log_ctx,
 {
     int result;
 
-    log_cfg->sync_log_buff_interval = iniGetIntValueEx(
+    log_cfg->sync_log_buff_interval = iniGetTimestampValueEx(
             ini_ctx->section_name, "sync_log_buff_interval",
-            ini_ctx->context, SF_DEF_SYNC_LOG_BUFF_INTERVAL, true);
+            ini_ctx->context, SF_DEF_SYNC_LOG_BUFF_INTERVAL, 1, true);
     if (log_cfg->sync_log_buff_interval <= 0) {
         log_cfg->sync_log_buff_interval = SF_DEF_SYNC_LOG_BUFF_INTERVAL;
     }
