@@ -968,6 +968,9 @@ void sf_context_config_to_string(const SFContext *sf_context,
                 sock_handler->inner.port, inner_bind_addr,
                 sock_handler->outer.port, outer_bind_addr);
     }
+    if (len >= size) {
+        return;
+    }
 
     len += snprintf(output + len, size - len,
             ", address_family=%s, accept_threads=%d, work_threads=%d",
@@ -975,6 +978,9 @@ void sf_context_config_to_string(const SFContext *sf_context,
             sf_context->accept_threads, sf_context->work_threads);
 
 #if IOEVENT_USE_URING
+    if (len >= size) {
+        return;
+    }
     len += snprintf(output + len, size - len, ", use_io_uring=%d, "
             "use_send_zc=%d", sf_context->use_io_uring,
             sf_context->use_send_zc);
@@ -1072,11 +1078,17 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             g_sf_global_vars.thread_stack_size / 1024, pkg_buff);
 
 #if IOEVENT_USE_URING
+    if (len >= size) {
+        return;
+    }
     len += snprintf(output + len, size - len, "use_io_uring=%d, "
             "use_send_zc=%d, ", g_sf_context.use_io_uring,
             g_sf_context.use_send_zc);
 #endif
 
+    if (len >= size) {
+        return;
+    }
     len += snprintf(output + len, size - len,
             "tcp_quick_ack=%d, "
             "log_level=%s, "
@@ -1085,6 +1097,9 @@ void sf_global_config_to_string_ex(const char *max_pkg_size_item_nm,
             log_get_level_caption(),
             g_sf_global_vars.run_by.group,
             g_sf_global_vars.run_by.user);
+    if (len >= size) {
+        return;
+    }
 
     sf_log_config_to_string(&g_sf_global_vars.error_log,
             "error-log", output + len, size - len);
