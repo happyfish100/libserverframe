@@ -755,16 +755,21 @@ static void sigQuitHandler(int sig)
 
 static void sigHupHandler(int sig)
 {
-    logInfo("file: "__FILE__", line: %d, "
-            "catch signal %d, reload log_level from config %s",
-            __LINE__, sig, SF_G_CONFIG_FILENAME);
-    reload_log_level_ex(SF_G_CONFIG_FILENAME);
+    if (SF_G_CONFIG_FILENAME != NULL) {
+        logInfo("file: "__FILE__", line: %d, "
+                "catch signal %d, reload log_level from config %s",
+                __LINE__, sig, SF_G_CONFIG_FILENAME);
+        reload_log_level_ex(SF_G_CONFIG_FILENAME);
+    } else {
+        logInfo("file: "__FILE__", line: %d, "
+                "catch signal %d, ignore it!", __LINE__, sig);
+    }
 }
 
 static void sigUsrHandler(int sig)
 {
     logInfo("file: "__FILE__", line: %d, "
-            "catch signal %d", __LINE__, sig);
+            "catch signal %d, ignore it!", __LINE__, sig);
 }
 
 int sf_setup_signal_handler()
