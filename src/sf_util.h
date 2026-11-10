@@ -69,7 +69,7 @@ __FILE__, eln, eres, emsg, strerror(eres))
 
 #define SF_COMMON_OPT_STRING  "NVh"
 #define SF_COMMON_LONG_OPTIONS  \
-    {"no-daemon", no_argument, NULL, 'N'}, \
+    {"no-daemon", no_argument, NULL, 'N'},   \
     {"version",   no_argument, NULL, 'V'},   \
     {"help",      no_argument, NULL, 'h'}
 

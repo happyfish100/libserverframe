@@ -46,7 +46,7 @@ SFGlobalVariables g_sf_global_vars = {
     SF_DEF_MAX_BUFF_SIZE}, 0, SF_DEF_THREAD_STACK_SIZE, 0,
     {false, 0, 0, {'\0'}, {'\0'}},
     {SF_DEF_SYNC_LOG_BUFF_INTERVAL, false},
-    {0, 0}, NULL, {NULL, 0}
+    {0, 0}, NULL, {NULL, 0}, 0, NULL
 };
 
 SFContext g_sf_context = {{'\0'}, NULL, 0, false, false, false,

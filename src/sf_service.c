@@ -48,10 +48,6 @@ static void sigQuitHandler(int sig);
 static void sigHupHandler(int sig);
 static void sigUsrHandler(int sig);
 
-#if defined(DEBUG_FLAG)
-static void sigDumpHandler(int sig);
-#endif
-
 struct worker_thread_context {
     SFContext *sf_context;
     struct nio_thread_data *thread_data;
@@ -742,26 +738,6 @@ int sf_accept_loop_ex(SFContext *sf_context, const bool blocked)
     return 0;
 }
 
-#if defined(DEBUG_FLAG)
-static void sigDumpHandler(int sig)
-{
-    static bool bDumpFlag = false;
-    char filename[256];
-
-    if (bDumpFlag) {
-        return;
-    }
-
-    bDumpFlag = true;
-
-    snprintf(filename, sizeof(filename), 
-        "%s/logs/sf_dump.log", SF_G_BASE_PATH_STR);
-    //manager_dump_global_vars_to_file(filename);
-
-    bDumpFlag = false;
-}
-#endif
-
 static void sigQuitHandler(int sig)
 {
     if (!terminate_flag) {
@@ -780,13 +756,15 @@ static void sigQuitHandler(int sig)
 static void sigHupHandler(int sig)
 {
     logInfo("file: "__FILE__", line: %d, "
-        "catch signal %d", __LINE__, sig);
+            "catch signal %d, reload log_level from config %s",
+            __LINE__, sig, SF_G_CONFIG_FILENAME);
+    reload_log_level_ex(SF_G_CONFIG_FILENAME);
 }
 
 static void sigUsrHandler(int sig)
 {
     logInfo("file: "__FILE__", line: %d, "
-        "catch signal %d, ignore it", __LINE__, sig);
+            "catch signal %d", __LINE__, sig);
 }
 
 int sf_setup_signal_handler()
@@ -836,20 +814,6 @@ int sf_setup_signal_handler()
         return errno;
     }
 
-#if defined(DEBUG_FLAG)
-    memset(&act, 0, sizeof(act));
-    sigemptyset(&act.sa_mask);
-    act.sa_handler = sigDumpHandler;
-    if(sigaction(SIGUSR1, &act, NULL) < 0 ||
-        sigaction(SIGUSR2, &act, NULL) < 0)
-    {
-        logCrit("file: "__FILE__", line: %d, "
-            "call sigaction fail, errno: %d, error info: %s",
-            __LINE__, errno, strerror(errno));
-        logCrit("exit abnormally!\n");
-        return errno;
-    }
-#endif
     return 0;
 }
 

@@ -60,6 +60,7 @@ typedef struct sf_global_variables {
     sf_error_handler_callback error_handler;
     string_t empty;
     volatile time_t last_binlog_writer_log_timestamp;
+    const char *config_filename;  //since 1.2.16
 } SFGlobalVariables;
 
 typedef struct sf_context_ini_config {
@@ -84,6 +85,7 @@ extern SFContext                 g_sf_context;
 #define SF_G_BASE_PATH_INITED    g_sf_global_vars.base_path.inited
 #define SF_G_BASE_PATH_CREATED   g_sf_global_vars.base_path.created
 #define SF_G_CONTINUE_FLAG       g_sf_global_vars.continue_flag
+#define SF_G_CONFIG_FILENAME     g_sf_global_vars.config_filename
 #define SF_G_CONNECT_TIMEOUT     g_sf_global_vars.net_buffer_cfg.connect_timeout
 #define SF_G_NETWORK_TIMEOUT     g_sf_global_vars.net_buffer_cfg.network_timeout
 #define SF_G_MAX_CONNECTIONS     g_sf_global_vars.net_buffer_cfg.max_connections
