@@ -32,6 +32,11 @@ extern "C" {
     IdempotencyChannel *idempotency_channel_alloc(const uint32_t channel_id,
             const int key);
 
+    static inline void idempotency_channel_hold(IdempotencyChannel *channel)
+    {
+        __sync_add_and_fetch(&channel->ref_count, 1);
+    }
+
     void idempotency_channel_release(IdempotencyChannel *channel,
             const bool is_holder);
 
