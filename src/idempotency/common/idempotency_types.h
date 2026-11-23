@@ -13,14 +13,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 #ifndef _IDEMPOTENCY_COMMON_TYPES_H
 #define _IDEMPOTENCY_COMMON_TYPES_H
 
 #include "fastcommon/common_define.h"
 
 #define SF_IDEMPOTENCY_CHANNEL_ID_BITS    16
-#define SF_IDEMPOTENCY_REQUEST_ID_BITS    (64 - SF_IDEMPOTENCY_CHANNEL_ID_BITS)
 #define SF_IDEMPOTENCY_MAX_CHANNEL_COUNT  ((1 << SF_IDEMPOTENCY_CHANNEL_ID_BITS) - 1)
 #define SF_IDEMPOTENCY_MAX_CHANNEL_ID     SF_IDEMPOTENCY_MAX_CHANNEL_COUNT
 
